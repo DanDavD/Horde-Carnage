@@ -1,0 +1,27 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure
+        run: cmake --preset default
+
+      - name: Build Debug
+        run: cmake --build --preset debug
+
+      - name: Build Release
+        run: cmake --build --preset release
+
+      - name: Test Debug
+        run: ctest --preset debug
+
+      - name: Test Release
+        run: ctest --preset release
