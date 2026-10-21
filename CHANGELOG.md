@@ -12,3 +12,5 @@ Versions follow [Semantic Versioning](https://semver.org/) while the game is a p
 - **Game window** (`Game.h`, `Game.cpp`, `main.cpp`): a 1280x720 window with vsync and a placeholder title screen whose bobbing title is driven by simulation time.
 - **Tests and CI** (`tests/`, `.github/workflows/ci.yml`): doctest unit tests for the pure logic library `horde_core`, run by CTest, and a GitHub Actions workflow that builds Debug and Release and runs the tests on every push to `main` and every pull request.
 - **Docs**: README, CONTRIBUTING, `docs/ARCHITECTURE.md`, `docs/ROADMAP.md` and a pull request template.
+- **Vector math** (`Vec2.h`): a small 2D vector type for `horde_core`, so the pure logic and its tests do not depend on raylib. Covered by `Vec2Tests`.
+- **Movement model** (`Movement.h`, `Movement.cpp`): a `Motion` component and a `StepMovement` function that accelerate toward a target velocity and decelerate when the input is released. Input is clamped to length 1, so a keyboard diagonal is not faster than a straight line and a half-pushed stick gives half speed. Not wired into the game yet. Covered by `MovementTests`, explained in `docs/MOVEMENT.md`.

@@ -1,6 +1,7 @@
 # Pure game logic. The tests link this library, so nothing in it may open a window.
 add_library(horde_core STATIC
-    core/FixedTimestep.cpp)
+    core/FixedTimestep.cpp
+    core/Movement.cpp)
 target_include_directories(horde_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 horde_set_warnings(horde_core)
 

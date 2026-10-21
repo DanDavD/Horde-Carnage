@@ -28,6 +28,10 @@ When a feature has rules (damage, cooldowns, wave timing), the rules go into `ho
 3. Run `Update` that many times, always with the same `dt`.
 4. Draw once, passing `FixedTimestep::Alpha` (how far we are into the next step) so drawing can interpolate between two steps.
 
+### Components and systems
+
+Game objects are plain structs (components) that hold data, and free functions (systems) that update them. The first ones are the `Motion` component and the `StepMovement` system, described in [Movement](MOVEMENT.md). `horde_core` has its own `Vec2` type, so it never includes raylib.
+
 ## Design decisions
 
 - **A fixed timestep instead of updating with the raw frame time.** With a variable `dt`, a fast enemy can jump through a thin wall on a slow frame, and a dash covers a different distance at 60 and 144 FPS. With a fixed step, the same inputs always give the same result, which also makes gameplay bugs reproducible.
@@ -47,6 +51,7 @@ When a feature has rules (damage, cooldowns, wave timing), the rules go into `ho
 ## Tests
 
 - `tests/core/FixedTimestepTests.cpp`: exact steps, accumulation of short frames, the remainder of long frames (`Alpha`), the clamp on huge frames, negative frame times and the 60 Hz default.
+- `tests/core/Vec2Tests.cpp` and `tests/core/MovementTests.cpp`: see [Movement](MOVEMENT.md#tests).
 
 ## Limitations
 
