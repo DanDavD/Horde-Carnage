@@ -28,6 +28,10 @@ When a feature has rules (damage, cooldowns, wave timing), the rules go into `ho
 3. Run `Update` that many times, always with the same `dt`.
 4. Draw once, passing `FixedTimestep::Alpha` (how far we are into the next step) so drawing can interpolate between two steps.
 
+### Components and systems
+
+Game objects are plain structs (components) that hold data, and free functions (systems) that update them. The first ones are the `Motion` component and the `StepMovement`, `UpdateFacing` and `ConfineToArena` systems, described in [Movement](MOVEMENT.md). The camera follows the same shape: a `FollowCamera` component and a `StepFollowCamera` system, described in [Camera](CAMERA.md). The app only turns it into a raylib `Camera2D` when it draws. `Player` is a struct of components, not a class with behaviour. `horde_core` has its own `Vec2` type, so it never includes raylib; the app converts with `ToRaylib` right before drawing.
+
 ## Design decisions
 
 - **A fixed timestep instead of updating with the raw frame time.** With a variable `dt`, a fast enemy can jump through a thin wall on a slow frame, and a dash covers a different distance at 60 and 144 FPS. With a fixed step, the same inputs always give the same result, which also makes gameplay bugs reproducible.
@@ -47,8 +51,9 @@ When a feature has rules (damage, cooldowns, wave timing), the rules go into `ho
 ## Tests
 
 - `tests/core/FixedTimestepTests.cpp`: exact steps, accumulation of short frames, the remainder of long frames (`Alpha`), the clamp on huge frames, negative frame times and the 60 Hz default.
+- `tests/core/Vec2Tests.cpp`, `MovementTests.cpp`, `FacingTests.cpp`, `ArenaTests.cpp` and `AnalogInputTests.cpp`: see [Movement](MOVEMENT.md#tests).
+- `tests/core/FollowCameraTests.cpp`: see [Camera](CAMERA.md#tests).
 
 ## Limitations
 
-- Rendering does not interpolate anything yet, because nothing moves except the title. `Alpha` is already passed to `Draw` for when entities exist.
 - I only build and test on Windows with MSVC. The CMake setup should work with GCC and Clang, but I have not tried it.

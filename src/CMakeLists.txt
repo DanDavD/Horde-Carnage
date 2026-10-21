@@ -1,13 +1,18 @@
 # Pure game logic. The tests link this library, so nothing in it may open a window.
 add_library(horde_core STATIC
-    core/FixedTimestep.cpp)
+    core/Arena.cpp
+    core/Facing.cpp
+    core/FixedTimestep.cpp
+    core/FollowCamera.cpp
+    core/Movement.cpp)
 target_include_directories(horde_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 horde_set_warnings(horde_core)
 
 # The game itself: window, input, rendering and the main loop.
 add_executable(HordeCarnage
     main.cpp
-    app/Game.cpp)
+    app/Game.cpp
+    app/PlayerInput.cpp)
 target_link_libraries(HordeCarnage PRIVATE horde_core raylib)
 target_compile_definitions(HordeCarnage PRIVATE "HORDE_VERSION=\"${PROJECT_VERSION}\"")
 horde_set_warnings(HordeCarnage)

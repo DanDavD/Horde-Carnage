@@ -1,6 +1,8 @@
 #pragma once
 
 #include "core/FixedTimestep.h"
+#include "core/FollowCamera.h"
+#include "core/Player.h"
 
 namespace horde {
 
@@ -21,7 +23,13 @@ private:
     void Draw(float alpha) const;
 
     FixedTimestep _timestep;
-    double _simulationTime = 0.0;
+    Player _player;
+    FollowCamera _camera; ///< Declared after _player: it is built from the player's starting position.
+
+#ifndef NDEBUG
+    bool _showDebugOverlay = false;
+    Vec2 _lastMoveInput; ///< Kept only so the overlay can show what the last step read.
+#endif
 };
 
 } // namespace horde
