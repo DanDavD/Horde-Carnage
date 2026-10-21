@@ -21,6 +21,13 @@ void Step(Motion& motion, Vec2 input, int steps) {
 
 } // namespace
 
+TEST_CASE("a mover spawned with MotionAt starts still, with no jump from the origin") {
+    constexpr Motion motion = horde::MotionAt(Vec2{40.0f, 60.0f});
+    CHECK(motion.position == Vec2{40.0f, 60.0f});
+    CHECK(motion.previousPosition == Vec2{40.0f, 60.0f});
+    CHECK(motion.velocity == Vec2{});
+}
+
 TEST_CASE("with no input a mover at rest stays where it is") {
     Motion motion{.position = {5.0f, 5.0f}};
     Step(motion, Vec2{}, 10);

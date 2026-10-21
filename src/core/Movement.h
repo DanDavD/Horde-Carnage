@@ -22,6 +22,12 @@ struct Motion {
     Vec2 velocity;
 };
 
+/// A mover standing still at `position`. Spawning through this sets `previousPosition` too,
+/// so the first interpolated frame is not drawn from the origin.
+[[nodiscard]] constexpr Motion MotionAt(Vec2 position) {
+    return Motion{.position = position, .previousPosition = position};
+}
+
 /// Advances `motion` by one fixed step of `dt` seconds.
 ///
 /// @param input Where the mover wants to go. Its length is the fraction of top speed (an analog

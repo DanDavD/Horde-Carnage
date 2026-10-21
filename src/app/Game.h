@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/FixedTimestep.h"
+#include "core/Player.h"
 
 namespace horde {
 
@@ -21,7 +22,7 @@ private:
     void Draw(float alpha) const;
 
     FixedTimestep _timestep;
-    double _simulationTime = 0.0;
+    Player _player;
 };
 
 } // namespace horde

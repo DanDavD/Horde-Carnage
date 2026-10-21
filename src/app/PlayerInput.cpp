@@ -1,0 +1,41 @@
+#include "app/PlayerInput.h"
+
+#include <raylib.h>
+
+#include "core/AnalogInput.h"
+
+namespace horde {
+
+namespace {
+
+constexpr int kGamepad = 0;
+constexpr float kStickDeadzone = 0.2f;
+
+float KeyAxis(int negativeKey, int negativeAltKey, int positiveKey, int positiveAltKey) {
+    float axis = 0.0f;
+    if (IsKeyDown(negativeKey) || IsKeyDown(negativeAltKey)) {
+        axis -= 1.0f;
+    }
+    if (IsKeyDown(positiveKey) || IsKeyDown(positiveAltKey)) {
+        axis += 1.0f;
+    }
+    return axis;
+}
+
+} // namespace
+
+Vec2 ReadMoveInput() {
+    const Vec2 keys{KeyAxis(KEY_A, KEY_LEFT, KEY_D, KEY_RIGHT), KeyAxis(KEY_W, KEY_UP, KEY_S, KEY_DOWN)};
+
+    Vec2 stick;
+    if (IsGamepadAvailable(kGamepad)) {
+        const Vec2 raw{GetGamepadAxisMovement(kGamepad, GAMEPAD_AXIS_LEFT_X),
+                       GetGamepadAxisMovement(kGamepad, GAMEPAD_AXIS_LEFT_Y)};
+        stick = ApplyRadialDeadzone(raw, kStickDeadzone);
+    }
+
+    // Both devices add up. StepMovement clamps the sum to length 1, so using both is never faster.
+    return keys + stick;
+}
+
+} // namespace horde
