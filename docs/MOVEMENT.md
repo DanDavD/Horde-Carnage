@@ -32,7 +32,7 @@ Every moving entity has a `Motion` component: `position`, `previousPosition` and
 
 The renderer draws the player at `Lerp(previousPosition, position, alpha)`, where `alpha` comes from `FixedTimestep::Alpha`. That keeps movement smooth on monitors faster than 60 Hz. A dark eye on the player's edge shows `facing`.
 
-World units are pixels for now, and y grows downward like on screen. The arena is 1200x620 and fits the window, so there is no camera yet.
+World units are pixels at camera zoom 1, and y grows downward like on screen. The arena is 2400x1600, bigger than the window, and a camera follows the player. See [Camera](CAMERA.md).
 
 ## Design decisions
 
@@ -73,7 +73,7 @@ Other values:
 |---|---|---|
 | Player body radius | `Player::radius` (`src/core/Player.h`) | 20 units |
 | Stick deadzone | `kStickDeadzone` (`src/app/PlayerInput.cpp`) | 0.2 |
-| Arena rectangle | `kArena` (`src/app/Game.cpp`) | (40, 60) to (1240, 680) |
+| Arena rectangle | `kArena` (`src/app/Game.cpp`) | (0, 0) to (2400, 1600) |
 | Starting facing | `Player::facing` (`src/core/Player.h`) | (0, 1), facing down |
 
 ## Tests

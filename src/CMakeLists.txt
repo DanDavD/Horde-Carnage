@@ -3,6 +3,7 @@ add_library(horde_core STATIC
     core/Arena.cpp
     core/Facing.cpp
     core/FixedTimestep.cpp
+    core/FollowCamera.cpp
     core/Movement.cpp)
 target_include_directories(horde_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 horde_set_warnings(horde_core)
