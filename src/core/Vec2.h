@@ -45,6 +45,20 @@ struct Vec2 {
     return std::sqrt(LengthSquared(v));
 }
 
+/// Positive when `a` and `b` point roughly the same way, negative when they point apart, zero at 90 degrees.
+[[nodiscard]] constexpr float Dot(Vec2 a, Vec2 b) {
+    return a.x * b.x + a.y * b.y;
+}
+
+/// Returns `v` scaled to length 1. A zero vector has no direction, so it stays zero.
+[[nodiscard]] inline Vec2 Normalized(Vec2 v) {
+    const float length = Length(v);
+    if (length == 0.0f) {
+        return {};
+    }
+    return v * (1.0f / length);
+}
+
 /// Returns `v` shortened to `maxLength` if it is longer, unchanged otherwise.
 /// Movement input goes through this so a diagonal on the keyboard is not faster than a straight line.
 [[nodiscard]] inline Vec2 ClampLength(Vec2 v, float maxLength) {

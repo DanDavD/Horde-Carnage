@@ -23,6 +23,11 @@ private:
 
     FixedTimestep _timestep;
     Player _player;
+
+#ifndef NDEBUG
+    bool _showDebugOverlay = false;
+    Vec2 _lastMoveInput; ///< Kept only so the overlay can show what the last step read.
+#endif
 };
 
 } // namespace horde

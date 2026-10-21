@@ -69,13 +69,23 @@ TEST_CASE("releasing the input stops the mover without sliding back") {
     CHECK(motion.velocity == Vec2{});
 }
 
-TEST_CASE("reversing direction slows down through zero and speeds up the other way") {
+TEST_CASE("turning back brakes at the deceleration rate, then accelerates the other way") {
     Motion motion{.velocity = {100.0f, 0.0f}};
-    Step(motion, Vec2{-1.0f, 0.0f}, 2);
+    Step(motion, Vec2{-1.0f, 0.0f}, 1);
     CHECK(motion.velocity == Vec2{});
 
-    Step(motion, Vec2{-1.0f, 0.0f}, 2);
+    Step(motion, Vec2{-1.0f, 0.0f}, 1);
+    CHECK(motion.velocity == Vec2{-50.0f, 0.0f});
+
+    Step(motion, Vec2{-1.0f, 0.0f}, 1);
     CHECK(motion.velocity == Vec2{-100.0f, 0.0f});
+}
+
+TEST_CASE("a 90 degree turn is not braking, so it uses the acceleration rate") {
+    Motion motion{.velocity = {100.0f, 0.0f}};
+    const Vec2 before = motion.velocity;
+    Step(motion, Vec2{0.0f, 1.0f}, 1);
+    CHECK(horde::Length(motion.velocity - before) == doctest::Approx(kStats.acceleration * kDt));
 }
 
 TEST_CASE("a step moves by the new velocity and remembers the old position") {

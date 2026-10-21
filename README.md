@@ -23,7 +23,7 @@ This is day 2 of 15. Progress is tracked in the [roadmap](docs/ROADMAP.md) and t
 **What works today:**
 - A CMake project that downloads raylib and doctest at a pinned version, so a fresh clone builds with one command.
 - A window with a fixed-timestep main loop: the game simulates at 60 Hz whatever the monitor's refresh rate, and renders once per frame.
-- A player you move around an arena with the keyboard or a gamepad. It speeds up and stops over a fraction of a second, is never faster on a diagonal, and slides along the walls. See [Movement](docs/MOVEMENT.md).
+- A player you move around an arena with the keyboard or a gamepad. It speeds up and stops over a fraction of a second, turns back quickly, is never faster on a diagonal, faces the way you push, and slides along the walls. See [Movement](docs/MOVEMENT.md).
 - Unit tests for the pure logic, and a GitHub Actions workflow that builds and tests every push and pull request on Windows.
 - Warnings are errors for the project's own code (`/W4 /WX` on MSVC).
 
@@ -56,7 +56,7 @@ build\default\src\Release\HordeCarnage.exe
 
 You can also open the folder in Visual Studio (*File > Open > Folder*). It reads `CMakePresets.json` by itself.
 
-**Controls:** `WASD` or the arrow keys move, and so does the left stick of a gamepad. `Esc` quits.
+**Controls:** `WASD` or the arrow keys move, and so do the left stick and the d-pad of a gamepad. `Esc` quits. In Debug builds, `F1` shows a movement overlay.
 
 ## Building and testing
 

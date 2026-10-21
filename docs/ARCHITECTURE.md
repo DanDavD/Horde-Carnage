@@ -30,7 +30,7 @@ When a feature has rules (damage, cooldowns, wave timing), the rules go into `ho
 
 ### Components and systems
 
-Game objects are plain structs (components) that hold data, and free functions (systems) that update them. The first ones are the `Motion` component and the `StepMovement` and `ConfineToArena` systems, described in [Movement](MOVEMENT.md). `Player` is a struct of components, not a class with behaviour. `horde_core` has its own `Vec2` type, so it never includes raylib; the app converts with `ToRaylib` right before drawing.
+Game objects are plain structs (components) that hold data, and free functions (systems) that update them. The first ones are the `Motion` component and the `StepMovement`, `UpdateFacing` and `ConfineToArena` systems, described in [Movement](MOVEMENT.md). `Player` is a struct of components, not a class with behaviour. `horde_core` has its own `Vec2` type, so it never includes raylib; the app converts with `ToRaylib` right before drawing.
 
 ## Design decisions
 
@@ -51,7 +51,7 @@ Game objects are plain structs (components) that hold data, and free functions (
 ## Tests
 
 - `tests/core/FixedTimestepTests.cpp`: exact steps, accumulation of short frames, the remainder of long frames (`Alpha`), the clamp on huge frames, negative frame times and the 60 Hz default.
-- `tests/core/Vec2Tests.cpp`, `MovementTests.cpp`, `ArenaTests.cpp` and `AnalogInputTests.cpp`: see [Movement](MOVEMENT.md#tests).
+- `tests/core/Vec2Tests.cpp`, `MovementTests.cpp`, `FacingTests.cpp`, `ArenaTests.cpp` and `AnalogInputTests.cpp`: see [Movement](MOVEMENT.md#tests).
 
 ## Limitations
 

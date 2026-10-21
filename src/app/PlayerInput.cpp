@@ -22,20 +22,35 @@ float KeyAxis(int negativeKey, int negativeAltKey, int positiveKey, int positive
     return axis;
 }
 
+float ButtonAxis(int negativeButton, int positiveButton) {
+    float axis = 0.0f;
+    if (IsGamepadButtonDown(kGamepad, negativeButton)) {
+        axis -= 1.0f;
+    }
+    if (IsGamepadButtonDown(kGamepad, positiveButton)) {
+        axis += 1.0f;
+    }
+    return axis;
+}
+
 } // namespace
 
 Vec2 ReadMoveInput() {
     const Vec2 keys{KeyAxis(KEY_A, KEY_LEFT, KEY_D, KEY_RIGHT), KeyAxis(KEY_W, KEY_UP, KEY_S, KEY_DOWN)};
 
     Vec2 stick;
+    Vec2 dpad;
     if (IsGamepadAvailable(kGamepad)) {
         const Vec2 raw{GetGamepadAxisMovement(kGamepad, GAMEPAD_AXIS_LEFT_X),
                        GetGamepadAxisMovement(kGamepad, GAMEPAD_AXIS_LEFT_Y)};
         stick = ApplyRadialDeadzone(raw, kStickDeadzone);
+        // Some players move with the d-pad, as in older arcade brawlers. It works like the keyboard.
+        dpad = {ButtonAxis(GAMEPAD_BUTTON_LEFT_FACE_LEFT, GAMEPAD_BUTTON_LEFT_FACE_RIGHT),
+                ButtonAxis(GAMEPAD_BUTTON_LEFT_FACE_UP, GAMEPAD_BUTTON_LEFT_FACE_DOWN)};
     }
 
-    // Both devices add up. StepMovement clamps the sum to length 1, so using both is never faster.
-    return keys + stick;
+    // All devices add up. StepMovement clamps the sum to length 1, so using two at once is never faster.
+    return keys + stick + dpad;
 }
 
 } // namespace horde

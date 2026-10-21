@@ -11,7 +11,7 @@ namespace horde {
 struct MovementStats {
     float maxSpeed = 300.0f;      ///< World units per second.
     float acceleration = 3000.0f; ///< Units per second squared while there is input.
-    float deceleration = 4000.0f; ///< Units per second squared once the input is released.
+    float deceleration = 4000.0f; ///< Units per second squared when braking: no input, or input against the velocity.
 };
 
 /// Where something is and how it moves. The component every moving entity has.
