@@ -10,13 +10,13 @@ The rules live in `horde_core` and know nothing about raylib:
 
 The game executable turns it into a raylib `Camera2D`:
 
-- `src/app/Game.cpp`: `ToRaylibCamera` builds the `Camera2D`, and `Draw` wraps the arena and the player in `BeginMode2D` and `EndMode2D`. The HUD (FPS, version, controls, the Debug overlay text) is drawn after `EndMode2D`, so it stays fixed on screen.
+- `src/app/Game.cpp`: `ToRaylibCamera` builds the `Camera2D`, and `Draw` wraps the arena, the enemies and the player in `BeginMode2D` and `EndMode2D`. The HUD (FPS, version, controls, the Debug overlay text) is drawn after `EndMode2D`, so it stays fixed on screen.
 
 ## How it works
 
 The camera has a `center`, a `previousCenter` and a `viewSize` (how much of the world fits on screen; at zoom 1 it is the window size, 1280x720). It is created with `FollowCameraAt`, already settled on the player, so the first frame does not slide in from somewhere else.
 
-Once per fixed step, after the player has moved, `StepFollowCamera` does three things:
+Once per fixed step, as the last part of `StepWorld` (after the player and the enemies have moved), `StepFollowCamera` does three things:
 
 1. **Pick a goal:** the player's position plus `velocity * lookAhead`. When the player runs right, the goal is to the right of the player, so the player sees more of where they are going. When the player stops, the velocity drops to zero and the goal slides back onto the player.
 2. **Clamp the goal** with `ClampViewToArena`, against the arena grown by `wallMargin` on every side. The view can show the walls and a strip of the outside, but not more. On an axis where the arena is smaller than the view, the view is centred on the arena.

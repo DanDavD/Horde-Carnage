@@ -8,4 +8,9 @@ namespace horde {
 /// left stick and d-pad of the first gamepad. The result can be longer than 1; `StepMovement` clamps it.
 [[nodiscard]] Vec2 ReadMoveInput();
 
+/// Whether a restart button went down this frame: Enter or R on the keyboard, A or Start on the first
+/// gamepad. Call it once per frame, not once per fixed step: a press is an event, and a frame that runs
+/// no step would lose it.
+[[nodiscard]] bool ReadRestartPressed();
+
 } // namespace horde

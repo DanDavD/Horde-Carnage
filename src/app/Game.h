@@ -1,8 +1,7 @@
 #pragma once
 
 #include "core/FixedTimestep.h"
-#include "core/FollowCamera.h"
-#include "core/Player.h"
+#include "core/Session.h"
 
 namespace horde {
 
@@ -23,8 +22,7 @@ private:
     void Draw(float alpha) const;
 
     FixedTimestep _timestep;
-    Player _player;
-    FollowCamera _camera; ///< Declared after _player: it is built from the player's starting position.
+    Session _session;
 
 #ifndef NDEBUG
     bool _showDebugOverlay = false;

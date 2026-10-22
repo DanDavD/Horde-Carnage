@@ -18,17 +18,21 @@ I chose plain C++ with a small library instead of an engine on purpose. raylib o
 
 ## Current status
 
-This is day 2 of 15. Progress is tracked in the [roadmap](docs/ROADMAP.md) and the [changelog](CHANGELOG.md).
+This is day 3 of 15. Progress is tracked in the [roadmap](docs/ROADMAP.md) and the [changelog](CHANGELOG.md).
 
 **What works today:**
 - A CMake project that downloads raylib and doctest at a pinned version, so a fresh clone builds with one command.
 - A window with a fixed-timestep main loop: the game simulates at 60 Hz whatever the monitor's refresh rate, and renders once per frame.
 - A player you move around an arena with the keyboard or a gamepad. It speeds up and stops over a fraction of a second, turns back quickly, is never faster on a diagonal, faces the way you push, and slides along the walls. See [Movement](docs/MOVEMENT.md).
 - An arena bigger than the screen, with a camera that follows the player smoothly, looks a little ahead of where you run, and stops at the walls. See [Camera](docs/CAMERA.md).
+- Six hairballs that come at you from every side and stop when they touch you. They are slower than you, so you can run away. See [Enemies](docs/ENEMIES.md).
+- Bodies push each other apart instead of stacking. You can shove one hairball out of your way, but a crowd slows you down. See [Collisions](docs/COLLISIONS.md).
+- A health bar. Each hairball that touches you takes 10 of your 100 hit points, and after a hit you blink and cannot be hurt for 0.8 seconds. See [Health](docs/HEALTH.md).
+- A game over screen that shows how long you survived, and a restart into a fresh arena. See [Game flow](docs/GAME_FLOW.md).
 - Unit tests for the pure logic, and a GitHub Actions workflow that builds and tests every push and pull request on Windows.
 - Warnings are errors for the project's own code (`/W4 /WX` on MSVC).
 
-**Still to do:** enemies, combat, waves and everything else that makes it a game. See the [roadmap](docs/ROADMAP.md).
+**Still to do:** you cannot fight back yet. Next are melee combat (day 4) and enemy waves (day 5), then everything else that makes it a game. See the [roadmap](docs/ROADMAP.md).
 
 ## Tech stack
 
@@ -57,7 +61,7 @@ build\default\src\Release\HordeCarnage.exe
 
 You can also open the folder in Visual Studio (*File > Open > Folder*). It reads `CMakePresets.json` by itself.
 
-**Controls:** `WASD` or the arrow keys move, and so do the left stick and the d-pad of a gamepad. `Esc` quits. In Debug builds, `F1` shows a movement overlay.
+**Controls:** `WASD` or the arrow keys move, and so do the left stick and the d-pad of a gamepad. After a game over, `Enter` or `R` (`A` or `Start` on a gamepad) plays again. `Esc` quits. In Debug builds, `F1` shows a debug overlay.
 
 ## Building and testing
 

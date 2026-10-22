@@ -1,0 +1,70 @@
+# Health and contact damage
+
+## What it is
+
+How the player gets hurt. The player has 100 hit points. A hairball that touches the player takes 10. After each hit the player is invulnerable for 0.8 seconds, and blinks to show it. At 0 the run is over (see [Game flow](GAME_FLOW.md)).
+
+The rules live in `horde_core`:
+
+- `src/core/Health.h`, `src/core/Health.cpp`: the `Health` component, `ApplyDamage`, `TickHealth`, `IsDead` and `IsInvulnerable`.
+- `src/core/Collision.h`, `src/core/Collision.cpp`: `AreTouching`, the contact test.
+- `src/core/World.cpp`: `StepWorld` counts the invulnerability window down and applies contact damage.
+- `src/core/Player.h` and `src/core/Enemy.h`: the player has a `Health`, and the hairball has a `contactDamage`.
+
+The game executable shows it:
+
+- `src/app/Game.cpp`: `DrawHealthBar` draws the bar in the top left corner, and `DrawPlayer` makes the player blink while invulnerable and turns them grey when dead.
+
+## How it works
+
+Every fixed step, `StepWorld`:
+
+1. **Counts the invulnerability window down** with `TickHealth`, at the start of the step.
+2. Moves everyone and resolves collisions (see [Collisions](COLLISIONS.md)).
+3. **Applies contact damage:** for every hairball, if `AreTouching` says it touches the player (the sum of the radii plus `kContactSlack`), `ApplyDamage(player.health, enemy.contactDamage)`.
+
+`ApplyDamage` does nothing if the body is dead or still inside its invulnerability window. Otherwise it takes the damage, never going below 0, and opens a new window of `invulnerabilityAfterHit` seconds.
+
+On screen:
+
+- **The health bar** shows `current / max`. Its fill turns pale while the player is invulnerable, so a hit reads on the bar as well as on the body.
+- **The player blinks** while invulnerable: faded for 0.1 s, solid for 0.1 s. The blink is computed from the time left in the window, so it needs no extra state.
+- **A dead player is grey.**
+
+## Design decisions
+
+- **An invulnerability window after each hit.** A hairball resting against the player touches it on every fixed step, 60 times a second. Without the window, one hairball would take 10 points per step and empty the bar in a sixth of a second, before the player could react. With it, damage arrives at a readable rhythm, and the blink tells the player when the next touch can hurt.
+  - Rejected: damage over time (a few points per second while touching). It is harder to read, because the bar drains smoothly and no single moment says "you got hit".
+  - Rejected: a cooldown per enemy instead of per player. Six hairballs around the player would each land their own hit, 60 points at once, and being surrounded would kill in under a second. One window per player means a crowd hurts like one hairball, so the player has time to fight their way out once combat exists.
+- **Contact damage is checked after collisions.** Then "touching" means the bodies really ended the step touching, not that one passed near the other halfway through.
+- **The same contact test for chasing and for damage.** `ChaseInput` stops a hairball at the sum of the radii plus `kContactSlack`, and `AreTouching` uses the same distance. A hairball that has stopped against the player always counts as touching it.
+- **Integer hit points.** Every number the player sees is a whole number, and the tests compare health exactly.
+  - Rejected: floats. Nothing needs fractions yet, and "73.99999" on a health bar is a bug report.
+- **No knockback on the player yet.** It would help the player get out of a crowd, but pushing the player around is the kind of feel decision that belongs with combat on day 4, where enemies get knockback too.
+
+## How to tune it
+
+| Value | Where | Default |
+|---|---|---|
+| Player hit points | `Health::current` and `Health::max` (`src/core/Health.h`) | 100 |
+| Invulnerability after a hit | `Health::invulnerabilityAfterHit` | 0.8 s |
+| Hairball contact damage | `Enemy::contactDamage` (`src/core/Enemy.h`) | 10 |
+| Blink period and fade | `kBlinkPeriod`, `kBlinkFade` (`src/app/Game.cpp`) | 0.1 s, 35% |
+
+With the defaults the player survives 9 touches and dies on the 10th. A crowd that never lets go lands the first hit at once and the 10th 7.2 s later (9 windows of 0.8 s). Standing still from the start, the hairballs need a little over 3 seconds to arrive, so a player who does nothing dies after about 10 seconds. In a Release build the game over screen read "You survived 10.5 seconds" for that case.
+
+In a Debug build, `F1` shows the health and the time left in the window.
+
+## Tests
+
+- `tests/core/HealthTests.cpp`: a hit takes health and opens the window; a second hit inside the window does nothing; once the window has passed the next hit lands; the window never goes below 0; health stops at 0 and the body is dead; and a dead body takes no more hits.
+- `tests/core/CollisionTests.cpp`: bodies count as touching up to the contact slack, and not past it.
+- `tests/core/WorldTests.cpp`: hairballs that are not touching do not hurt; a touching hairball hurts once, not again 0.7 s later, and again 0.9 s later; and when the whole crowd arrives at once the first hit takes exactly one hairball's damage, not six.
+
+`DrawHealthBar` and the blink are not unit tested, because they need a window. I checked them in a Release build.
+
+## Limitations
+
+- **Nothing heals.** Healing comes with the power-ups on day 10.
+- **Only the player has health.** Enemies get it with combat on day 4, through the same `Health` component.
+- **The bar has no animation.** It jumps to the new value. A trailing "damage" bar that drains behind it is part of the game feel pass on day 12.

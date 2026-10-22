@@ -16,19 +16,21 @@ The rules live in `horde_core`, so they have no idea where the input comes from 
 The game executable connects them to the hardware and the screen:
 
 - `src/app/PlayerInput.h`, `src/app/PlayerInput.cpp`: `ReadMoveInput` reads the keyboard and the first gamepad.
-- `src/app/Game.cpp`: steps the player every fixed step, draws the arena and the player, and in Debug builds draws a movement overlay.
+- `src/app/Game.cpp`: passes the input to `StepSession`, which steps the world (`StepWorld` in `src/core/World.cpp`) every fixed step, draws the arena and the player, and in Debug builds draws a movement overlay.
 
 ## How it works
 
-Every moving entity has a `Motion` component: `position`, `previousPosition` and `velocity`. It is created with `MotionAt(position)`, which sets both positions to the same point. Once per fixed step (1/60 s, see [Architecture](ARCHITECTURE.md)), `Game::Update` does this for the player:
+Every moving entity has a `Motion` component: `position`, `previousPosition` and `velocity`. It is created with `MotionAt(position)`, which sets both positions to the same point. Once per fixed step (1/60 s, see [Architecture](ARCHITECTURE.md)), this happens for the player:
 
-1. **Read the input** with `ReadMoveInput`. WASD, the arrow keys and the gamepad d-pad give `-1`, `0` or `1` on each axis. The left stick of the first gamepad goes through a radial deadzone of 0.2. All of them are added together.
+1. **Read the input**: `Game::Update` calls `ReadMoveInput` and passes the result through `StepSession` to `StepWorld`, which does the rest of the steps. WASD, the arrow keys and the gamepad d-pad give `-1`, `0` or `1` on each axis. The left stick of the first gamepad goes through a radial deadzone of 0.2. All of them are added together.
 2. **Turn the player** with `UpdateFacing`. If there is any input, `facing` becomes the input direction at length 1. If there is none, `facing` keeps its last value.
 3. **Step the movement** with `StepMovement`:
    1. **Clamp the input to length 1.** The input says where the mover wants to go, and its length is how much of the top speed it wants. A keyboard diagonal is `(1, 1)`, which is about 1.41 long, so without the clamp the player would move 41% faster diagonally. An analog stick pushed halfway gives about 0.5, and keeps that half speed.
    2. **Move the velocity toward the target velocity** (`input * maxSpeed`) by at most `rate * dt`. The rate is `deceleration` when the mover is braking, and `acceleration` otherwise. Braking means there is no input, or the input points against the current velocity (their dot product is negative). A 90 degree turn is not braking. `MoveTowards` never goes past the target, so a mover that stops does not slide backwards.
    3. **Integrate the position** with the new velocity, after saving the old one in `previousPosition`.
-4. **Confine it to the arena** with `ConfineToArena`. On each axis, if the body (a circle of `radius`) went through a wall, it is put back against the wall, and the part of the velocity that points into that wall is set to zero. The other axis is not touched, so the player slides along walls.
+4. **Confine it to the arena** with `ConfineToArena`. This happens after every body has moved and collisions have pushed overlapping bodies apart (see [Collisions](COLLISIONS.md)), so a body pushed into a wall is put back too. On each axis, if the body (a circle of `radius`) went through a wall, it is put back against the wall, and the part of the velocity that points into that wall is set to zero. The other axis is not touched, so the player slides along walls.
+
+Enemies go through the same movement and wall steps with their own input and numbers. See [Enemies](ENEMIES.md).
 
 The renderer draws the player at `Lerp(previousPosition, position, alpha)`, where `alpha` comes from `FixedTimestep::Alpha`. That keeps movement smooth on monitors faster than 60 Hz. A dark eye on the player's edge shows `facing`.
 
@@ -90,5 +92,5 @@ The tests use round numbers that are exact in binary floating point where they c
 
 - With the keyboard or the d-pad, `facing` has 8 directions. Only the stick gives every angle.
 - A turn of less than 90 degrees from the velocity uses `acceleration`, even though part of it is braking. It has not been tuned by hand yet, and it is the first thing to check if curves feel loose.
-- Walls are the only thing that stops a mover. Collisions between bodies come with the first enemy on day 3.
+- Walls and other bodies are the only things that stop a mover. There are no obstacles inside the arena yet.
 - Only the first gamepad is read, and only its left stick and d-pad.

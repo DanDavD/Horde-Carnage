@@ -25,12 +25,27 @@ When a feature has rules (damage, cooldowns, wave timing), the rules go into `ho
 
 1. Ask raylib how long the last frame took (`GetFrameTime`).
 2. Give that time to `FixedTimestep::Advance`, which answers how many fixed 1/60 s steps are due.
-3. Run `Update` that many times, always with the same `dt`.
+3. Run `Update` that many times, always with the same `dt`. `Update` reads the input (`ReadMoveInput`) and passes it to `StepSession`, which runs all the rules.
+
+Before the steps, `Run` also reads button presses that are events rather than held states (restart, and the Debug overlay toggle), once per frame, so a frame that runs no step cannot lose them.
 4. Draw once, passing `FixedTimestep::Alpha` (how far we are into the next step) so drawing can interpolate between two steps.
+
+### The world
+
+`World` (`src/core/World.h`) holds everything the simulation needs as plain data: the arena, the player, the enemies and the camera. Two functions work on it:
+
+- `CreateWorld` builds the starting state: the player in the middle of the arena, the hairballs around it, the camera on the player.
+- `StepWorld` advances it by one fixed step, in this order: the invulnerability window, the player (facing, movement), every enemy (chase, movement), collisions between bodies and the walls (four passes, see [Collisions](COLLISIONS.md)), contact damage (see [Health](HEALTH.md)), then the camera.
+
+### The session
+
+`Session` (`src/core/Session.h`) wraps the world in a small state machine: `Playing` steps the world, and `GameOver` freezes it once the player's health reaches 0. `TryRestart` replaces the world with a fresh one from `CreateWorld`. See [Game flow](GAME_FLOW.md).
+
+`Game` owns one `Session`. It reads the input, calls `StepSession`, and draws the result. It never changes the world itself.
 
 ### Components and systems
 
-Game objects are plain structs (components) that hold data, and free functions (systems) that update them. The first ones are the `Motion` component and the `StepMovement`, `UpdateFacing` and `ConfineToArena` systems, described in [Movement](MOVEMENT.md). The camera follows the same shape: a `FollowCamera` component and a `StepFollowCamera` system, described in [Camera](CAMERA.md). The app only turns it into a raylib `Camera2D` when it draws. `Player` is a struct of components, not a class with behaviour. `horde_core` has its own `Vec2` type, so it never includes raylib; the app converts with `ToRaylib` right before drawing.
+Game objects are plain structs (components) that hold data, and free functions (systems) that update them. The first ones are the `Motion` component and the `StepMovement`, `UpdateFacing` and `ConfineToArena` systems, described in [Movement](MOVEMENT.md). The camera follows the same shape: a `FollowCamera` component and a `StepFollowCamera` system, described in [Camera](CAMERA.md). The app only turns it into a raylib `Camera2D` when it draws. `Player` and `Enemy` are structs of components, not classes with behaviour, and they share the same movement systems (see [Enemies](ENEMIES.md)). `horde_core` has its own `Vec2` type, so it never includes raylib; the app converts with `ToRaylib` right before drawing.
 
 ## Design decisions
 
@@ -41,6 +56,8 @@ Game objects are plain structs (components) that hold data, and free functions (
 - **raylib instead of an engine or a hand-written renderer.** I want my time to go into the game architecture, not into OpenGL setup and drivers. raylib is a small C library, so it does not decide how the game is structured.
   - Rejected: SDL2. It is just as valid, but needs more setup for 2D drawing and text.
 - **Dependencies pinned with CMake's FetchContent.** A fresh clone builds with one command, with no package manager to install, and everyone gets the same versions.
+- **The whole simulation step lives in `horde_core` (`StepWorld`), and the app only reads input and draws.** A full game step can then run in a unit test, without a window. One test plays 400 steps twice with the same inputs and checks that both worlds end identical, which is the fixed timestep's promise put to the test. Restarting the game (later on day 3) is creating a fresh `World`, so nothing from the last run can leak into the next.
+  - Rejected: keeping the update logic in `Game`. It would grow into a class that does everything, and could only be tested by playing.
 - **Warnings as errors only for my code.** `horde_set_warnings` adds `/W4 /WX` to the project's targets. raylib and doctest are added as `SYSTEM`, so a warning in their headers cannot break my build.
 
 ## How to tune it
@@ -53,6 +70,10 @@ Game objects are plain structs (components) that hold data, and free functions (
 - `tests/core/FixedTimestepTests.cpp`: exact steps, accumulation of short frames, the remainder of long frames (`Alpha`), the clamp on huge frames, negative frame times and the 60 Hz default.
 - `tests/core/Vec2Tests.cpp`, `MovementTests.cpp`, `FacingTests.cpp`, `ArenaTests.cpp` and `AnalogInputTests.cpp`: see [Movement](MOVEMENT.md#tests).
 - `tests/core/FollowCameraTests.cpp`: see [Camera](CAMERA.md#tests).
+- `tests/core/ChaseTests.cpp` and `WorldTests.cpp`: see [Enemies](ENEMIES.md#tests).
+- `tests/core/CollisionTests.cpp` and the crowd cases in `WorldTests.cpp`: see [Collisions](COLLISIONS.md#tests).
+- `tests/core/HealthTests.cpp` and the contact damage cases in `WorldTests.cpp`: see [Health](HEALTH.md#tests).
+- `tests/core/SessionTests.cpp`: see [Game flow](GAME_FLOW.md#tests).
 
 ## Limitations
 
