@@ -25,7 +25,9 @@ When a feature has rules (damage, cooldowns, wave timing), the rules go into `ho
 
 1. Ask raylib how long the last frame took (`GetFrameTime`).
 2. Give that time to `FixedTimestep::Advance`, which answers how many fixed 1/60 s steps are due.
-3. Run `Update` that many times, always with the same `dt`. `Update` reads the input (`ReadMoveInput`) and passes it to `StepWorld`, which runs all the rules.
+3. Run `Update` that many times, always with the same `dt`. `Update` reads the input (`ReadMoveInput`) and passes it to `StepSession`, which runs all the rules.
+
+Before the steps, `Run` also reads button presses that are events rather than held states (restart, and the Debug overlay toggle), once per frame, so a frame that runs no step cannot lose them.
 4. Draw once, passing `FixedTimestep::Alpha` (how far we are into the next step) so drawing can interpolate between two steps.
 
 ### The world
@@ -33,9 +35,13 @@ When a feature has rules (damage, cooldowns, wave timing), the rules go into `ho
 `World` (`src/core/World.h`) holds everything the simulation needs as plain data: the arena, the player, the enemies and the camera. Two functions work on it:
 
 - `CreateWorld` builds the starting state: the player in the middle of the arena, the hairballs around it, the camera on the player.
-- `StepWorld` advances it by one fixed step, in this order: the player (facing, movement), then every enemy (chase, movement), then collisions between bodies and the walls (four passes, see [Collisions](COLLISIONS.md)), then the camera.
+- `StepWorld` advances it by one fixed step, in this order: the invulnerability window, the player (facing, movement), every enemy (chase, movement), collisions between bodies and the walls (four passes, see [Collisions](COLLISIONS.md)), contact damage (see [Health](HEALTH.md)), then the camera.
 
-`Game` owns one `World`. It reads the input, calls `StepWorld`, and draws the result. It never changes the world itself.
+### The session
+
+`Session` (`src/core/Session.h`) wraps the world in a small state machine: `Playing` steps the world, and `GameOver` freezes it once the player's health reaches 0. `TryRestart` replaces the world with a fresh one from `CreateWorld`. See [Game flow](GAME_FLOW.md).
+
+`Game` owns one `Session`. It reads the input, calls `StepSession`, and draws the result. It never changes the world itself.
 
 ### Components and systems
 
@@ -66,6 +72,8 @@ Game objects are plain structs (components) that hold data, and free functions (
 - `tests/core/FollowCameraTests.cpp`: see [Camera](CAMERA.md#tests).
 - `tests/core/ChaseTests.cpp` and `WorldTests.cpp`: see [Enemies](ENEMIES.md#tests).
 - `tests/core/CollisionTests.cpp` and the crowd cases in `WorldTests.cpp`: see [Collisions](COLLISIONS.md#tests).
+- `tests/core/HealthTests.cpp` and the contact damage cases in `WorldTests.cpp`: see [Health](HEALTH.md#tests).
+- `tests/core/SessionTests.cpp`: see [Game flow](GAME_FLOW.md#tests).
 
 ## Limitations
 

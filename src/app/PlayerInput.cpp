@@ -53,4 +53,12 @@ Vec2 ReadMoveInput() {
     return keys + stick + dpad;
 }
 
+bool ReadRestartPressed() {
+    if (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_R)) {
+        return true;
+    }
+    return IsGamepadAvailable(kGamepad) && (IsGamepadButtonPressed(kGamepad, GAMEPAD_BUTTON_RIGHT_FACE_DOWN) ||
+                                           IsGamepadButtonPressed(kGamepad, GAMEPAD_BUTTON_MIDDLE_RIGHT));
+}
+
 } // namespace horde

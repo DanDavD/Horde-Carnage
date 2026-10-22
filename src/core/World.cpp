@@ -7,6 +7,7 @@
 #include "core/Chase.h"
 #include "core/Collision.h"
 #include "core/Facing.h"
+#include "core/Health.h"
 #include "core/Movement.h"
 
 namespace horde {
@@ -41,6 +42,17 @@ void SeparateEveryone(World& world) {
     }
 }
 
+// After collisions, so contact means the bodies really ended the step touching. The invulnerability
+// window lets only the first touch of a crowd land.
+void ApplyContactDamage(World& world) {
+    Player& player = world.player;
+    for (const Enemy& enemy : world.enemies) {
+        if (AreTouching(player.motion.position, player.radius, enemy.motion.position, enemy.radius)) {
+            ApplyDamage(player.health, enemy.contactDamage);
+        }
+    }
+}
+
 } // namespace
 
 World CreateWorld(const Arena& arena, Vec2 viewSize) {
@@ -60,7 +72,9 @@ World CreateWorld(const Arena& arena, Vec2 viewSize) {
 }
 
 void StepWorld(World& world, Vec2 moveInput, float dt) {
+    world.elapsedSeconds += dt;
     Player& player = world.player;
+    TickHealth(player.health, dt);
     UpdateFacing(player.facing, moveInput);
     StepMovement(player.motion, moveInput, player.stats, dt);
 
@@ -77,6 +91,8 @@ void StepWorld(World& world, Vec2 moveInput, float dt) {
         SeparateEveryone(world);
         ConfineEveryone(world);
     }
+
+    ApplyContactDamage(world);
 
     // Last, so the camera follows where everything ended up in this step.
     StepFollowCamera(world.camera, player.motion.position, player.motion.velocity, world.arena, dt);

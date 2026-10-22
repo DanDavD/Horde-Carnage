@@ -85,3 +85,10 @@ TEST_CASE("speed across the contact is kept, so bodies slide past each other") {
     CHECK(a.velocity == Vec2{0.0f, 100.0f});
     CHECK(b.velocity == Vec2{});
 }
+
+TEST_CASE("bodies count as touching up to the contact slack, and not past it") {
+    // Radii 10 and 10: they touch at 20, and the slack allows up to 21.
+    CHECK(horde::AreTouching(Vec2{0.0f, 0.0f}, kRadius, Vec2{20.0f, 0.0f}, kRadius));
+    CHECK(horde::AreTouching(Vec2{0.0f, 0.0f}, kRadius, Vec2{20.0f + horde::kContactSlack, 0.0f}, kRadius));
+    CHECK_FALSE(horde::AreTouching(Vec2{0.0f, 0.0f}, kRadius, Vec2{22.0f, 0.0f}, kRadius));
+}

@@ -9,6 +9,10 @@ namespace horde {
 /// player would flicker between "touching" and "one hair away" from one step to the next.
 inline constexpr float kContactSlack = 1.0f;
 
+/// Whether two circles touch, allowing `kContactSlack`. Chasers stop at this distance, and contact
+/// damage uses the same test, so a hairball that stopped against the player always counts as touching it.
+[[nodiscard]] bool AreTouching(Vec2 a, float radiusA, Vec2 b, float radiusB);
+
 /// The fraction of an overlap that body A takes when it collides with body B: `weightB / (weightA + weightB)`.
 /// A heavier body moves less. Only the ratio between the two weights matters.
 [[nodiscard]] float PushShare(float weightA, float weightB);

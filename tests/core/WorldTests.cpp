@@ -182,3 +182,46 @@ TEST_CASE("the same inputs always give the same world") {
         CHECK(a.enemies[i].motion.position == b.enemies[i].motion.position);
     }
 }
+
+TEST_CASE("survival time counts simulated seconds") {
+    World world = horde::CreateWorld(kArena, kView);
+    Step(world, Vec2{}, 120);
+    CHECK(world.elapsedSeconds == doctest::Approx(2.0f));
+}
+
+TEST_CASE("hairballs that are not touching the player do not hurt it") {
+    World world = horde::CreateWorld(kArena, kView);
+    Step(world, Vec2{}, 60);
+    CHECK(world.player.health.current == world.player.health.max);
+}
+
+TEST_CASE("a touching hairball hurts the player once per invulnerability window") {
+    World world = horde::CreateWorld(kArena, kView);
+    horde::Player& player = world.player;
+    const Vec2 touching = player.motion.position + Vec2{player.radius + 18.0f, 0.0f};
+    world.enemies.assign(1, Enemy{.motion = horde::MotionAt(touching)});
+    const int damage = world.enemies[0].contactDamage;
+
+    Step(world, Vec2{}, 1);
+    CHECK(player.health.current == player.health.max - damage);
+
+    // 0.7 s later the window (0.8 s) is still open.
+    Step(world, Vec2{}, 42);
+    CHECK(player.health.current == player.health.max - damage);
+
+    // 0.9 s after the first hit it has closed, and the hairball is still touching.
+    Step(world, Vec2{}, 12);
+    CHECK(player.health.current == player.health.max - 2 * damage);
+}
+
+TEST_CASE("a whole crowd arriving at once still lands only one hit") {
+    World world = horde::CreateWorld(kArena, kView);
+    const int damage = world.enemies[0].contactDamage;
+    int steps = 0;
+    while (world.player.health.current == world.player.health.max && steps < 600) {
+        Step(world, Vec2{}, 1);
+        ++steps;
+    }
+    // The six hairballs arrive together, but the first touch opens the window and the other five miss.
+    CHECK(world.player.health.current == world.player.health.max - damage);
+}

@@ -17,13 +17,14 @@ inline constexpr float kHairballSpawnDistance = 520.0f;
 
 /// Everything the simulation needs, as plain data: the arena, the player, the enemies and the camera.
 ///
-/// The app reads the input and draws a World. It never changes one directly. Restarting the game
-/// will be assigning a fresh World, so nothing from the last run can leak into the next.
+/// The app reads the input and draws a World. It never changes one directly. Restarting the game is
+/// assigning a fresh World (see `Session`), so nothing from the last run can leak into the next.
 struct World {
     Arena arena;
     Player player;
     std::vector<Enemy> enemies;
     FollowCamera camera;
+    float elapsedSeconds = 0.0f; ///< Simulated time since the world was created: how long the player survived.
 };
 
 /// The starting world: the player in the middle of `arena`, `kStartingHairballs` hairballs on a ring
@@ -34,7 +35,8 @@ struct World {
 [[nodiscard]] World CreateWorld(const Arena& arena, Vec2 viewSize);
 
 /// Advances the whole simulation by one fixed step of `dt` seconds: everyone moves, then overlapping
-/// bodies are pushed apart, then everyone is held inside the arena, then the camera follows.
+/// bodies are pushed apart, then everyone is held inside the arena, then hairballs that touch the
+/// player hurt it, then the camera follows.
 ///
 /// @param moveInput The player's movement input for this step, as `ReadMoveInput` gives it.
 void StepWorld(World& world, Vec2 moveInput, float dt);

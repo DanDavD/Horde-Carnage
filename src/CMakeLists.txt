@@ -6,7 +6,9 @@ add_library(horde_core STATIC
     core/Facing.cpp
     core/FixedTimestep.cpp
     core/FollowCamera.cpp
+    core/Health.cpp
     core/Movement.cpp
+    core/Session.cpp
     core/World.cpp)
 target_include_directories(horde_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 horde_set_warnings(horde_core)

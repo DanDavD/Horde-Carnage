@@ -8,7 +8,9 @@ add_executable(horde_tests
     core/FacingTests.cpp
     core/FixedTimestepTests.cpp
     core/FollowCameraTests.cpp
+    core/HealthTests.cpp
     core/MovementTests.cpp
+    core/SessionTests.cpp
     core/Vec2Tests.cpp
     core/WorldTests.cpp)
 target_link_libraries(horde_tests PRIVATE horde_core doctest::doctest)

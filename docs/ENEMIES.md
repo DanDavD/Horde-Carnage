@@ -36,7 +36,7 @@ So a hairball rolls toward the player, brakes when it touches them, and starts a
   - Rejected: "arrive" steering, which slows down gradually inside a radius. It stops more smoothly, but adds a tuning value, and a hairball is meant to be dumb. A high deceleration (2000) already limits the slide past contact to `maxSpeed^2 / (2 * deceleration)`, about 6 units.
 - **Hairballs are slower than the player** (160 against 300). The player can always run away. A horde is dangerous because of its numbers, not because one enemy is fast.
 - **Hairballs chase the player's position after the player's move in the same step.** If they read it before, they would always aim one step behind.
-- **The enemy list is sized once, in `CreateWorld`.** `StepWorld` never adds or removes enemies, so a running game does not allocate memory. When enemies start dying and spawning (days 4 and 5), the list becomes an `ObjectPool`.
+- **The enemy list is sized once, in `CreateWorld`.** `StepWorld` never adds or removes enemies, so a running game does not allocate memory. A restart builds the list again, once. When enemies start dying and spawning (days 4 and 5), the list becomes an `ObjectPool`.
 - **The eyes look at the player.** A round body has no front, so the eyes show what the hairball is after, even when it stands still.
 
 ## How to tune it
@@ -62,6 +62,6 @@ In a Debug build, `F1` shows how many enemies the world has.
 ## Limitations
 
 - **Hairballs all aim at the same point, the player.** Collisions keep them from stacking, but they do not plan around each other: the ones behind keep walking into the ones in front. See the limitations in [Collisions](COLLISIONS.md#limitations).
-- **Touching the player does nothing yet.** Contact damage and the player's health come later on day 3.
+- **Touching the player is the only way a hairball hurts.** It takes 10 hit points per touch, at most one hit every 0.8 s. See [Health](HEALTH.md).
 - **There are always exactly 6.** They cannot be killed (day 4), and there are no waves (day 5).
 - **When the player walks slowly away, a hairball at contact switches between walking and stopping from one step to the next.** I have not checked how that looks in motion yet, only in still screenshots.

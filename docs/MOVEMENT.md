@@ -16,13 +16,13 @@ The rules live in `horde_core`, so they have no idea where the input comes from 
 The game executable connects them to the hardware and the screen:
 
 - `src/app/PlayerInput.h`, `src/app/PlayerInput.cpp`: `ReadMoveInput` reads the keyboard and the first gamepad.
-- `src/app/Game.cpp`: passes the input to `StepWorld` (`src/core/World.cpp`) every fixed step, draws the arena and the player, and in Debug builds draws a movement overlay.
+- `src/app/Game.cpp`: passes the input to `StepSession`, which steps the world (`StepWorld` in `src/core/World.cpp`) every fixed step, draws the arena and the player, and in Debug builds draws a movement overlay.
 
 ## How it works
 
 Every moving entity has a `Motion` component: `position`, `previousPosition` and `velocity`. It is created with `MotionAt(position)`, which sets both positions to the same point. Once per fixed step (1/60 s, see [Architecture](ARCHITECTURE.md)), this happens for the player:
 
-1. **Read the input**: `Game::Update` calls `ReadMoveInput` and passes the result to `StepWorld`, which does the rest of the steps. WASD, the arrow keys and the gamepad d-pad give `-1`, `0` or `1` on each axis. The left stick of the first gamepad goes through a radial deadzone of 0.2. All of them are added together.
+1. **Read the input**: `Game::Update` calls `ReadMoveInput` and passes the result through `StepSession` to `StepWorld`, which does the rest of the steps. WASD, the arrow keys and the gamepad d-pad give `-1`, `0` or `1` on each axis. The left stick of the first gamepad goes through a radial deadzone of 0.2. All of them are added together.
 2. **Turn the player** with `UpdateFacing`. If there is any input, `facing` becomes the input direction at length 1. If there is none, `facing` keeps its last value.
 3. **Step the movement** with `StepMovement`:
    1. **Clamp the input to length 1.** The input says where the mover wants to go, and its length is how much of the top speed it wants. A keyboard diagonal is `(1, 1)`, which is about 1.41 long, so without the clamp the player would move 41% faster diagonally. An analog stick pushed halfway gives about 0.5, and keeps that half speed.

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "core/FixedTimestep.h"
-#include "core/World.h"
+#include "core/Session.h"
 
 namespace horde {
 
@@ -22,7 +22,7 @@ private:
     void Draw(float alpha) const;
 
     FixedTimestep _timestep;
-    World _world;
+    Session _session;
 
 #ifndef NDEBUG
     bool _showDebugOverlay = false;

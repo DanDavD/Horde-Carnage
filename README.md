@@ -27,10 +27,12 @@ This is day 3 of 15. Progress is tracked in the [roadmap](docs/ROADMAP.md) and t
 - An arena bigger than the screen, with a camera that follows the player smoothly, looks a little ahead of where you run, and stops at the walls. See [Camera](docs/CAMERA.md).
 - Six hairballs that come at you from every side and stop when they touch you. They are slower than you, so you can run away. See [Enemies](docs/ENEMIES.md).
 - Bodies push each other apart instead of stacking. You can shove one hairball out of your way, but a crowd slows you down. See [Collisions](docs/COLLISIONS.md).
+- A health bar. Each hairball that touches you takes 10 of your 100 hit points, and after a hit you blink and cannot be hurt for 0.8 seconds. See [Health](docs/HEALTH.md).
+- A game over screen that shows how long you survived, and a restart into a fresh arena. See [Game flow](docs/GAME_FLOW.md).
 - Unit tests for the pure logic, and a GitHub Actions workflow that builds and tests every push and pull request on Windows.
 - Warnings are errors for the project's own code (`/W4 /WX` on MSVC).
 
-**Still to do:** health, contact damage and game over (the rest of day 3), then combat, waves and everything else that makes it a game. See the [roadmap](docs/ROADMAP.md).
+**Still to do:** you cannot fight back yet. Next are melee combat (day 4) and enemy waves (day 5), then everything else that makes it a game. See the [roadmap](docs/ROADMAP.md).
 
 ## Tech stack
 
@@ -59,7 +61,7 @@ build\default\src\Release\HordeCarnage.exe
 
 You can also open the folder in Visual Studio (*File > Open > Folder*). It reads `CMakePresets.json` by itself.
 
-**Controls:** `WASD` or the arrow keys move, and so do the left stick and the d-pad of a gamepad. `Esc` quits. In Debug builds, `F1` shows a movement overlay.
+**Controls:** `WASD` or the arrow keys move, and so do the left stick and the d-pad of a gamepad. After a game over, `Enter` or `R` (`A` or `Start` on a gamepad) plays again. `Esc` quits. In Debug builds, `F1` shows a debug overlay.
 
 ## Building and testing
 

@@ -5,6 +5,11 @@
 
 namespace horde {
 
+bool AreTouching(Vec2 a, float radiusA, Vec2 b, float radiusB) {
+    const float reach = radiusA + radiusB + kContactSlack;
+    return LengthSquared(b - a) <= reach * reach;
+}
+
 float PushShare(float weightA, float weightB) {
     assert(weightA > 0.0f && weightB > 0.0f && "collision weights must be positive");
     return weightB / (weightA + weightB);
