@@ -3,11 +3,13 @@ add_executable(horde_tests
     TestMain.cpp
     core/AnalogInputTests.cpp
     core/ArenaTests.cpp
+    core/ChaseTests.cpp
     core/FacingTests.cpp
     core/FixedTimestepTests.cpp
     core/FollowCameraTests.cpp
     core/MovementTests.cpp
-    core/Vec2Tests.cpp)
+    core/Vec2Tests.cpp
+    core/WorldTests.cpp)
 target_link_libraries(horde_tests PRIVATE horde_core doctest::doctest)
 horde_set_warnings(horde_tests)
 

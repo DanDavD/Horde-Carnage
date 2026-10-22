@@ -18,17 +18,18 @@ I chose plain C++ with a small library instead of an engine on purpose. raylib o
 
 ## Current status
 
-This is day 2 of 15. Progress is tracked in the [roadmap](docs/ROADMAP.md) and the [changelog](CHANGELOG.md).
+This is day 3 of 15. Progress is tracked in the [roadmap](docs/ROADMAP.md) and the [changelog](CHANGELOG.md).
 
 **What works today:**
 - A CMake project that downloads raylib and doctest at a pinned version, so a fresh clone builds with one command.
 - A window with a fixed-timestep main loop: the game simulates at 60 Hz whatever the monitor's refresh rate, and renders once per frame.
 - A player you move around an arena with the keyboard or a gamepad. It speeds up and stops over a fraction of a second, turns back quickly, is never faster on a diagonal, faces the way you push, and slides along the walls. See [Movement](docs/MOVEMENT.md).
 - An arena bigger than the screen, with a camera that follows the player smoothly, looks a little ahead of where you run, and stops at the walls. See [Camera](docs/CAMERA.md).
+- Six hairballs that come at you from every side and stop when they touch you. They are slower than you, so you can run away. See [Enemies](docs/ENEMIES.md).
 - Unit tests for the pure logic, and a GitHub Actions workflow that builds and tests every push and pull request on Windows.
 - Warnings are errors for the project's own code (`/W4 /WX` on MSVC).
 
-**Still to do:** enemies, combat, waves and everything else that makes it a game. See the [roadmap](docs/ROADMAP.md).
+**Still to do:** collisions between bodies, health, contact damage and game over (the rest of day 3), then combat, waves and everything else that makes it a game. See the [roadmap](docs/ROADMAP.md).
 
 ## Tech stack
 
