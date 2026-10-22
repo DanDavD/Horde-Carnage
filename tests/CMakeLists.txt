@@ -4,6 +4,7 @@ add_executable(horde_tests
     core/AnalogInputTests.cpp
     core/ArenaTests.cpp
     core/ChaseTests.cpp
+    core/CollisionTests.cpp
     core/FacingTests.cpp
     core/FixedTimestepTests.cpp
     core/FollowCameraTests.cpp

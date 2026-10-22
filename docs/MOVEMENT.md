@@ -28,7 +28,7 @@ Every moving entity has a `Motion` component: `position`, `previousPosition` and
    1. **Clamp the input to length 1.** The input says where the mover wants to go, and its length is how much of the top speed it wants. A keyboard diagonal is `(1, 1)`, which is about 1.41 long, so without the clamp the player would move 41% faster diagonally. An analog stick pushed halfway gives about 0.5, and keeps that half speed.
    2. **Move the velocity toward the target velocity** (`input * maxSpeed`) by at most `rate * dt`. The rate is `deceleration` when the mover is braking, and `acceleration` otherwise. Braking means there is no input, or the input points against the current velocity (their dot product is negative). A 90 degree turn is not braking. `MoveTowards` never goes past the target, so a mover that stops does not slide backwards.
    3. **Integrate the position** with the new velocity, after saving the old one in `previousPosition`.
-4. **Confine it to the arena** with `ConfineToArena`. On each axis, if the body (a circle of `radius`) went through a wall, it is put back against the wall, and the part of the velocity that points into that wall is set to zero. The other axis is not touched, so the player slides along walls.
+4. **Confine it to the arena** with `ConfineToArena`. This happens after every body has moved and collisions have pushed overlapping bodies apart (see [Collisions](COLLISIONS.md)), so a body pushed into a wall is put back too. On each axis, if the body (a circle of `radius`) went through a wall, it is put back against the wall, and the part of the velocity that points into that wall is set to zero. The other axis is not touched, so the player slides along walls.
 
 Enemies go through the same movement and wall steps with their own input and numbers. See [Enemies](ENEMIES.md).
 
@@ -92,5 +92,5 @@ The tests use round numbers that are exact in binary floating point where they c
 
 - With the keyboard or the d-pad, `facing` has 8 directions. Only the stick gives every angle.
 - A turn of less than 90 degrees from the velocity uses `acceleration`, even though part of it is braking. It has not been tuned by hand yet, and it is the first thing to check if curves feel loose.
-- Walls are the only thing that stops a mover. Collisions between bodies come with the first enemy on day 3.
+- Walls and other bodies are the only things that stop a mover. There are no obstacles inside the arena yet.
 - Only the first gamepad is read, and only its left stick and d-pad.

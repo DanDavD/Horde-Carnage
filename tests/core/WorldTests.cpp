@@ -1,8 +1,10 @@
+#include <algorithm>
 #include <cstddef>
 #include <vector>
 
 #include <doctest/doctest.h>
 
+#include "core/Collision.h"
 #include "core/World.h"
 
 using horde::Arena;
@@ -25,6 +27,24 @@ void Step(World& world, Vec2 input, int steps) {
 
 float DistanceToPlayer(const World& world, const Enemy& enemy) {
     return horde::Length(enemy.motion.position - world.player.motion.position);
+}
+
+// How far the two most overlapping bodies sink into each other. 0 when nobody overlaps.
+float DeepestOverlap(const World& world) {
+    float deepest = 0.0f;
+    const auto check = [&deepest](Vec2 a, float radiusA, Vec2 b, float radiusB) {
+        deepest = std::max(deepest, radiusA + radiusB - horde::Length(b - a));
+    };
+    const horde::Player& player = world.player;
+    for (std::size_t i = 0; i < world.enemies.size(); ++i) {
+        const Enemy& enemy = world.enemies[i];
+        check(player.motion.position, player.radius, enemy.motion.position, enemy.radius);
+        for (std::size_t j = i + 1; j < world.enemies.size(); ++j) {
+            const Enemy& other = world.enemies[j];
+            check(enemy.motion.position, enemy.radius, other.motion.position, other.radius);
+        }
+    }
+    return deepest;
 }
 
 bool InsideArena(Vec2 position, float radius) {
@@ -86,17 +106,55 @@ TEST_CASE("hairballs walk toward the player") {
     }
 }
 
-TEST_CASE("hairballs stop when they touch the player instead of pushing into its centre") {
+TEST_CASE("hairballs come to rest touching the player, without sinking into it") {
     World world = horde::CreateWorld(kArena, kView);
     Step(world, Vec2{}, 600);
 
     for (const Enemy& enemy : world.enemies) {
         const float contact = enemy.radius + world.player.radius;
-        // The last full step and the braking after it can carry a hairball a few units past contact.
-        CHECK(DistanceToPlayer(world, enemy) <= contact);
-        CHECK(DistanceToPlayer(world, enemy) > contact - 10.0f);
-        CHECK(enemy.motion.velocity == Vec2{});
+        CHECK(DistanceToPlayer(world, enemy) >= contact - 0.01f);
+        CHECK(DistanceToPlayer(world, enemy) <= contact + horde::kContactSlack);
+        CHECK(horde::Length(enemy.motion.velocity) < 0.01f);
     }
+    CHECK(DeepestOverlap(world) < 0.01f);
+}
+
+TEST_CASE("hairballs that follow a running player spread out instead of piling up") {
+    World world = horde::CreateWorld(kArena, kView);
+    Step(world, Vec2{}, 300);
+    Step(world, Vec2{1.0f, 0.0f}, 120);
+    Step(world, Vec2{}, 240);
+    CHECK(DeepestOverlap(world) < 0.5f);
+}
+
+TEST_CASE("a crowd leans on a standing player, but far too slowly to notice") {
+    // The hairballs in the second row cannot touch the player, so they keep walking into the first row,
+    // and a little of that push reaches the player. It must stay under 2% of the player's top speed.
+    World world = horde::CreateWorld(kArena, kView);
+    Step(world, Vec2{}, 300);
+    Step(world, Vec2{1.0f, 0.0f}, 120);
+
+    const Vec2 before = world.player.motion.position;
+    Step(world, Vec2{}, 600);
+    const float driftPerSecond = horde::Length(world.player.motion.position - before) / 10.0f;
+    CHECK(driftPerSecond < 0.02f * world.player.stats.maxSpeed);
+}
+
+TEST_CASE("the player can shove through a hairball, but slower than running free") {
+    World free = horde::CreateWorld(kArena, kView);
+    free.enemies.clear();
+    World blocked = horde::CreateWorld(kArena, kView);
+    blocked.enemies.assign(1, Enemy{.motion = horde::MotionAt(blocked.player.motion.position + Vec2{60.0f, 0.0f})});
+
+    const float start = free.player.motion.position.x;
+    Step(free, Vec2{1.0f, 0.0f}, 60);
+    Step(blocked, Vec2{1.0f, 0.0f}, 60);
+
+    const float freeDistance = free.player.motion.position.x - start;
+    const float blockedDistance = blocked.player.motion.position.x - start;
+    CHECK(blockedDistance < freeDistance);
+    CHECK(blockedDistance > 0.5f * freeDistance);
+    CHECK(blocked.enemies[0].motion.position.x > blocked.player.motion.position.x);
 }
 
 TEST_CASE("nobody leaves the arena when the player runs into a corner") {

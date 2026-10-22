@@ -33,7 +33,8 @@ struct World {
 /// does not allocate memory.
 [[nodiscard]] World CreateWorld(const Arena& arena, Vec2 viewSize);
 
-/// Advances the whole simulation by one fixed step of `dt` seconds.
+/// Advances the whole simulation by one fixed step of `dt` seconds: everyone moves, then overlapping
+/// bodies are pushed apart, then everyone is held inside the arena, then the camera follows.
 ///
 /// @param moveInput The player's movement input for this step, as `ReadMoveInput` gives it.
 void StepWorld(World& world, Vec2 moveInput, float dt);

@@ -33,7 +33,7 @@ When a feature has rules (damage, cooldowns, wave timing), the rules go into `ho
 `World` (`src/core/World.h`) holds everything the simulation needs as plain data: the arena, the player, the enemies and the camera. Two functions work on it:
 
 - `CreateWorld` builds the starting state: the player in the middle of the arena, the hairballs around it, the camera on the player.
-- `StepWorld` advances it by one fixed step, in this order: the player (facing, movement, walls), then every enemy (chase, movement, walls), then the camera.
+- `StepWorld` advances it by one fixed step, in this order: the player (facing, movement), then every enemy (chase, movement), then collisions between bodies and the walls (four passes, see [Collisions](COLLISIONS.md)), then the camera.
 
 `Game` owns one `World`. It reads the input, calls `StepWorld`, and draws the result. It never changes the world itself.
 
@@ -65,6 +65,7 @@ Game objects are plain structs (components) that hold data, and free functions (
 - `tests/core/Vec2Tests.cpp`, `MovementTests.cpp`, `FacingTests.cpp`, `ArenaTests.cpp` and `AnalogInputTests.cpp`: see [Movement](MOVEMENT.md#tests).
 - `tests/core/FollowCameraTests.cpp`: see [Camera](CAMERA.md#tests).
 - `tests/core/ChaseTests.cpp` and `WorldTests.cpp`: see [Enemies](ENEMIES.md#tests).
+- `tests/core/CollisionTests.cpp` and the crowd cases in `WorldTests.cpp`: see [Collisions](COLLISIONS.md#tests).
 
 ## Limitations
 

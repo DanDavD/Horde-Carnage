@@ -20,9 +20,9 @@ The game executable only draws them:
 
 Once per fixed step, after the player has moved, `StepWorld` does this for every hairball:
 
-1. **Decide where to go** with `ChaseInput(position, playerPosition, stopDistance)`. The stop distance is the hairball's radius plus the player's, the distance at which the two bodies touch. Farther than that, the input is the direction to the player at length 1. Closer, the input is zero.
+1. **Decide where to go** with `ChaseInput(position, playerPosition, stopDistance)`. The stop distance is the hairball's radius plus the player's, the distance at which the two bodies touch, plus `kContactSlack` (1 unit, see [Collisions](COLLISIONS.md)). Farther than that, the input is the direction to the player at length 1. Closer, the input is zero.
 2. **Move** with `StepMovement`, the same function the player uses, with the hairball's `MovementStats`. It accelerates toward the player, and brakes when the input drops to zero.
-3. **Stay inside the arena** with `ConfineToArena`, like the player.
+3. **Get pushed and held in.** Once every body has moved, collisions push overlapping bodies apart (hairballs against each other and against the player), and `ConfineToArena` keeps everyone inside the walls. See [Collisions](COLLISIONS.md).
 
 So a hairball rolls toward the player, brakes when it touches them, and starts again as soon as the player steps away.
 
@@ -61,7 +61,7 @@ In a Debug build, `F1` shows how many enemies the world has.
 
 ## Limitations
 
-- **Hairballs pass through each other.** Coming from every side they overlap a little around the player, and when the player runs away they all aim at the same point behind the player and pile up into one. Collisions between bodies come in the next step of day 3.
+- **Hairballs all aim at the same point, the player.** Collisions keep them from stacking, but they do not plan around each other: the ones behind keep walking into the ones in front. See the limitations in [Collisions](COLLISIONS.md#limitations).
 - **Touching the player does nothing yet.** Contact damage and the player's health come later on day 3.
 - **There are always exactly 6.** They cannot be killed (day 4), and there are no waves (day 5).
 - **When the player walks slowly away, a hairball at contact switches between walking and stopping from one step to the next.** I have not checked how that looks in motion yet, only in still screenshots.
