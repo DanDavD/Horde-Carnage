@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/Dash.h"
 #include "core/Health.h"
 #include "core/Loadout.h"
 #include "core/Movement.h"
@@ -20,6 +21,7 @@ struct Player {
     Vec2 facing{0.0f, 1.0f};
     Health health;
     Loadout loadout;
+    Dash dash;
 };
 
 } // namespace horde

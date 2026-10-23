@@ -3,6 +3,7 @@ add_library(horde_core STATIC
     core/Arena.cpp
     core/Chase.cpp
     core/Collision.cpp
+    core/Dash.cpp
     core/Facing.cpp
     core/FixedTimestep.cpp
     core/FollowCamera.cpp

@@ -7,6 +7,7 @@
 
 #include "core/Chase.h"
 #include "core/Collision.h"
+#include "core/Dash.h"
 #include "core/Facing.h"
 #include "core/Health.h"
 #include "core/Loadout.h"
@@ -24,6 +25,47 @@ constexpr int kCollisionPasses = 4;
 constexpr float kHitFlashSeconds = 0.1f;
 constexpr float kHitStunSeconds = 0.15f;
 
+// Every source of damage to the player goes through here, so a dash protects from all of them.
+void HurtPlayer(Player& player, int damage) {
+    if (!IsDashInvulnerable(player.dash)) {
+        ApplyDamage(player.health, damage);
+    }
+}
+
+// A dash goes where the player is pushing. Standing still, it goes toward the aim point of this step, not
+// the facing: the facing is only updated after moving, so it is a step old, and a flick of the mouse
+// followed by a dash in the same frame would go the wrong way.
+void StartDashIfAsked(Player& player, const PlayerCommands& commands) {
+    if (!commands.dashPressed || IsDashing(player.dash)) {
+        return;
+    }
+    // With the cursor right on the player there is no aim direction (the same one unit tolerance as
+    // AimFacing), and the facing is the best guess.
+    Vec2 direction = player.facing;
+    if (LengthSquared(commands.move) > 0.0f) {
+        direction = commands.move;
+    } else if (commands.aimAt && LengthSquared(*commands.aimAt - player.motion.position) > 1.0f) {
+        direction = *commands.aimAt - player.motion.position;
+    }
+    TryStartDash(player.dash, player.motion.position, direction);
+}
+
+void MovePlayer(Player& player, Vec2 move, float dt) {
+    Dash& dash = player.dash;
+    const bool dashing = IsDashing(dash);
+    const Vec2 dashStep = StepDash(dash, dt);
+    if (!dashing) {
+        StepMovement(player.motion, move, player.stats, dt);
+        return;
+    }
+    // The burst replaces normal movement. The velocity reports running speed rather than the burst's
+    // 1500 units/s: the player leaves the dash at running pace instead of sliding on, and the camera's
+    // look-ahead does not lurch forward for a tenth of a second.
+    player.motion.previousPosition = player.motion.position;
+    player.motion.position += dashStep;
+    player.motion.velocity = dash.direction * player.stats.maxSpeed;
+}
+
 // Switching happens before the trigger, so a switch and a click in the same step fire the new gun.
 void HandleWeapons(World& world, const PlayerCommands& commands, float dt) {
     Player& player = world.player;
@@ -37,7 +79,8 @@ void HandleWeapons(World& world, const PlayerCommands& commands, float dt) {
     TickLoadout(loadout, dt);
 
     Weapon& weapon = Equipped(loadout);
-    if (PullTrigger(weapon, commands.fireHeld, commands.firePressed)) {
+    const bool handsFree = !IsDashing(player.dash);
+    if (PullTrigger(weapon, commands.fireHeld, commands.firePressed, handsFree)) {
         const Vec2 muzzle = MuzzlePoint(player.motion.position, player.facing, player.radius, weapon.stats);
         world.bullets.Spawn(MakeBullet(muzzle, player.facing, weapon.stats));
         ++world.shotsFired;
@@ -70,13 +113,17 @@ void ConfineEveryone(World& world) {
 
 // Every pair once: the player against each enemy, then each enemy against the ones after it. With a few
 // dozen bodies that is a few hundred checks per pass, so a spatial grid would cost more than it saves.
+// A dashing player passes through bodies, so a dash can escape a crowd or go through the boss.
 void SeparateEveryone(World& world) {
     Player& player = world.player;
+    const bool playerIsSolid = !IsDashing(player.dash);
     auto& enemies = world.enemies;
     for (std::size_t i = 0; i < enemies.Size(); ++i) {
         Enemy& enemy = enemies[i];
-        SeparateCircles(player.motion, player.radius, enemy.motion, enemy.radius,
-                        PushShare(player.weight, enemy.weight));
+        if (playerIsSolid) {
+            SeparateCircles(player.motion, player.radius, enemy.motion, enemy.radius,
+                            PushShare(player.weight, enemy.weight));
+        }
         for (std::size_t j = i + 1; j < enemies.Size(); ++j) {
             Enemy& other = enemies[j];
             SeparateCircles(enemy.motion, enemy.radius, other.motion, other.radius,
@@ -137,7 +184,7 @@ void ApplyContactDamage(World& world) {
     Player& player = world.player;
     for (const Enemy& enemy : world.enemies) {
         if (AreTouching(player.motion.position, player.radius, enemy.motion.position, enemy.radius)) {
-            ApplyDamage(player.health, enemy.contactDamage);
+            HurtPlayer(player, enemy.contactDamage);
         }
     }
 }
@@ -179,7 +226,9 @@ void StepWorld(World& world, const PlayerCommands& commands, float dt) {
     world.elapsedSeconds += dt;
     Player& player = world.player;
     TickHealth(player.health, dt);
-    StepMovement(player.motion, commands.move, player.stats, dt);
+    TickDashCooldown(player.dash, dt);
+    StartDashIfAsked(player, commands);
+    MovePlayer(player, commands.move, dt);
 
     // Aim after moving, so the gun points from where the player is now, not from a step ago.
     if (commands.aimAt) {

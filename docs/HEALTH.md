@@ -21,7 +21,7 @@ Every fixed step, `StepWorld`:
 
 1. **Counts the invulnerability window down** with `TickHealth`, at the start of the step.
 2. Moves everyone and resolves collisions (see [Collisions](COLLISIONS.md)).
-3. **Applies contact damage:** for every hairball, if `AreTouching` says it touches the player (the sum of the radii plus `kContactSlack`), `ApplyDamage(player.health, enemy.contactDamage)`.
+3. **Applies contact damage:** for every hairball, if `AreTouching` says it touches the player (the sum of the radii plus `kContactSlack`), it hurts the player through `HurtPlayer`, the single door for damage to the player. `HurtPlayer` ignores the damage while a dash makes the player invulnerable (see [Player abilities](ABILITIES.md)), and otherwise calls `ApplyDamage(player.health, enemy.contactDamage)`.
 
 `ApplyDamage` does nothing if the body is dead or still inside its invulnerability window. Otherwise it takes the damage, never going below 0, and opens a new window of `invulnerabilityAfterHit` seconds.
 

@@ -114,3 +114,13 @@ TEST_CASE("the pistol hits harder per bullet and the SMG fires faster") {
     CHECK(horde::kPistol.damage > horde::kSmg.damage);
     CHECK(horde::kSmg.shotsPerSecond > horde::kPistol.shotsPerSecond);
 }
+
+TEST_CASE("a trigger that cannot fire still remembers a press for when it can") {
+    Weapon weapon{.stats = horde::kPistol};
+    horde::TickWeapon(weapon, kDt);
+    CHECK_FALSE(horde::PullTrigger(weapon, false, true, false));
+    CHECK(weapon.bufferedPressSeconds > 0.0f);
+
+    horde::TickWeapon(weapon, kDt);
+    CHECK(horde::PullTrigger(weapon, false, false, true));
+}

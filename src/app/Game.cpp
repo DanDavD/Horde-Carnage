@@ -41,6 +41,12 @@ constexpr float kBlinkFade = 0.35f;
 constexpr float kPistolBarrelWidth = 6.0f;
 constexpr float kSmgBarrelWidth = 9.0f;
 constexpr float kMuzzleFlashRadius = 8.0f;
+// The dash leaves a fading trail of ghosts between where it started and the body, so a move that takes
+// seven frames still reads as a jump.
+constexpr int kDashGhosts = 4;
+// The dash bar sits under the health bar.
+constexpr int kDashBarY = 64;
+constexpr int kDashBarHeight = 6;
 // A bullet is drawn as a short streak behind its head, so its direction reads even in a still frame.
 constexpr float kBulletStreak = 14.0f;
 constexpr float kBulletWidth = 4.0f;
@@ -75,9 +81,10 @@ constexpr Color kHitFlash{255, 255, 255, 255};
 
 #ifndef NDEBUG
 constexpr const char* kControlsHint =
-    "WASD move   Mouse aim   Click fire   Q, 1, 2, wheel switch gun   Esc quit   F1 debug";
+    "WASD move   Mouse aim   Click fire   Space dash   Q, 1, 2, wheel switch gun   Esc quit   F1 debug";
 #else
-constexpr const char* kControlsHint = "WASD move   Mouse aim   Click fire   Q, 1, 2, wheel switch gun   Esc quit";
+constexpr const char* kControlsHint =
+    "WASD move   Mouse aim   Click fire   Space dash   Q, 1, 2, wheel switch gun   Esc quit";
 #endif
 
 const char* FireModeLabel(FireMode mode) {
@@ -108,10 +115,26 @@ void DrawArena(const Arena& arena) {
     DrawRectangleLinesEx(walls, kWallThickness, kWall);
 }
 
+// Ghosts fade with the dash's invulnerability, so the trail also shows how long the player is safe.
+void DrawDashTrail(const Player& player, Vec2 position) {
+    const Dash& dash = player.dash;
+    if (!IsDashInvulnerable(dash)) {
+        return;
+    }
+    const float strength = dash.invulnerableSeconds / dash.stats.invulnerability;
+    for (int i = 0; i < kDashGhosts; ++i) {
+        const float along = static_cast<float>(i) / kDashGhosts;
+        const Vec2 ghost = Lerp(dash.origin, position, along);
+        const float size = player.radius * (0.6f + 0.4f * along);
+        DrawCircleV(ToRaylib(ghost), size, Fade(kPlayerFill, 0.4f * strength * along));
+    }
+}
+
 void DrawPlayer(const Player& player, float alpha) {
     // Drawn between the last two fixed steps, so movement is smooth above 60 Hz.
     const Vec2 position = Lerp(player.motion.previousPosition, player.motion.position, alpha);
     const Health& health = player.health;
+    DrawDashTrail(player, position);
 
     Color edge = IsDead(health) ? kPlayerDeadEdge : kPlayerEdge;
     Color fill = IsDead(health) ? kPlayerDeadFill : kPlayerFill;
@@ -218,6 +241,17 @@ void DrawCrosshair(Vector2 at) {
     DrawCircleV(at, 1.5f, kCrosshair);
 }
 
+// Fills up as the dash recharges, and lights up when it is ready.
+void DrawDashBar(const Dash& dash) {
+    constexpr int kX = 10;
+    constexpr int kWidth = 260;
+    const float total = dash.stats.duration + dash.stats.cooldown;
+    const float ready = 1.0f - dash.cooldownSeconds / total;
+    DrawRectangle(kX, kDashBarY, kWidth, kDashBarHeight, kBarBack);
+    DrawRectangle(kX, kDashBarY, static_cast<int>(kWidth * ready), kDashBarHeight,
+                  dash.cooldownSeconds > 0.0f ? kSoftText : kPlayerFill);
+}
+
 void DrawGameOver(const Session& session) {
     DrawRectangle(0, 0, kScreenWidth, kScreenHeight, Fade(BLACK, 0.55f));
     DrawCenteredText("GAME OVER", kScreenHeight / 2 - 90, 64, kBlood);
@@ -261,9 +295,9 @@ void DrawDebugHud(const World& world, Vec2 moveInput) {
     const FollowCamera& camera = world.camera;
     const Motion& motion = player.motion;
     constexpr int kX = 10;
-    constexpr int kY = 72; // Below the health bar.
+    constexpr int kY = 80; // Below the health and dash bars.
     constexpr int kLine = 20;
-    DrawRectangle(kX - 4, kY - 4, 300, 11 * kLine + 8, Fade(BLACK, 0.6f));
+    DrawRectangle(kX - 4, kY - 4, 300, 12 * kLine + 8, Fade(BLACK, 0.6f));
     DrawText(TextFormat("input  %5.2f %5.2f  len %4.2f", moveInput.x, moveInput.y, Length(moveInput)), kX, kY,
              18, RAYWHITE);
     DrawText(TextFormat("speed  %5.0f / %.0f", Length(motion.velocity), player.stats.maxSpeed), kX, kY + kLine, 18,
@@ -285,6 +319,8 @@ void DrawDebugHud(const World& world, Vec2 moveInput) {
     DrawText(TextFormat("weapon %s  cd %.2f", std::string(weapon.stats.name).c_str(), weapon.cooldownSeconds), kX,
              kY + 9 * kLine, 18, RAYWHITE);
     DrawText(TextFormat("shots  %d  kills %d", world.shotsFired, world.kills), kX, kY + 10 * kLine, 18, RAYWHITE);
+    DrawText(TextFormat("dash   cd %.2f  inv %.2f", player.dash.cooldownSeconds, player.dash.invulnerableSeconds), kX,
+             kY + 11 * kLine, 18, RAYWHITE);
 }
 #endif
 
@@ -340,7 +376,8 @@ void Game::Update(float dt) {
                                   .fireHeld = ReadFireHeld(),
                                   .firePressed = _pendingPresses.fire,
                                   .selectSlot = _pendingPresses.weaponSlot,
-                                  .cycleWeapon = _pendingPresses.cycleWeapon};
+                                  .cycleWeapon = _pendingPresses.cycleWeapon,
+                                  .dashPressed = _pendingPresses.dash};
     // Presses are events: only the first step of a frame uses them, so a frame that runs two steps does
     // not fire twice for one click.
     _pendingPresses = {};
@@ -390,6 +427,7 @@ void Game::Draw(float alpha) const {
 #endif
 
     DrawHealthBar(player.health);
+    DrawDashBar(player.dash);
     DrawWeaponPanel(player.loadout);
     DrawFPS(10, 10);
     DrawText("Horde Carnage v" HORDE_VERSION, kScreenWidth - 230, 10, 20, kSoftText);

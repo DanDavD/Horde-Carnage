@@ -14,7 +14,7 @@ The rules live in `horde_core`:
 
 Every fixed step, `StepWorld` first moves everyone (the player with its input, the hairballs with their chase input). Only then does it resolve collisions, in 4 passes. Each pass:
 
-1. **Checks every pair once:** the player against each hairball, and each hairball against every hairball after it in the list.
+1. **Checks every pair once:** the player against each hairball, and each hairball against every hairball after it in the list. A dashing player is left out, so a dash passes through bodies (see [Player abilities](ABILITIES.md)).
 2. **Separates each overlapping pair** with `SeparateCircles`:
    1. If the distance between the centres is less than the sum of the radii, the circles overlap by the difference.
    2. Both bodies move apart along the line between their centres until they just touch. Body A moves `PushShare(weightA, weightB) = weightB / (weightA + weightB)` of the overlap, body B the rest. With the player at weight 4 and a hairball at 1, the player takes 20% and the hairball 80%.

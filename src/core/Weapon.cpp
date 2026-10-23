@@ -18,9 +18,12 @@ void TickWeapon(Weapon& weapon, float dt) {
     weapon.muzzleFlashSeconds = std::max(weapon.muzzleFlashSeconds - dt, 0.0f);
 }
 
-bool PullTrigger(Weapon& weapon, bool held, bool pressed) {
+bool PullTrigger(Weapon& weapon, bool held, bool pressed, bool canFire) {
     if (pressed) {
         weapon.bufferedPressSeconds = kTriggerBufferSeconds;
+    }
+    if (!canFire) {
+        return false;
     }
 
     const bool hasPress = weapon.bufferedPressSeconds > 0.0f;
