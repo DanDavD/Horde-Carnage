@@ -27,8 +27,9 @@ Session OneHitFromDeath() {
     Session session = horde::StartSession(kArena, kView);
     horde::Player& player = session.world.player;
     player.health.current = 10;
-    session.world.enemies.assign(
-        1, Enemy{.motion = horde::MotionAt(player.motion.position + Vec2{player.radius + 18.0f, 0.0f})});
+    session.world.enemies.Clear();
+    const Vec2 touching = player.motion.position + Vec2{player.radius + 18.0f, 0.0f};
+    session.world.enemies.Spawn(Enemy{.motion = horde::MotionAt(touching)});
     return session;
 }
 
@@ -97,8 +98,9 @@ TEST_CASE("after the delay a restart starts a fresh world") {
     CHECK(session.world.player.health.current == session.world.player.health.max);
     CHECK(session.world.elapsedSeconds == 0.0f);
     CHECK(session.world.player.motion.position == fresh.player.motion.position);
-    REQUIRE(session.world.enemies.size() == fresh.enemies.size());
-    for (std::size_t i = 0; i < fresh.enemies.size(); ++i) {
+    REQUIRE(session.world.enemies.Size() == fresh.enemies.Size());
+    CHECK(session.world.bullets.Empty());
+    for (std::size_t i = 0; i < fresh.enemies.Size(); ++i) {
         CHECK(session.world.enemies[i].motion.position == fresh.enemies[i].motion.position);
     }
 }

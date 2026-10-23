@@ -64,3 +64,10 @@ TEST_CASE("an arena narrower than the mover keeps it in the middle") {
     CHECK(motion.position == Vec2{5.0f, 50.0f});
     CHECK(motion.velocity == Vec2{});
 }
+
+TEST_CASE("an arena contains the points inside it and on its edge, and nothing outside") {
+    CHECK(horde::Contains(kArena, Vec2{50.0f, 50.0f}));
+    CHECK(horde::Contains(kArena, Vec2{100.0f, 0.0f}));
+    CHECK_FALSE(horde::Contains(kArena, Vec2{100.5f, 50.0f}));
+    CHECK_FALSE(horde::Contains(kArena, Vec2{50.0f, -1.0f}));
+}

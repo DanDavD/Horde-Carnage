@@ -1,5 +1,7 @@
 #pragma once
 
+#include <optional>
+
 #include "core/Movement.h"
 
 namespace horde {
@@ -12,6 +14,13 @@ inline constexpr float kContactSlack = 1.0f;
 /// Whether two circles touch, allowing `kContactSlack`. Chasers stop at this distance, and contact
 /// damage uses the same test, so a hairball that stopped against the player always counts as touching it.
 [[nodiscard]] bool AreTouching(Vec2 a, float radiusA, Vec2 b, float radiusB);
+
+/// When a circle of `radius` moving from `from` to `to` first touches a still circle at `center`, as a
+/// fraction of the way from 0 to 1. Empty if it never does in that move. 0 if they already touch.
+///
+/// Bullets use it instead of checking only where they end the step, so a fast bullet cannot skip over a
+/// thin enemy, and when two enemies are in its path the nearer one is hit.
+[[nodiscard]] std::optional<float> SweepCircle(Vec2 from, Vec2 to, float radius, Vec2 center, float otherRadius);
 
 /// The fraction of an overlap that body A takes when it collides with body B: `weightB / (weightA + weightB)`.
 /// A heavier body moves less. Only the ratio between the two weights matters.

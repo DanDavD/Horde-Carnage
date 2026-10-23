@@ -36,12 +36,14 @@ constexpr float kHairballEyeRadius = 0.22f;
 // While invulnerable the player blinks: faded for one period, solid for the next.
 constexpr float kBlinkPeriod = 0.1f;
 constexpr float kBlinkFade = 0.35f;
-// The gun is a barrel that sticks out of the body toward the aim. The SMG reads as the bigger gun.
-constexpr float kPistolBarrelLength = 14.0f;
-constexpr float kSmgBarrelLength = 22.0f;
+// The gun is a barrel that sticks out of the body toward the aim, as long as `WeaponStats::barrelLength`.
+// The SMG's is thicker, so it reads as the bigger gun.
 constexpr float kPistolBarrelWidth = 6.0f;
 constexpr float kSmgBarrelWidth = 9.0f;
 constexpr float kMuzzleFlashRadius = 8.0f;
+// A bullet is drawn as a short streak behind its head, so its direction reads even in a still frame.
+constexpr float kBulletStreak = 14.0f;
+constexpr float kBulletWidth = 4.0f;
 // Weapon panel in the bottom right corner, one box per slot.
 constexpr int kSlotBoxWidth = 150;
 constexpr int kSlotBoxHeight = 48;
@@ -68,6 +70,8 @@ constexpr Color kBarEdge{120, 100, 110, 255};
 constexpr Color kGun{175, 180, 195, 255};
 constexpr Color kMuzzleFlash{255, 220, 120, 255};
 constexpr Color kCrosshair{240, 240, 245, 255};
+constexpr Color kBullet{255, 230, 140, 255};
+constexpr Color kHitFlash{255, 255, 255, 255};
 
 #ifndef NDEBUG
 constexpr const char* kControlsHint =
@@ -123,8 +127,7 @@ void DrawPlayer(const Player& player, float alpha) {
     // The barrel goes under the body, so it reads as held, sticking out toward the aim.
     const Weapon& weapon = Equipped(player.loadout);
     const bool automatic = weapon.stats.mode == FireMode::Auto;
-    const float barrelLength = automatic ? kSmgBarrelLength : kPistolBarrelLength;
-    const Vec2 muzzle = position + player.facing * (player.radius + barrelLength);
+    const Vec2 muzzle = MuzzlePoint(position, player.facing, player.radius, weapon.stats);
     DrawLineEx(ToRaylib(position), ToRaylib(muzzle), automatic ? kSmgBarrelWidth : kPistolBarrelWidth, gun);
 
     DrawCircleV(ToRaylib(position), player.radius, edge);
@@ -139,16 +142,20 @@ void DrawPlayer(const Player& player, float alpha) {
 void DrawHairball(const Enemy& enemy, Vec2 playerPosition, float alpha) {
     const Vec2 position = Lerp(enemy.motion.previousPosition, enemy.motion.position, alpha);
     const float radius = enemy.radius;
+    // A hit turns the whole body white for a moment, so every bullet that lands is visible.
+    const bool flashing = enemy.hitFlashSeconds > 0.0f;
+    const Color edge = flashing ? kHitFlash : kHairballEdge;
+    const Color fill = flashing ? kHitFlash : kHairballFill;
 
     for (int i = 0; i < kHairTufts; ++i) {
         const float angle = 2.0f * std::numbers::pi_v<float> * static_cast<float>(i) / kHairTufts;
         const Vec2 out{std::cos(angle), std::sin(angle)};
         const Vec2 root = position + out * (radius * 0.7f);
         const Vec2 tip = position + out * (radius * (1.0f + kTuftLength));
-        DrawLineEx(ToRaylib(root), ToRaylib(tip), 3.0f, kHairballEdge);
+        DrawLineEx(ToRaylib(root), ToRaylib(tip), 3.0f, edge);
     }
-    DrawCircleV(ToRaylib(position), radius, kHairballEdge);
-    DrawCircleV(ToRaylib(position), radius - 3.0f, kHairballFill);
+    DrawCircleV(ToRaylib(position), radius, edge);
+    DrawCircleV(ToRaylib(position), radius - 3.0f, fill);
 
     // The eyes look at the player, so it is clear what the hairball is after even when it stands still.
     const Vec2 look = Normalized(playerPosition - position);
@@ -156,6 +163,13 @@ void DrawHairball(const Enemy& enemy, Vec2 playerPosition, float alpha) {
     const Vec2 eyes = position + look * (radius * kHairballEyeOffset);
     DrawCircleV(ToRaylib(eyes + side * (radius * kHairballEyeSpread)), radius * kHairballEyeRadius, kHairballEye);
     DrawCircleV(ToRaylib(eyes - side * (radius * kHairballEyeSpread)), radius * kHairballEyeRadius, kHairballEye);
+}
+
+void DrawBullet(const Projectile& bullet, float alpha) {
+    const Vec2 head = Lerp(bullet.motion.previousPosition, bullet.motion.position, alpha);
+    const Vec2 tail = head - Normalized(bullet.motion.velocity) * kBulletStreak;
+    DrawLineEx(ToRaylib(tail), ToRaylib(head), kBulletWidth, kBullet);
+    DrawCircleV(ToRaylib(head), bullet.radius, kBullet);
 }
 
 void DrawHealthBar(const Health& health) {
@@ -207,8 +221,10 @@ void DrawCrosshair(Vector2 at) {
 void DrawGameOver(const Session& session) {
     DrawRectangle(0, 0, kScreenWidth, kScreenHeight, Fade(BLACK, 0.55f));
     DrawCenteredText("GAME OVER", kScreenHeight / 2 - 90, 64, kBlood);
-    DrawCenteredText(TextFormat("You survived %.1f seconds", session.world.elapsedSeconds), kScreenHeight / 2 - 10,
-                     28, RAYWHITE);
+    const World& world = session.world;
+    const char* summary = TextFormat("You survived %.1f seconds and killed %d %s", world.elapsedSeconds, world.kills,
+                                     world.kills == 1 ? "hairball" : "hairballs");
+    DrawCenteredText(summary, kScreenHeight / 2 - 10, 28, RAYWHITE);
     // Dimmed until the restart delay has passed, so it is clear why an early press did nothing.
     const Color prompt = CanRestart(session) ? RAYWHITE : Fade(kSoftText, 0.4f);
     DrawCenteredText("Press Enter or R (A or Start on a gamepad) to play again", kScreenHeight / 2 + 40, 22, prompt);
@@ -258,7 +274,9 @@ void DrawDebugHud(const World& world, Vec2 moveInput) {
     DrawText(TextFormat("pos    %5.0f %5.0f", motion.position.x, motion.position.y), kX, kY + 4 * kLine, 18,
              RAYWHITE);
     DrawText(TextFormat("camera %5.0f %5.0f", camera.center.x, camera.center.y), kX, kY + 5 * kLine, 18, ORANGE);
-    DrawText(TextFormat("enemies %d", static_cast<int>(world.enemies.size())), kX, kY + 6 * kLine, 18, RAYWHITE);
+    DrawText(TextFormat("enemies %d  bullets %d", static_cast<int>(world.enemies.Size()),
+                        static_cast<int>(world.bullets.Size())),
+             kX, kY + 6 * kLine, 18, RAYWHITE);
     DrawText(TextFormat("health %d / %d  inv %.2f", player.health.current, player.health.max,
                         player.health.invulnerableSeconds),
              kX, kY + 7 * kLine, 18, RAYWHITE);
@@ -266,7 +284,7 @@ void DrawDebugHud(const World& world, Vec2 moveInput) {
     const Weapon& weapon = Equipped(player.loadout);
     DrawText(TextFormat("weapon %s  cd %.2f", std::string(weapon.stats.name).c_str(), weapon.cooldownSeconds), kX,
              kY + 9 * kLine, 18, RAYWHITE);
-    DrawText(TextFormat("shots  %d", world.shotsFired), kX, kY + 10 * kLine, 18, RAYWHITE);
+    DrawText(TextFormat("shots  %d  kills %d", world.shotsFired, world.kills), kX, kY + 10 * kLine, 18, RAYWHITE);
 }
 #endif
 
@@ -352,6 +370,9 @@ void Game::Draw(float alpha) const {
     for (const Enemy& enemy : world.enemies) {
         DrawHairball(enemy, playerPosition, alpha);
     }
+    for (const Projectile& bullet : world.bullets) {
+        DrawBullet(bullet, alpha);
+    }
     // The player is drawn last, so it is never hidden under a crowd.
     DrawPlayer(player, alpha);
 #ifndef NDEBUG
@@ -372,6 +393,7 @@ void Game::Draw(float alpha) const {
     DrawWeaponPanel(player.loadout);
     DrawFPS(10, 10);
     DrawText("Horde Carnage v" HORDE_VERSION, kScreenWidth - 230, 10, 20, kSoftText);
+    DrawText(TextFormat("Kills %d", world.kills), kScreenWidth - 230, 36, 20, RAYWHITE);
     if (playing) {
         DrawText(kControlsHint, kHudMargin, kScreenHeight - 30, 18, kSoftText);
         DrawCrosshair(GetMousePosition());

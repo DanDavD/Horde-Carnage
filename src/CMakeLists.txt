@@ -9,6 +9,7 @@ add_library(horde_core STATIC
     core/Health.cpp
     core/Loadout.cpp
     core/Movement.cpp
+    core/Projectile.cpp
     core/Session.cpp
     core/Weapon.cpp
     core/World.cpp)

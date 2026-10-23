@@ -10,6 +10,28 @@ bool AreTouching(Vec2 a, float radiusA, Vec2 b, float radiusB) {
     return LengthSquared(b - a) <= reach * reach;
 }
 
+std::optional<float> SweepCircle(Vec2 from, Vec2 to, float radius, Vec2 center, float otherRadius) {
+    // Solve |from + t * move - center| = radius + otherRadius for the smallest t in [0, 1].
+    const Vec2 move = to - from;
+    const Vec2 offset = from - center;
+    const float reach = radius + otherRadius;
+    const float c = LengthSquared(offset) - reach * reach;
+    if (c <= 0.0f) {
+        return 0.0f;
+    }
+    const float a = LengthSquared(move);
+    const float b = 2.0f * Dot(offset, move);
+    const float discriminant = b * b - 4.0f * a * c;
+    if (a == 0.0f || discriminant < 0.0f) {
+        return std::nullopt;
+    }
+    const float t = (-b - std::sqrt(discriminant)) / (2.0f * a);
+    if (t < 0.0f || t > 1.0f) {
+        return std::nullopt;
+    }
+    return t;
+}
+
 float PushShare(float weightA, float weightB) {
     assert(weightA > 0.0f && weightB > 0.0f && "collision weights must be positive");
     return weightB / (weightA + weightB);

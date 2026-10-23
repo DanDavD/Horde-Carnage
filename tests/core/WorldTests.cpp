@@ -31,6 +31,12 @@ void Step(World& world, Vec2 move, int steps) {
     Step(world, PlayerCommands{.move = move}, steps);
 }
 
+// Replaces the ring with one hairball at `position`, for tests about a single enemy.
+Enemy& OnlyEnemyAt(World& world, Vec2 position) {
+    world.enemies.Clear();
+    return *world.enemies.Spawn(Enemy{.motion = horde::MotionAt(position)});
+}
+
 float DistanceToPlayer(const World& world, const Enemy& enemy) {
     return horde::Length(enemy.motion.position - world.player.motion.position);
 }
@@ -42,10 +48,10 @@ float DeepestOverlap(const World& world) {
         deepest = std::max(deepest, radiusA + radiusB - horde::Length(b - a));
     };
     const horde::Player& player = world.player;
-    for (std::size_t i = 0; i < world.enemies.size(); ++i) {
+    for (std::size_t i = 0; i < world.enemies.Size(); ++i) {
         const Enemy& enemy = world.enemies[i];
         check(player.motion.position, player.radius, enemy.motion.position, enemy.radius);
-        for (std::size_t j = i + 1; j < world.enemies.size(); ++j) {
+        for (std::size_t j = i + 1; j < world.enemies.Size(); ++j) {
             const Enemy& other = world.enemies[j];
             check(enemy.motion.position, enemy.radius, other.motion.position, other.radius);
         }
@@ -65,7 +71,8 @@ TEST_CASE("a new world puts the player in the middle and the hairballs on a ring
     CHECK(world.player.motion.position == Vec2{1200.0f, 800.0f});
     CHECK(world.player.motion.previousPosition == world.player.motion.position);
 
-    REQUIRE(world.enemies.size() == static_cast<std::size_t>(horde::kStartingHairballs));
+    REQUIRE(world.enemies.Size() == static_cast<std::size_t>(horde::kStartingHairballs));
+    CHECK(world.bullets.Empty());
     for (const Enemy& enemy : world.enemies) {
         CHECK(DistanceToPlayer(world, enemy) == doctest::Approx(horde::kHairballSpawnDistance));
         CHECK(enemy.motion.previousPosition == enemy.motion.position);
@@ -107,7 +114,7 @@ TEST_CASE("hairballs walk toward the player") {
     }
 
     Step(world, Vec2{}, 60);
-    for (std::size_t i = 0; i < world.enemies.size(); ++i) {
+    for (std::size_t i = 0; i < world.enemies.Size(); ++i) {
         CHECK(DistanceToPlayer(world, world.enemies[i]) < before[i]);
     }
 }
@@ -148,9 +155,9 @@ TEST_CASE("a crowd leans on a standing player, but far too slowly to notice") {
 
 TEST_CASE("the player can shove through a hairball, but slower than running free") {
     World free = horde::CreateWorld(kArena, kView);
-    free.enemies.clear();
+    free.enemies.Clear();
     World blocked = horde::CreateWorld(kArena, kView);
-    blocked.enemies.assign(1, Enemy{.motion = horde::MotionAt(blocked.player.motion.position + Vec2{60.0f, 0.0f})});
+    OnlyEnemyAt(blocked, blocked.player.motion.position + Vec2{60.0f, 0.0f});
 
     const float start = free.player.motion.position.x;
     Step(free, Vec2{1.0f, 0.0f}, 60);
@@ -190,7 +197,10 @@ TEST_CASE("the same inputs always give the same world") {
     CHECK(a.player.motion.position == b.player.motion.position);
     CHECK(a.player.facing == b.player.facing);
     CHECK(a.shotsFired == b.shotsFired);
-    for (std::size_t i = 0; i < a.enemies.size(); ++i) {
+    CHECK(a.kills == b.kills);
+    REQUIRE(a.bullets.Size() == b.bullets.Size());
+    REQUIRE(a.enemies.Size() == b.enemies.Size());
+    for (std::size_t i = 0; i < a.enemies.Size(); ++i) {
         CHECK(a.enemies[i].motion.position == b.enemies[i].motion.position);
     }
 }
@@ -210,8 +220,7 @@ TEST_CASE("hairballs that are not touching the player do not hurt it") {
 TEST_CASE("a touching hairball hurts the player once per invulnerability window") {
     World world = horde::CreateWorld(kArena, kView);
     horde::Player& player = world.player;
-    const Vec2 touching = player.motion.position + Vec2{player.radius + 18.0f, 0.0f};
-    world.enemies.assign(1, Enemy{.motion = horde::MotionAt(touching)});
+    OnlyEnemyAt(world, player.motion.position + Vec2{player.radius + 18.0f, 0.0f});
     const int damage = world.enemies[0].contactDamage;
 
     Step(world, Vec2{}, 1);
@@ -251,6 +260,7 @@ TEST_CASE("the fire button fires the gun in hand") {
     World world = horde::CreateWorld(kArena, kView);
     Step(world, PlayerCommands{.firePressed = true}, 1);
     CHECK(world.shotsFired == 1);
+    CHECK(world.bullets.Size() == 1);
     CHECK(horde::Equipped(world.player.loadout).muzzleFlashSeconds > 0.0f);
 }
 
@@ -275,4 +285,118 @@ TEST_CASE("weapon commands switch the gun in hand") {
 
     Step(world, PlayerCommands{.selectSlot = 0}, 1);
     CHECK(world.player.loadout.equipped == 0);
+}
+
+namespace {
+
+// Aims along +x from the player, where the single-enemy tests put their hairballs.
+PlayerCommands AimRight(const World& world, bool firePressed) {
+    return PlayerCommands{.aimAt = world.player.motion.position + Vec2{1000.0f, 0.0f}, .firePressed = firePressed};
+}
+
+} // namespace
+
+TEST_CASE("a shot leaves the muzzle and flies where the player aims") {
+    World world = horde::CreateWorld(kArena, kView);
+    world.enemies.Clear();
+    const horde::Player& player = world.player;
+    const Vec2 muzzle = horde::MuzzlePoint(player.motion.position, Vec2{1.0f, 0.0f}, player.radius, horde::kPistol);
+
+    Step(world, AimRight(world, true), 1);
+    REQUIRE(world.bullets.Size() == 1);
+    const horde::Projectile& bullet = world.bullets[0];
+    CHECK(bullet.motion.previousPosition.x == doctest::Approx(muzzle.x));
+    CHECK(bullet.motion.previousPosition.y == doctest::Approx(muzzle.y));
+    CHECK(bullet.motion.velocity.x == doctest::Approx(horde::kPistol.bulletSpeed));
+    CHECK(bullet.motion.velocity.y == doctest::Approx(0.0f));
+}
+
+TEST_CASE("a bullet that hits nothing is gone once it has flown its range") {
+    World world = horde::CreateWorld(kArena, kView);
+    world.enemies.Clear();
+    Step(world, AimRight(world, true), 1);
+    REQUIRE(world.bullets.Size() == 1);
+
+    const int lifetimeSteps = static_cast<int>(horde::kPistol.range / horde::kPistol.bulletSpeed / kDt);
+    Step(world, AimRight(world, false), lifetimeSteps + 1);
+    CHECK(world.bullets.Empty());
+}
+
+TEST_CASE("a bullet that reaches a wall is gone at once") {
+    World world = horde::CreateWorld(kArena, kView);
+    world.enemies.Clear();
+    world.player.motion = horde::MotionAt(Vec2{kArena.max.x - 60.0f, 800.0f});
+    Step(world, AimRight(world, true), 1);
+    Step(world, AimRight(world, false), 5);
+    CHECK(world.bullets.Empty());
+}
+
+TEST_CASE("three pistol bullets kill a hairball, and the kill is counted") {
+    World world = horde::CreateWorld(kArena, kView);
+    OnlyEnemyAt(world, world.player.motion.position + Vec2{250.0f, 0.0f});
+
+    // Three clicks, each when the pistol is ready again, then time for the last bullet to arrive.
+    for (int shot = 0; shot < 3; ++shot) {
+        Step(world, AimRight(world, true), 1);
+        Step(world, AimRight(world, false), 9);
+    }
+    Step(world, AimRight(world, false), 30);
+
+    CHECK(world.enemies.Empty());
+    CHECK(world.kills == 1);
+    CHECK(world.shotsFired == 3);
+}
+
+TEST_CASE("a hit flashes the hairball, stuns it and knocks it back along the bullet") {
+    World world = horde::CreateWorld(kArena, kView);
+    Enemy& hairball = OnlyEnemyAt(world, world.player.motion.position + Vec2{200.0f, 0.0f});
+    Step(world, AimRight(world, true), 1);
+    for (int i = 0; i < 30 && hairball.health.current == hairball.health.max; ++i) {
+        Step(world, AimRight(world, false), 1);
+    }
+
+    REQUIRE(hairball.health.current == hairball.health.max - horde::kPistol.damage);
+    CHECK(hairball.hitFlashSeconds > 0.0f);
+    CHECK(hairball.stunSeconds > 0.0f);
+    // It was walking toward the player (-x). The knockback turns it around, away from the player.
+    CHECK(hairball.motion.velocity.x > 0.0f);
+}
+
+TEST_CASE("a bullet hits only the nearest hairball in its path") {
+    World world = horde::CreateWorld(kArena, kView);
+    const Vec2 player = world.player.motion.position;
+    world.enemies.Clear();
+    world.enemies.Spawn(Enemy{.motion = horde::MotionAt(player + Vec2{150.0f, 0.0f})});
+    world.enemies.Spawn(Enemy{.motion = horde::MotionAt(player + Vec2{200.0f, 0.0f})});
+
+    Step(world, AimRight(world, true), 1);
+    Step(world, AimRight(world, false), 30);
+
+    REQUIRE(world.enemies.Size() == 2);
+    CHECK(world.enemies[0].health.current == world.enemies[0].health.max - horde::kPistol.damage);
+    CHECK(world.enemies[1].health.current == world.enemies[1].health.max);
+}
+
+TEST_CASE("a hairball killed in a step is gone before it can touch the player") {
+    World world = horde::CreateWorld(kArena, kView);
+    horde::Player& player = world.player;
+    Enemy& hairball = OnlyEnemyAt(world, player.motion.position + Vec2{player.radius + 18.0f, 0.0f});
+    hairball.health.current = 1;
+
+    // Point blank: the muzzle is inside the hairball, so the bullet hits in the step it is fired.
+    Step(world, AimRight(world, true), 1);
+    CHECK(world.kills == 1);
+    CHECK(player.health.current == player.health.max);
+}
+
+TEST_CASE("a cleared arena gets a new ring of hairballs after the delay") {
+    World world = horde::CreateWorld(kArena, kView);
+    world.enemies.Clear();
+
+    const int delaySteps = static_cast<int>(horde::kRespawnDelaySeconds / kDt);
+    Step(world, Vec2{}, delaySteps - 6);
+    CHECK(world.enemies.Empty());
+
+    Step(world, Vec2{}, 12);
+    CHECK(world.enemies.Size() == static_cast<std::size_t>(horde::kStartingHairballs));
 }

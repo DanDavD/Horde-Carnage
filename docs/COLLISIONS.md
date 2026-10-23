@@ -6,7 +6,7 @@ How bodies in the arena push each other: the player against the hairballs, and t
 
 The rules live in `horde_core`:
 
-- `src/core/Collision.h`, `src/core/Collision.cpp`: `SeparateCircles` resolves one pair, `PushShare` turns two weights into how the push is split, and `kContactSlack` says how close counts as touching.
+- `src/core/Collision.h`, `src/core/Collision.cpp`: `SeparateCircles` resolves one pair, `PushShare` turns two weights into how the push is split, and `kContactSlack` says how close counts as touching. `SweepCircle`, the hit test for bullets, lives in the same file and is described in [Bullets and hits](BULLETS.md).
 - `src/core/World.cpp`: `StepWorld` runs the collision passes over every pair of bodies, with the walls after each pass.
 - `src/core/Player.h` and `src/core/Enemy.h`: each body has a `weight` next to its `radius`.
 
