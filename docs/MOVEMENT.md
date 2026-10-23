@@ -9,7 +9,7 @@ The rules live in `horde_core`, so they have no idea where the input comes from 
 - `src/core/Vec2.h`: a small 2D vector type with the few operations movement needs.
 - `src/core/Movement.h`, `src/core/Movement.cpp`: the `Motion` component, the `MovementStats` tuning values, `MotionAt` to spawn a mover and the `StepMovement` function.
 - `src/core/Arena.h`, `src/core/Arena.cpp`: the `Arena` rectangle and `ConfineToArena`, which keeps a mover inside its walls.
-- `src/core/Facing.h`, `src/core/Facing.cpp`: `UpdateFacing`, which turns a facing direction toward the input.
+- `src/core/Facing.h`, `src/core/Facing.cpp`: `UpdateFacing`, which turns a facing direction toward the movement input when nothing aims. Aiming with the mouse (`AimFacing`) is described in [Aiming and weapons](WEAPONS.md).
 - `src/core/AnalogInput.h`: `ApplyRadialDeadzone` for gamepad sticks.
 - `src/core/Player.h`: the player's data (`Motion`, `MovementStats`, a body radius and a facing direction).
 
@@ -23,7 +23,7 @@ The game executable connects them to the hardware and the screen:
 Every moving entity has a `Motion` component: `position`, `previousPosition` and `velocity`. It is created with `MotionAt(position)`, which sets both positions to the same point. Once per fixed step (1/60 s, see [Architecture](ARCHITECTURE.md)), this happens for the player:
 
 1. **Read the input**: `Game::Update` calls `ReadMoveInput` and passes the result through `StepSession` to `StepWorld`, which does the rest of the steps. WASD, the arrow keys and the gamepad d-pad give `-1`, `0` or `1` on each axis. The left stick of the first gamepad goes through a radial deadzone of 0.2. All of them are added together.
-2. **Turn the player** with `UpdateFacing`. If there is any input, `facing` becomes the input direction at length 1. If there is none, `facing` keeps its last value.
+2. **Turn the player.** With the mouse, `facing` points at the cursor (see [Aiming and weapons](WEAPONS.md)), whatever the movement does. Without an aim point, `UpdateFacing` makes `facing` the movement input direction at length 1, and keeps its last value when there is no input.
 3. **Step the movement** with `StepMovement`:
    1. **Clamp the input to length 1.** The input says where the mover wants to go, and its length is how much of the top speed it wants. A keyboard diagonal is `(1, 1)`, which is about 1.41 long, so without the clamp the player would move 41% faster diagonally. An analog stick pushed halfway gives about 0.5, and keeps that half speed.
    2. **Move the velocity toward the target velocity** (`input * maxSpeed`) by at most `rate * dt`. The rate is `deceleration` when the mover is braking, and `acceleration` otherwise. Braking means there is no input, or the input points against the current velocity (their dot product is negative). A 90 degree turn is not braking. `MoveTowards` never goes past the target, so a mover that stops does not slide backwards.
@@ -43,8 +43,8 @@ World units are pixels at camera zoom 1, and y grows downward like on screen. Th
 - **A separate deceleration rate.** Stopping a bit faster than starting makes dodging feel sharp. It is one extra number, and it can be set equal to `acceleration` if I do not want it.
 - **Turning back counts as braking.** Pushing against the velocity uses `deceleration` until the velocity crosses zero, then `acceleration` takes over. Before this, turning around took longer than stopping (0.2 s against 0.075 s at the defaults), and dodging back the way you came felt sluggish. Now it takes 0.175 s.
   - Rejected: splitting the velocity into a part along the input and a part across it, and braking only the second. It handles curves more precisely, but the dot product test gives the same result for the turns that matter (straight back) with one line of code.
-- **Facing follows the input, not the velocity.** After a turn, the velocity still points the old way for a few steps. The melee swing on day 4 has to go where the player is pushing now, not where the body is still sliding.
-  - Rejected: aiming with the mouse or the right stick. It is a different control scheme, and I want to try the swing with movement facing first. If it feels limiting on day 4, aim can feed `facing` from another input without touching the movement code.
+- **Without an aim, facing follows the input, not the velocity.** After a turn, the velocity still points the old way for a few steps, and the player should look where they are pushing now.
+- **Aim feeds `facing` from another input, without touching the movement code.** On day 2 I planned a melee swing aimed by movement, and wrote that mouse aim could be added this way if needed. On day 4 I switched to guns aimed with the mouse, and it took exactly that: a second way to set `facing`.
 - **Semi-implicit Euler** (update velocity, then move with the new velocity). With a fixed step and no springs it is stable and exact enough, and it is the simplest option.
 - **My own `Vec2` instead of raylib's `Vector2`.** `horde_core` must not depend on raylib, so the tests build and run without it. The app converts to `Vector2` in `ToRaylib` (`src/app/RaylibConvert.h`), right before drawing.
   - Rejected: a math library such as glm. It is far bigger than the five functions I need.
@@ -90,7 +90,7 @@ The tests use round numbers that are exact in binary floating point where they c
 
 ## Limitations
 
-- With the keyboard or the d-pad, `facing` has 8 directions. Only the stick gives every angle.
+- Without the mouse, `facing` from the keyboard or the d-pad has 8 directions. Only the stick gives every angle.
 - A turn of less than 90 degrees from the velocity uses `acceleration`, even though part of it is braking. It has not been tuned by hand yet, and it is the first thing to check if curves feel loose.
 - Walls and other bodies are the only things that stop a mover. There are no obstacles inside the arena yet.
 - Only the first gamepad is read, and only its left stick and d-pad.

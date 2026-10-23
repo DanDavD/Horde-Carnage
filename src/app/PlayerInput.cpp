@@ -53,6 +53,22 @@ Vec2 ReadMoveInput() {
     return keys + stick + dpad;
 }
 
+bool ReadFireHeld() {
+    return IsMouseButtonDown(MOUSE_BUTTON_LEFT);
+}
+
+void CollectButtonPresses(ButtonPresses& presses) {
+    presses.fire = presses.fire || IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
+    if (IsKeyPressed(KEY_ONE)) {
+        presses.weaponSlot = 0;
+    }
+    if (IsKeyPressed(KEY_TWO)) {
+        presses.weaponSlot = 1;
+    }
+    // With two guns, either wheel direction means "the other gun".
+    presses.cycleWeapon = presses.cycleWeapon || IsKeyPressed(KEY_Q) || GetMouseWheelMove() != 0.0f;
+}
+
 bool ReadRestartPressed() {
     if (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_R)) {
         return true;

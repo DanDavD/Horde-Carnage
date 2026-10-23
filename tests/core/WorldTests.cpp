@@ -9,6 +9,7 @@
 
 using horde::Arena;
 using horde::Enemy;
+using horde::PlayerCommands;
 using horde::Vec2;
 using horde::World;
 
@@ -19,10 +20,15 @@ constexpr Arena kArena{{0.0f, 0.0f}, {2400.0f, 1600.0f}};
 constexpr Vec2 kView{1280.0f, 720.0f};
 constexpr float kDt = 1.0f / 60.0f;
 
-void Step(World& world, Vec2 input, int steps) {
+void Step(World& world, const PlayerCommands& commands, int steps) {
     for (int i = 0; i < steps; ++i) {
-        horde::StepWorld(world, input, kDt);
+        horde::StepWorld(world, commands, kDt);
     }
+}
+
+// Most tests only move. Nothing aims, so the player faces where it walks.
+void Step(World& world, Vec2 move, int steps) {
+    Step(world, PlayerCommands{.move = move}, steps);
 }
 
 float DistanceToPlayer(const World& world, const Enemy& enemy) {
@@ -170,14 +176,20 @@ TEST_CASE("nobody leaves the arena when the player runs into a corner") {
 TEST_CASE("the same inputs always give the same world") {
     World a = horde::CreateWorld(kArena, kView);
     World b = horde::CreateWorld(kArena, kView);
-    const Vec2 inputs[] = {{1.0f, 0.0f}, {0.0f, -1.0f}, {-0.5f, 0.5f}, {}};
+    const Vec2 moves[] = {{1.0f, 0.0f}, {0.0f, -1.0f}, {-0.5f, 0.5f}, {}};
     for (int i = 0; i < 400; ++i) {
-        const Vec2 input = inputs[(i / 50) % 4];
-        horde::StepWorld(a, input, kDt);
-        horde::StepWorld(b, input, kDt);
+        const PlayerCommands commands{.move = moves[(i / 50) % 4],
+                                      .aimAt = Vec2{100.0f * static_cast<float>(i % 7), 900.0f},
+                                      .fireHeld = i % 3 == 0,
+                                      .firePressed = i % 10 == 0,
+                                      .cycleWeapon = i % 120 == 0};
+        horde::StepWorld(a, commands, kDt);
+        horde::StepWorld(b, commands, kDt);
     }
 
     CHECK(a.player.motion.position == b.player.motion.position);
+    CHECK(a.player.facing == b.player.facing);
+    CHECK(a.shotsFired == b.shotsFired);
     for (std::size_t i = 0; i < a.enemies.size(); ++i) {
         CHECK(a.enemies[i].motion.position == b.enemies[i].motion.position);
     }
@@ -224,4 +236,43 @@ TEST_CASE("a whole crowd arriving at once still lands only one hit") {
     }
     // The six hairballs arrive together, but the first touch opens the window and the other five miss.
     CHECK(world.player.health.current == world.player.health.max - damage);
+}
+
+TEST_CASE("the player faces the aim point, not the way it walks") {
+    World world = horde::CreateWorld(kArena, kView);
+    const Vec2 above = world.player.motion.position + Vec2{0.0f, -300.0f};
+    Step(world, PlayerCommands{.move = {1.0f, 0.0f}, .aimAt = above}, 30);
+
+    CHECK(world.player.motion.velocity.x > 0.0f);
+    CHECK(world.player.facing.y == doctest::Approx(-1.0f).epsilon(0.05));
+}
+
+TEST_CASE("the fire button fires the gun in hand") {
+    World world = horde::CreateWorld(kArena, kView);
+    Step(world, PlayerCommands{.firePressed = true}, 1);
+    CHECK(world.shotsFired == 1);
+    CHECK(horde::Equipped(world.player.loadout).muzzleFlashSeconds > 0.0f);
+}
+
+TEST_CASE("holding the button fires the SMG steadily but the pistol only once") {
+    World pistol = horde::CreateWorld(kArena, kView);
+    Step(pistol, PlayerCommands{.fireHeld = true, .firePressed = true}, 1);
+    Step(pistol, PlayerCommands{.fireHeld = true}, 59);
+    CHECK(pistol.shotsFired == 1);
+
+    World smg = horde::CreateWorld(kArena, kView);
+    Step(smg, PlayerCommands{.selectSlot = 1}, 1);
+    Step(smg, PlayerCommands{.fireHeld = true}, 60);
+    CHECK(smg.shotsFired == 10);
+}
+
+TEST_CASE("weapon commands switch the gun in hand") {
+    World world = horde::CreateWorld(kArena, kView);
+    CHECK(world.player.loadout.equipped == 0);
+
+    Step(world, PlayerCommands{.cycleWeapon = true}, 1);
+    CHECK(world.player.loadout.equipped == 1);
+
+    Step(world, PlayerCommands{.selectSlot = 0}, 1);
+    CHECK(world.player.loadout.equipped == 0);
 }

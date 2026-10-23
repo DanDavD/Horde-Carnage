@@ -16,9 +16,9 @@ constexpr Arena kArena{{0.0f, 0.0f}, {2400.0f, 1600.0f}};
 constexpr Vec2 kView{1280.0f, 720.0f};
 constexpr float kDt = 1.0f / 60.0f;
 
-void Step(Session& session, Vec2 input, int steps) {
+void Step(Session& session, Vec2 move, int steps) {
     for (int i = 0; i < steps; ++i) {
-        horde::StepSession(session, input, kDt);
+        horde::StepSession(session, horde::PlayerCommands{.move = move}, kDt);
     }
 }
 
@@ -44,7 +44,7 @@ TEST_CASE("a new session is playing, with the player at full health") {
 TEST_CASE("while playing, a session step is a world step") {
     Session session = horde::StartSession(kArena, kView);
     horde::World expected = horde::CreateWorld(kArena, kView);
-    horde::StepWorld(expected, Vec2{1.0f, 0.0f}, kDt);
+    horde::StepWorld(expected, horde::PlayerCommands{.move = {1.0f, 0.0f}}, kDt);
 
     Step(session, Vec2{1.0f, 0.0f}, 1);
     CHECK(session.world.player.motion.position == expected.player.motion.position);

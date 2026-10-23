@@ -1,5 +1,6 @@
 #pragma once
 
+#include "app/PlayerInput.h"
 #include "core/FixedTimestep.h"
 #include "core/Session.h"
 
@@ -23,6 +24,7 @@ private:
 
     FixedTimestep _timestep;
     Session _session;
+    ButtonPresses _pendingPresses; ///< Presses since the last fixed step, used by the next one.
 
 #ifndef NDEBUG
     bool _showDebugOverlay = false;

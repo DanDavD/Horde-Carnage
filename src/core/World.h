@@ -6,6 +6,7 @@
 #include "core/Enemy.h"
 #include "core/FollowCamera.h"
 #include "core/Player.h"
+#include "core/PlayerCommands.h"
 #include "core/Vec2.h"
 
 namespace horde {
@@ -25,6 +26,7 @@ struct World {
     std::vector<Enemy> enemies;
     FollowCamera camera;
     float elapsedSeconds = 0.0f; ///< Simulated time since the world was created: how long the player survived.
+    int shotsFired = 0;          ///< Shots fired this run. Later the game over screen can show accuracy.
 };
 
 /// The starting world: the player in the middle of `arena`, `kStartingHairballs` hairballs on a ring
@@ -34,11 +36,11 @@ struct World {
 /// does not allocate memory.
 [[nodiscard]] World CreateWorld(const Arena& arena, Vec2 viewSize);
 
-/// Advances the whole simulation by one fixed step of `dt` seconds: everyone moves, then overlapping
-/// bodies are pushed apart, then everyone is held inside the arena, then hairballs that touch the
-/// player hurt it, then the camera follows.
+/// Advances the whole simulation by one fixed step of `dt` seconds: everyone moves, the player aims and
+/// handles its guns, overlapping bodies are pushed apart, everyone is held inside the arena, hairballs
+/// that touch the player hurt it, and the camera follows.
 ///
-/// @param moveInput The player's movement input for this step, as `ReadMoveInput` gives it.
-void StepWorld(World& world, Vec2 moveInput, float dt);
+/// @param commands What the player asks for in this step: movement, aim, fire and weapon switching.
+void StepWorld(World& world, const PlayerCommands& commands, float dt);
 
 } // namespace horde

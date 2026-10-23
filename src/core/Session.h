@@ -30,8 +30,8 @@ struct Session {
 [[nodiscard]] Session StartSession(const Arena& arena, Vec2 viewSize);
 
 /// Advances the session by one fixed step: steps the world while playing, and moves to GameOver when
-/// the player dies. During GameOver only the state clock runs.
-void StepSession(Session& session, Vec2 moveInput, float dt);
+/// the player dies. During GameOver only the state clock runs, and the commands are ignored.
+void StepSession(Session& session, const PlayerCommands& commands, float dt);
 
 /// Whether `TryRestart` would restart now: the game is over and the restart delay has passed.
 [[nodiscard]] bool CanRestart(const Session& session);

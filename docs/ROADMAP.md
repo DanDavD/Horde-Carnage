@@ -15,18 +15,22 @@ Every layer ends with a game that runs and can be played, and every layer is one
 | 1 | Tue Oct 20 | `chore/project-setup` | CMake, raylib, tests, CI, fixed-timestep loop, docs |
 | 2 | Wed Oct 21 | `feat/player-movement` | Player entity, keyboard and gamepad movement, arena bounds, camera |
 | 3 | Thu Oct 22 | `feat/chaser-enemy` | A hairball enemy that chases the player, circle collisions, contact damage, health bar, game over and restart |
-| 4 | Fri Oct 23 | `feat/melee-combat` | Swing attack with an arc hitbox, damage, knockback, hit flash, enemy death and drops |
-| 5 | Sat Oct 24 | `feat/enemy-waves` | `ObjectPool` for enemies, spawner and wave director. Release `v0.1.0` |
+| 4 | Fri Oct 23 | `feat/shooting` | Mouse aim, a pistol and an SMG, pooled bullets (`ObjectPool`), damage, enemy death, hit flash and knockback |
+| 5 | Sat Oct 24 | `feat/enemy-waves` | Spawner and wave director, on the `ObjectPool` from day 4. Release `v0.1.0` |
 | 6 | Sun Oct 25 | `feat/data-driven-content` | Enemy, weapon and wave stats loaded from JSON files instead of code |
-| 7 | Mon Oct 26 | `feat/enemy-state-machine` | Enemy state machine, a charger and a spitter, pooled projectiles |
-| 8 | Tue Oct 27 | `feat/xp-and-level-up` | XP gems, levels, a level-up screen with three choices |
-| 9 | Wed Oct 28 | `feat/weapons` | Two or three weapons and their upgrades. Release `v0.2.0` |
+| 7 | Mon Oct 26 | `feat/enemy-state-machine` | Enemy state machine, a charger and a spitter that reuses the projectile pool |
+| 8 | Tue Oct 27 | `feat/xp-and-level-up` | XP gems (the first drops), levels, a level-up screen with three choices |
+| 9 | Wed Oct 28 | `feat/weapons` | More guns (for example a shotgun) and their upgrades. Release `v0.2.0` |
 | 10 | Thu Oct 29 | `feat/power-ups` | Pickups in the arena (heal, speed, rage). Checkpoint: decide what to cut |
 | 11 | Fri Oct 30 | `feat/boss` | Boss with its own state machine and two or three attack patterns, boss health bar, win screen |
 | 12 | Sat Oct 31 | `feat/game-feel` | Hit stop, screen shake, particles, sounds, main menu, pause |
 | 13 | Sun Nov 1 | `feat/art-pass` | Final look of the arena, the player and the enemies |
 | 14 | Mon Nov 2 | `chore/release-v0.3.0` | Bug bash, balancing, release build, README GIF, docs. Release `v0.3.0` |
 | 15 | Tue Nov 3 | | Buffer for anything that slipped, then present |
+
+## Changes to the plan
+
+- **Day 4: guns instead of a melee swing.** I want the feel of twin-stick shooters like SAS: Zombie Assault 4 and Dead Ops Arcade: kiting a horde while shooting behind you. That needs aim independent of movement, so the player aims with the mouse. Because of the change, the `ObjectPool` moves from day 5 to day 4 (bullets need it first), and enemy drops move from day 4 to day 8, where XP gems are the drops.
 
 ## Releases
 
@@ -39,7 +43,7 @@ Every layer ends with a game that runs and can be played, and every layer is one
 The core loop (move, fight, waves, die or win) always has to be solid, because it is what shows how I program. On day 10 I check where I am, and I cut in this order:
 
 1. The boss gets simpler: one or two patterns instead of three.
-2. Fewer weapons: one weapon with upgrades instead of several.
+2. Fewer guns: the pistol and the SMG with upgrades, and no new ones.
 3. Power-ups go away.
 4. The art pass becomes clean shapes and colours instead of sprites.
 

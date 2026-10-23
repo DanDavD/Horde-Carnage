@@ -1,8 +1,8 @@
 # Horde Carnage
 
-A top-down hack and slash about surviving a horde, written in C++20 with raylib.
+A top-down shooter about surviving a horde, written in C++20 with raylib.
 
-Waves of monsters chase you around an arena. You cut through them, pick up what they drop, level up, change how your weapon works, and at the end a boss shows up.
+Waves of monsters chase you around an arena. You run with the keyboard, aim and shoot with the mouse, pick up what they drop, level up, change how your guns work, and at the end a boss shows up.
 
 ![C++20](https://img.shields.io/badge/C%2B%2B-20-blue?logo=cplusplus)
 ![raylib](https://img.shields.io/badge/raylib-5.5-black)
@@ -12,7 +12,7 @@ Waves of monsters chase you around an arena. You cut through them, pick up what 
 
 ## The idea
 
-I'm building Horde Carnage as a vertical slice in 15 days (October 20 to November 3, 2026), inspired by games like Castle Crashers, The Binding of Isaac and Dungeon Rampage.
+I'm building Horde Carnage as a vertical slice in 15 days (October 20 to November 3, 2026), inspired by games like Dungeon Rampage, The Binding of Isaac and Castle Crashers, with the twin-stick shooting of SAS: Zombie Assault 4 and the "Dead Ops Arcade" mode of Call of Duty: Black Ops.
 
 I chose plain C++ with a small library instead of an engine on purpose. raylib only gives me a window, input, 2D drawing and audio. Everything that makes it a game (the loop, entities, collisions, enemy AI, waves, progression) is my own code, and that is the part I want to show.
 
@@ -29,10 +29,11 @@ This is day 3 of 15. Progress is tracked in the [roadmap](docs/ROADMAP.md) and t
 - Bodies push each other apart instead of stacking. You can shove one hairball out of your way, but a crowd slows you down. See [Collisions](docs/COLLISIONS.md).
 - A health bar. Each hairball that touches you takes 10 of your 100 hit points, and after a hit you blink and cannot be hurt for 0.8 seconds. See [Health](docs/HEALTH.md).
 - A game over screen that shows how long you survived, and a restart into a fresh arena. See [Game flow](docs/GAME_FLOW.md).
+- Aiming with the mouse, independent of where you walk, and two guns: a semi-automatic pistol (one shot per click) and an automatic SMG (hold to fire). A panel shows the gun in hand. See [Aiming and weapons](docs/WEAPONS.md).
 - Unit tests for the pure logic, and a GitHub Actions workflow that builds and tests every push and pull request on Windows.
 - Warnings are errors for the project's own code (`/W4 /WX` on MSVC).
 
-**Still to do:** you cannot fight back yet. Next are melee combat (day 4) and enemy waves (day 5), then everything else that makes it a game. See the [roadmap](docs/ROADMAP.md).
+**Still to do:** the guns do not fire bullets yet. Next are bullets that hit and kill (the rest of day 4) and enemy waves (day 5), then everything else that makes it a game. See the [roadmap](docs/ROADMAP.md).
 
 ## Tech stack
 
@@ -61,7 +62,17 @@ build\default\src\Release\HordeCarnage.exe
 
 You can also open the folder in Visual Studio (*File > Open > Folder*). It reads `CMakePresets.json` by itself.
 
-**Controls:** `WASD` or the arrow keys move, and so do the left stick and the d-pad of a gamepad. After a game over, `Enter` or `R` (`A` or `Start` on a gamepad) plays again. `Esc` quits. In Debug builds, `F1` shows a debug overlay.
+**Controls:**
+
+| Action | Keyboard and mouse | Gamepad |
+|---|---|---|
+| Move | `WASD` or the arrow keys | Left stick or d-pad |
+| Aim | Mouse | Not yet |
+| Fire | Left click (hold with the SMG) | Not yet |
+| Switch gun | `Q`, `1`, `2` or the mouse wheel | Not yet |
+| Play again after a game over | `Enter` or `R` | `A` or `Start` |
+| Quit | `Esc` | |
+| Debug overlay (Debug builds only) | `F1` | |
 
 ## Building and testing
 
@@ -93,7 +104,7 @@ See [Architecture](docs/ARCHITECTURE.md) for how the pieces fit together.
 The full day-by-day plan, with what I cut first if I fall behind, is in [docs/ROADMAP.md](docs/ROADMAP.md).
 
 - [x] `v0.0.1` Project setup: CMake, raylib, tests, CI, fixed-timestep loop
-- [ ] `v0.1.0` Core loop: movement, enemies that chase you, melee combat, waves, game over
+- [ ] `v0.1.0` Core loop: movement, enemies that chase you, shooting, waves, game over
 - [ ] `v0.2.0` Progression: XP, level-ups, weapons, data-driven enemies and weapons
 - [ ] `v0.3.0` Vertical slice: power-ups, the boss, game feel, menus
 

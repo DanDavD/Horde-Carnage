@@ -1,7 +1,9 @@
 #include "app/Game.h"
 
 #include <cmath>
+#include <cstddef>
 #include <numbers>
+#include <string>
 
 #include <raylib.h>
 
@@ -34,6 +36,17 @@ constexpr float kHairballEyeRadius = 0.22f;
 // While invulnerable the player blinks: faded for one period, solid for the next.
 constexpr float kBlinkPeriod = 0.1f;
 constexpr float kBlinkFade = 0.35f;
+// The gun is a barrel that sticks out of the body toward the aim. The SMG reads as the bigger gun.
+constexpr float kPistolBarrelLength = 14.0f;
+constexpr float kSmgBarrelLength = 22.0f;
+constexpr float kPistolBarrelWidth = 6.0f;
+constexpr float kSmgBarrelWidth = 9.0f;
+constexpr float kMuzzleFlashRadius = 8.0f;
+// Weapon panel in the bottom right corner, one box per slot.
+constexpr int kSlotBoxWidth = 150;
+constexpr int kSlotBoxHeight = 48;
+constexpr int kSlotBoxGap = 8;
+constexpr int kHudMargin = 12;
 
 constexpr Color kBackground{20, 18, 24, 255};
 constexpr Color kFloor{34, 30, 40, 255};
@@ -51,12 +64,21 @@ constexpr Color kBlood{220, 60, 50, 255};
 constexpr Color kBarBack{50, 20, 24, 255};
 constexpr Color kBarHurt{255, 140, 120, 255};
 constexpr Color kBarEdge{120, 100, 110, 255};
+// Light steel, so the barrel stands out against the dark floor where it leaves the body.
+constexpr Color kGun{175, 180, 195, 255};
+constexpr Color kMuzzleFlash{255, 220, 120, 255};
+constexpr Color kCrosshair{240, 240, 245, 255};
 
 #ifndef NDEBUG
-constexpr const char* kControlsHint = "Move: WASD, arrows, left stick or d-pad    Debug overlay: F1    Quit: Esc";
+constexpr const char* kControlsHint =
+    "WASD move   Mouse aim   Click fire   Q, 1, 2, wheel switch gun   Esc quit   F1 debug";
 #else
-constexpr const char* kControlsHint = "Move: WASD, arrows, left stick or d-pad    Quit: Esc";
+constexpr const char* kControlsHint = "WASD move   Mouse aim   Click fire   Q, 1, 2, wheel switch gun   Esc quit";
 #endif
+
+const char* FireModeLabel(FireMode mode) {
+    return mode == FireMode::Auto ? "AUTO" : "SEMI-AUTO";
+}
 
 void DrawCenteredText(const char* text, int y, int fontSize, Color color) {
     const int width = MeasureText(text, fontSize);
@@ -89,16 +111,29 @@ void DrawPlayer(const Player& player, float alpha) {
 
     Color edge = IsDead(health) ? kPlayerDeadEdge : kPlayerEdge;
     Color fill = IsDead(health) ? kPlayerDeadFill : kPlayerFill;
+    Color gun = IsDead(health) ? kPlayerDeadEdge : kGun;
     // The blink tells the player they were hit and that the next touch will not hurt yet.
     const bool fadedHalf = static_cast<int>(health.invulnerableSeconds / kBlinkPeriod) % 2 == 1;
     if (IsInvulnerable(health) && fadedHalf) {
         edge = Fade(edge, kBlinkFade);
         fill = Fade(fill, kBlinkFade);
+        gun = Fade(gun, kBlinkFade);
     }
+
+    // The barrel goes under the body, so it reads as held, sticking out toward the aim.
+    const Weapon& weapon = Equipped(player.loadout);
+    const bool automatic = weapon.stats.mode == FireMode::Auto;
+    const float barrelLength = automatic ? kSmgBarrelLength : kPistolBarrelLength;
+    const Vec2 muzzle = position + player.facing * (player.radius + barrelLength);
+    DrawLineEx(ToRaylib(position), ToRaylib(muzzle), automatic ? kSmgBarrelWidth : kPistolBarrelWidth, gun);
 
     DrawCircleV(ToRaylib(position), player.radius, edge);
     DrawCircleV(ToRaylib(position), player.radius - kPlayerOutline, fill);
     DrawCircleV(ToRaylib(position + player.facing * (player.radius * kEyeOffset)), player.radius * kEyeRadius, edge);
+
+    if (weapon.muzzleFlashSeconds > 0.0f) {
+        DrawCircleV(ToRaylib(muzzle), kMuzzleFlashRadius, kMuzzleFlash);
+    }
 }
 
 void DrawHairball(const Enemy& enemy, Vec2 playerPosition, float alpha) {
@@ -135,6 +170,38 @@ void DrawHealthBar(const Health& health) {
     DrawRectangle(kX, kY, static_cast<int>(kWidth * fraction), kHeight, IsInvulnerable(health) ? kBarHurt : kBlood);
     DrawRectangleLines(kX, kY, kWidth, kHeight, kBarEdge);
     DrawText(TextFormat("%d / %d", health.current, health.max), kX + 8, kY + 2, 18, RAYWHITE);
+}
+
+// One box per slot. The gun in hand is lit, so the player can tell at a glance which one they hold.
+void DrawWeaponPanel(const Loadout& loadout) {
+    const int top = kScreenHeight - kSlotBoxHeight - kHudMargin;
+    for (int slot = 0; slot < kWeaponSlots; ++slot) {
+        const Weapon& weapon = loadout.slots[static_cast<std::size_t>(slot)];
+        const bool inHand = slot == loadout.equipped;
+        const int slotsToTheRight = kWeaponSlots - slot;
+        const int left = kScreenWidth - kHudMargin - slotsToTheRight * (kSlotBoxWidth + kSlotBoxGap) + kSlotBoxGap;
+        const Rectangle box{static_cast<float>(left), static_cast<float>(top), static_cast<float>(kSlotBoxWidth),
+                            static_cast<float>(kSlotBoxHeight)};
+
+        DrawRectangleRec(box, inHand ? Fade(kPlayerFill, 0.25f) : Fade(BLACK, 0.45f));
+        DrawRectangleLinesEx(box, inHand ? 2.0f : 1.0f, inHand ? kPlayerFill : kBarEdge);
+        const Color text = inHand ? RAYWHITE : kSoftText;
+        const std::string name = TextToUpper(std::string(weapon.stats.name).c_str());
+        DrawText(TextFormat("%d  %s", slot + 1, name.c_str()), left + 10, top + 6, 20, text);
+        DrawText(FireModeLabel(weapon.stats.mode), left + 10, top + 28, 14, text);
+    }
+}
+
+// Drawn in place of the system cursor while playing, so the aim point is easy to find in a crowd.
+void DrawCrosshair(Vector2 at) {
+    constexpr float kRadius = 10.0f;
+    constexpr float kTick = 6.0f;
+    DrawCircleLinesV(at, kRadius, kCrosshair);
+    DrawLineEx({at.x - kRadius - kTick, at.y}, {at.x - kRadius + 3.0f, at.y}, 2.0f, kCrosshair);
+    DrawLineEx({at.x + kRadius - 3.0f, at.y}, {at.x + kRadius + kTick, at.y}, 2.0f, kCrosshair);
+    DrawLineEx({at.x, at.y - kRadius - kTick}, {at.x, at.y - kRadius + 3.0f}, 2.0f, kCrosshair);
+    DrawLineEx({at.x, at.y + kRadius - 3.0f}, {at.x, at.y + kRadius + kTick}, 2.0f, kCrosshair);
+    DrawCircleV(at, 1.5f, kCrosshair);
 }
 
 void DrawGameOver(const Session& session) {
@@ -180,7 +247,7 @@ void DrawDebugHud(const World& world, Vec2 moveInput) {
     constexpr int kX = 10;
     constexpr int kY = 72; // Below the health bar.
     constexpr int kLine = 20;
-    DrawRectangle(kX - 4, kY - 4, 300, 9 * kLine + 8, Fade(BLACK, 0.6f));
+    DrawRectangle(kX - 4, kY - 4, 300, 11 * kLine + 8, Fade(BLACK, 0.6f));
     DrawText(TextFormat("input  %5.2f %5.2f  len %4.2f", moveInput.x, moveInput.y, Length(moveInput)), kX, kY,
              18, RAYWHITE);
     DrawText(TextFormat("speed  %5.0f / %.0f", Length(motion.velocity), player.stats.maxSpeed), kX, kY + kLine, 18,
@@ -196,6 +263,10 @@ void DrawDebugHud(const World& world, Vec2 moveInput) {
                         player.health.invulnerableSeconds),
              kX, kY + 7 * kLine, 18, RAYWHITE);
     DrawText(TextFormat("time   %.2f s", world.elapsedSeconds), kX, kY + 8 * kLine, 18, RAYWHITE);
+    const Weapon& weapon = Equipped(player.loadout);
+    DrawText(TextFormat("weapon %s  cd %.2f", std::string(weapon.stats.name).c_str(), weapon.cooldownSeconds), kX,
+             kY + 9 * kLine, 18, RAYWHITE);
+    DrawText(TextFormat("shots  %d", world.shotsFired), kX, kY + 10 * kLine, 18, RAYWHITE);
 }
 #endif
 
@@ -217,6 +288,15 @@ void Game::Run() {
         if (ReadRestartPressed()) {
             TryRestart(_session);
         }
+        CollectButtonPresses(_pendingPresses);
+
+        // The crosshair replaces the system cursor while playing. On the game over screen the cursor is back.
+        const bool playing = _session.state == SessionState::Playing;
+        if (playing && !IsCursorHidden()) {
+            HideCursor();
+        } else if (!playing && IsCursorHidden()) {
+            ShowCursor();
+        }
 #ifndef NDEBUG
         if (IsKeyPressed(KEY_F1)) {
             _showDebugOverlay = !_showDebugOverlay;
@@ -233,10 +313,22 @@ void Game::Run() {
 void Game::Update(float dt) {
     // Reading the hardware is the only part of a step that lives in the app. The rules are all in
     // StepSession and StepWorld.
-    const Vec2 moveInput = ReadMoveInput();
-    StepSession(_session, moveInput, dt);
+    //
+    // The mouse is turned into a world point with the camera as of the last step. The camera drawn on
+    // screen is a fraction of a step behind that, which is far below a pixel of aiming error.
+    const Camera2D camera = ToRaylibCamera(_session.world.camera, 1.0f);
+    const PlayerCommands commands{.move = ReadMoveInput(),
+                                  .aimAt = FromRaylib(GetScreenToWorld2D(GetMousePosition(), camera)),
+                                  .fireHeld = ReadFireHeld(),
+                                  .firePressed = _pendingPresses.fire,
+                                  .selectSlot = _pendingPresses.weaponSlot,
+                                  .cycleWeapon = _pendingPresses.cycleWeapon};
+    // Presses are events: only the first step of a frame uses them, so a frame that runs two steps does
+    // not fire twice for one click.
+    _pendingPresses = {};
+    StepSession(_session, commands, dt);
 #ifndef NDEBUG
-    _lastMoveInput = moveInput;
+    _lastMoveInput = commands.move;
 #endif
 }
 
@@ -277,10 +369,12 @@ void Game::Draw(float alpha) const {
 #endif
 
     DrawHealthBar(player.health);
+    DrawWeaponPanel(player.loadout);
     DrawFPS(10, 10);
     DrawText("Horde Carnage v" HORDE_VERSION, kScreenWidth - 230, 10, 20, kSoftText);
     if (playing) {
-        DrawText(kControlsHint, 40, kScreenHeight - 32, 20, kSoftText);
+        DrawText(kControlsHint, kHudMargin, kScreenHeight - 30, 18, kSoftText);
+        DrawCrosshair(GetMousePosition());
     } else {
         DrawGameOver(_session);
     }

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/Health.h"
+#include "core/Loadout.h"
 #include "core/Movement.h"
 
 namespace horde {
@@ -14,10 +15,11 @@ struct Player {
     /// How hard the player is to push, against an enemy's `weight`. Four times a hairball: one hairball
     /// cannot pin the player, but a crowd slows them down.
     float weight = 4.0f;
-    /// Direction the player looks, length 1. Starts facing down, toward the camera. The melee swing
-    /// on day 4 goes this way.
+    /// Direction the player looks and aims, length 1. It follows the mouse, not the movement, so the
+    /// player can run one way and shoot another. Starts facing down, toward the camera.
     Vec2 facing{0.0f, 1.0f};
     Health health;
+    Loadout loadout;
 };
 
 } // namespace horde

@@ -17,12 +17,12 @@ Session StartSession(const Arena& arena, Vec2 viewSize) {
     return Session{.world = CreateWorld(arena, viewSize)};
 }
 
-void StepSession(Session& session, Vec2 moveInput, float dt) {
+void StepSession(Session& session, const PlayerCommands& commands, float dt) {
     session.stateSeconds += dt;
 
     switch (session.state) {
     case SessionState::Playing:
-        StepWorld(session.world, moveInput, dt);
+        StepWorld(session.world, commands, dt);
         if (IsDead(session.world.player.health)) {
             EnterState(session, SessionState::GameOver);
         }

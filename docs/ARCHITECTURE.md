@@ -27,7 +27,11 @@ When a feature has rules (damage, cooldowns, wave timing), the rules go into `ho
 2. Give that time to `FixedTimestep::Advance`, which answers how many fixed 1/60 s steps are due.
 3. Run `Update` that many times, always with the same `dt`. `Update` reads the input (`ReadMoveInput`) and passes it to `StepSession`, which runs all the rules.
 
-Before the steps, `Run` also reads button presses that are events rather than held states (restart, and the Debug overlay toggle), once per frame, so a frame that runs no step cannot lose them.
+Before the steps, `Run` also reads button presses that are events rather than held states (fire, weapon switch, restart, and the Debug overlay toggle), once per frame, so a frame that runs no step cannot lose them.
+
+### Input becomes commands
+
+The simulation never reads a key or the mouse. Every step, `Game::Update` turns the hardware into a `PlayerCommands` (`src/core/PlayerCommands.h`): the movement input, the world point the mouse aims at, the fire button, and weapon switches. Tests drive the world with the same struct, and a gamepad will fill it later without the rules changing. See [Aiming and weapons](WEAPONS.md).
 4. Draw once, passing `FixedTimestep::Alpha` (how far we are into the next step) so drawing can interpolate between two steps.
 
 ### The world
@@ -35,7 +39,7 @@ Before the steps, `Run` also reads button presses that are events rather than he
 `World` (`src/core/World.h`) holds everything the simulation needs as plain data: the arena, the player, the enemies and the camera. Two functions work on it:
 
 - `CreateWorld` builds the starting state: the player in the middle of the arena, the hairballs around it, the camera on the player.
-- `StepWorld` advances it by one fixed step, in this order: the invulnerability window, the player (facing, movement), every enemy (chase, movement), collisions between bodies and the walls (four passes, see [Collisions](COLLISIONS.md)), contact damage (see [Health](HEALTH.md)), then the camera.
+- `StepWorld` advances it by one fixed step, in this order: the invulnerability window, the player (movement, aim, weapons), every enemy (chase, movement), collisions between bodies and the walls (four passes, see [Collisions](COLLISIONS.md)), contact damage (see [Health](HEALTH.md)), then the camera.
 
 ### The session
 
@@ -74,6 +78,7 @@ Game objects are plain structs (components) that hold data, and free functions (
 - `tests/core/CollisionTests.cpp` and the crowd cases in `WorldTests.cpp`: see [Collisions](COLLISIONS.md#tests).
 - `tests/core/HealthTests.cpp` and the contact damage cases in `WorldTests.cpp`: see [Health](HEALTH.md#tests).
 - `tests/core/SessionTests.cpp`: see [Game flow](GAME_FLOW.md#tests).
+- `tests/core/WeaponTests.cpp`, `LoadoutTests.cpp` and the aim and fire cases in `FacingTests.cpp` and `WorldTests.cpp`: see [Aiming and weapons](WEAPONS.md#tests).
 
 ## Limitations
 

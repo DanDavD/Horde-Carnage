@@ -11,4 +11,9 @@ namespace horde {
     return Vector2{v.x, v.y};
 }
 
+/// The other way, for input that raylib reports in its own types (the mouse).
+[[nodiscard]] inline Vec2 FromRaylib(Vector2 v) {
+    return Vec2{v.x, v.y};
+}
+
 } // namespace horde

@@ -8,6 +8,7 @@
 #include "core/Collision.h"
 #include "core/Facing.h"
 #include "core/Health.h"
+#include "core/Loadout.h"
 #include "core/Movement.h"
 
 namespace horde {
@@ -53,6 +54,22 @@ void ApplyContactDamage(World& world) {
     }
 }
 
+// Switching happens before the trigger, so a switch and a click in the same step fire the new gun.
+void HandleWeapons(Player& player, const PlayerCommands& commands, float dt, int& shotsFired) {
+    Loadout& loadout = player.loadout;
+    if (commands.selectSlot) {
+        SelectSlot(loadout, *commands.selectSlot);
+    }
+    if (commands.cycleWeapon) {
+        CycleWeapon(loadout);
+    }
+    TickLoadout(loadout, dt);
+    if (PullTrigger(Equipped(loadout), commands.fireHeld, commands.firePressed)) {
+        // The bullet itself comes with the projectile pool. For now a shot is the flash and this count.
+        ++shotsFired;
+    }
+}
+
 } // namespace
 
 World CreateWorld(const Arena& arena, Vec2 viewSize) {
@@ -71,12 +88,19 @@ World CreateWorld(const Arena& arena, Vec2 viewSize) {
     return world;
 }
 
-void StepWorld(World& world, Vec2 moveInput, float dt) {
+void StepWorld(World& world, const PlayerCommands& commands, float dt) {
     world.elapsedSeconds += dt;
     Player& player = world.player;
     TickHealth(player.health, dt);
-    UpdateFacing(player.facing, moveInput);
-    StepMovement(player.motion, moveInput, player.stats, dt);
+    StepMovement(player.motion, commands.move, player.stats, dt);
+
+    // Aim after moving, so the gun points from where the player is now, not from a step ago.
+    if (commands.aimAt) {
+        AimFacing(player.facing, player.motion.position, *commands.aimAt);
+    } else {
+        UpdateFacing(player.facing, commands.move);
+    }
+    HandleWeapons(player, commands, dt, world.shotsFired);
 
     // Enemies chase where the player is after this step's move, so they never aim at a stale position.
     for (Enemy& enemy : world.enemies) {

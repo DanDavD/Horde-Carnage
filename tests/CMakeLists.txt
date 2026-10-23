@@ -9,9 +9,11 @@ add_executable(horde_tests
     core/FixedTimestepTests.cpp
     core/FollowCameraTests.cpp
     core/HealthTests.cpp
+    core/LoadoutTests.cpp
     core/MovementTests.cpp
     core/SessionTests.cpp
     core/Vec2Tests.cpp
+    core/WeaponTests.cpp
     core/WorldTests.cpp)
 target_link_libraries(horde_tests PRIVATE horde_core doctest::doctest)
 horde_set_warnings(horde_tests)
