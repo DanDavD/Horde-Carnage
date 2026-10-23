@@ -34,7 +34,7 @@ The game executable reads the hardware and draws:
 
 1. A press opens a buffer of `kTriggerBufferSeconds` (0.15 s).
 2. A semi-automatic gun wants to fire when there is a buffered press. An automatic gun also wants to fire while the button is held.
-3. If something else has the player's hands (a dash, see [Player abilities](ABILITIES.md)), `canFire` is false and it stops here, with the press still buffered.
+3. If something else has the player's hands (a dash or a drink, see [Player abilities](ABILITIES.md)), `canFire` is false and it stops here, with the press still buffered.
 4. If the gun wants to fire and its cooldown is over, it fires: the cooldown is set to `1 / shotsPerSecond`, the buffer is cleared, and the muzzle flash starts (0.05 s).
 
 **Switching.** `SelectSlot` puts a slot in hand; `CycleWeapon` goes to the next one. Switching is instant. Both guns keep cooling down while in the holster, and a press buffered on the gun being put away is dropped.

@@ -28,6 +28,11 @@ struct Health {
 /// @return Whether the hit landed.
 bool ApplyDamage(Health& health, int amount);
 
+/// Restores `amount` hit points, never above `max`. The dead cannot be healed.
+///
+/// @return Whether any health was restored.
+bool Heal(Health& health, int amount);
+
 /// Counts the invulnerability window down by `dt` seconds.
 void TickHealth(Health& health, float dt);
 

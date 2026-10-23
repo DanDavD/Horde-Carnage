@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/Dash.h"
+#include "core/Flasks.h"
 #include "core/Health.h"
 #include "core/Loadout.h"
 #include "core/Movement.h"
@@ -22,6 +23,7 @@ struct Player {
     Health health;
     Loadout loadout;
     Dash dash;
+    Flasks flasks;
 };
 
 } // namespace horde

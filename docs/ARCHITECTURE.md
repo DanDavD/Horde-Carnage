@@ -39,7 +39,7 @@ The simulation never reads a key or the mouse. Every step, `Game::Update` turns 
 `World` (`src/core/World.h`) holds everything the simulation needs as plain data: the arena, the player, the enemies, the bullets and the camera. Enemies and bullets live in fixed-size pools inside it (see [Object pool](OBJECT_POOL.md)), so a running game never allocates memory. Two functions work on it:
 
 - `CreateWorld` builds the starting state: the player in the middle of the arena, the hairballs around it, the camera on the player.
-- `StepWorld` advances it by one fixed step, in this order: the invulnerability window and the dash cooldown, the player (dash or movement, aim, weapons), every enemy (chase, movement), collisions between bodies and the walls (four passes, see [Collisions](COLLISIONS.md)), bullets and their hits (see [Bullets and hits](BULLETS.md)), dead enemies removed, contact damage (see [Health](HEALTH.md)), an empty arena refilled, then the camera.
+- `StepWorld` advances it by one fixed step, in this order: the invulnerability window and the dash cooldown, the player (start a dash or a drink, the drink, the dash or normal movement, aim, weapons), every enemy (chase, movement), collisions between bodies and the walls (four passes, see [Collisions](COLLISIONS.md)), bullets and their hits (see [Bullets and hits](BULLETS.md)), dead enemies removed, contact damage (see [Health](HEALTH.md)), an empty arena refilled, then the camera.
 
 ### The session
 
@@ -80,7 +80,7 @@ Game objects are plain structs (components) that hold data, and free functions (
 - `tests/core/SessionTests.cpp`: see [Game flow](GAME_FLOW.md#tests).
 - `tests/core/WeaponTests.cpp`, `LoadoutTests.cpp` and the aim and fire cases in `FacingTests.cpp` and `WorldTests.cpp`: see [Aiming and weapons](WEAPONS.md#tests).
 - `tests/core/ObjectPoolTests.cpp`: see [Object pool](OBJECT_POOL.md#tests).
-- `tests/core/DashTests.cpp` and the dash cases in `WorldTests.cpp`: see [Player abilities](ABILITIES.md#tests).
+- `tests/core/DashTests.cpp`, `FlasksTests.cpp` and the dash and flask cases in `WorldTests.cpp`: see [Player abilities](ABILITIES.md#tests).
 - `tests/core/ProjectileTests.cpp`, the sweep cases in `CollisionTests.cpp` and the bullet cases in `WorldTests.cpp`: see [Bullets and hits](BULLETS.md#tests).
 
 ## Limitations

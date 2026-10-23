@@ -19,6 +19,7 @@ struct PlayerCommands {
     std::optional<int> selectSlot; ///< A weapon slot picked directly, counting from 0.
     bool cycleWeapon = false;      ///< Switch to the next weapon.
     bool dashPressed = false;      ///< The dash button went down since the last step.
+    bool healPressed = false;      ///< The heal button went down since the last step.
 };
 
 } // namespace horde

@@ -33,6 +33,7 @@ This is day 3 of 15. Progress is tracked in the [roadmap](docs/ROADMAP.md) and t
 - Bullets that fly, hit the first hairball in their path, flash it white and knock it back. Three pistol bullets or five SMG bullets kill a hairball, and a new ring arrives once you clear the arena. Kills are counted on screen and on the game over screen. See [Bullets and hits](docs/BULLETS.md).
 - Enemies and bullets live in fixed object pools, so the game never allocates memory while you play. See [Object pool](docs/OBJECT_POOL.md).
 - A dash that covers about four body widths in 0.12 s, passes through enemies and makes you untouchable while it lasts. See [Player abilities](docs/ABILITIES.md).
+- Three healing flasks per attempt, Dark Souls style: drinking takes a second, slows you down, and a hit while drinking wastes the flask.
 - Unit tests for the pure logic, and a GitHub Actions workflow that builds and tests every push and pull request on Windows.
 - Warnings are errors for the project's own code (`/W4 /WX` on MSVC).
 
@@ -74,6 +75,7 @@ You can also open the folder in Visual Studio (*File > Open > Folder*). It reads
 | Fire | Left click (hold with the SMG) | Not yet |
 | Switch gun | `Q`, `1`, `2` or the mouse wheel | Not yet |
 | Dash | `Space` or left `Shift` | Not yet |
+| Drink a flask | `E` | Not yet |
 | Play again after a game over | `Enter` or `R` | `A` or `Start` |
 | Quit | `Esc` | |
 | Debug overlay (Debug builds only) | `F1` | |

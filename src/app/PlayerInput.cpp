@@ -68,6 +68,7 @@ void CollectButtonPresses(ButtonPresses& presses) {
     // With two guns, either wheel direction means "the other gun".
     presses.cycleWeapon = presses.cycleWeapon || IsKeyPressed(KEY_Q) || GetMouseWheelMove() != 0.0f;
     presses.dash = presses.dash || IsKeyPressed(KEY_SPACE) || IsKeyPressed(KEY_LEFT_SHIFT);
+    presses.heal = presses.heal || IsKeyPressed(KEY_E);
 }
 
 bool ReadRestartPressed() {

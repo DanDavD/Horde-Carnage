@@ -8,6 +8,7 @@ add_executable(horde_tests
     core/DashTests.cpp
     core/FacingTests.cpp
     core/FixedTimestepTests.cpp
+    core/FlasksTests.cpp
     core/FollowCameraTests.cpp
     core/HealthTests.cpp
     core/LoadoutTests.cpp

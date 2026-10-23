@@ -8,6 +8,7 @@
 #include "core/Chase.h"
 #include "core/Collision.h"
 #include "core/Dash.h"
+#include "core/Flasks.h"
 #include "core/Facing.h"
 #include "core/Health.h"
 #include "core/Loadout.h"
@@ -25,10 +26,26 @@ constexpr int kCollisionPasses = 4;
 constexpr float kHitFlashSeconds = 0.1f;
 constexpr float kHitStunSeconds = 0.15f;
 
-// Every source of damage to the player goes through here, so a dash protects from all of them.
+// Every source of damage to the player goes through here, so a dash protects from all of them, and a hit
+// that lands spoils any drink in progress.
 void HurtPlayer(Player& player, int damage) {
-    if (!IsDashInvulnerable(player.dash)) {
-        ApplyDamage(player.health, damage);
+    if (!IsDashInvulnerable(player.dash) && ApplyDamage(player.health, damage)) {
+        InterruptDrinking(player.flasks);
+    }
+}
+
+// The dash and the drink exclude each other: drinking is a commitment, and a dash cannot be cancelled into
+// a heal. Drinking at full health would only waste a flask, so it is refused.
+void StartDrinkIfAsked(Player& player, const PlayerCommands& commands) {
+    const bool hurt = player.health.current < player.health.max;
+    if (commands.healPressed && hurt && !IsDashing(player.dash)) {
+        TryStartDrinking(player.flasks);
+    }
+}
+
+void DrinkFlasks(Player& player, float dt) {
+    if (const int healed = StepFlasks(player.flasks, dt); healed > 0) {
+        Heal(player.health, healed);
     }
 }
 
@@ -36,7 +53,7 @@ void HurtPlayer(Player& player, int damage) {
 // the facing: the facing is only updated after moving, so it is a step old, and a flick of the mouse
 // followed by a dash in the same frame would go the wrong way.
 void StartDashIfAsked(Player& player, const PlayerCommands& commands) {
-    if (!commands.dashPressed || IsDashing(player.dash)) {
+    if (!commands.dashPressed || IsDashing(player.dash) || IsDrinking(player.flasks)) {
         return;
     }
     // With the cursor right on the player there is no aim direction (the same one unit tolerance as
@@ -55,7 +72,11 @@ void MovePlayer(Player& player, Vec2 move, float dt) {
     const bool dashing = IsDashing(dash);
     const Vec2 dashStep = StepDash(dash, dt);
     if (!dashing) {
-        StepMovement(player.motion, move, player.stats, dt);
+        MovementStats stats = player.stats;
+        if (IsDrinking(player.flasks)) {
+            stats.maxSpeed *= player.flasks.stats.moveSpeedFactor;
+        }
+        StepMovement(player.motion, move, stats, dt);
         return;
     }
     // The burst replaces normal movement. The velocity reports running speed rather than the burst's
@@ -79,7 +100,7 @@ void HandleWeapons(World& world, const PlayerCommands& commands, float dt) {
     TickLoadout(loadout, dt);
 
     Weapon& weapon = Equipped(loadout);
-    const bool handsFree = !IsDashing(player.dash);
+    const bool handsFree = !IsDashing(player.dash) && !IsDrinking(player.flasks);
     if (PullTrigger(weapon, commands.fireHeld, commands.firePressed, handsFree)) {
         const Vec2 muzzle = MuzzlePoint(player.motion.position, player.facing, player.radius, weapon.stats);
         world.bullets.Spawn(MakeBullet(muzzle, player.facing, weapon.stats));
@@ -228,6 +249,8 @@ void StepWorld(World& world, const PlayerCommands& commands, float dt) {
     TickHealth(player.health, dt);
     TickDashCooldown(player.dash, dt);
     StartDashIfAsked(player, commands);
+    StartDrinkIfAsked(player, commands);
+    DrinkFlasks(player, dt);
     MovePlayer(player, commands.move, dt);
 
     // Aim after moving, so the gun points from where the player is now, not from a step ago.

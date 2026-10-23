@@ -6,6 +6,7 @@ add_library(horde_core STATIC
     core/Dash.cpp
     core/Facing.cpp
     core/FixedTimestep.cpp
+    core/Flasks.cpp
     core/FollowCamera.cpp
     core/Health.cpp
     core/Loadout.cpp
