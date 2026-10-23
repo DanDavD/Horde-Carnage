@@ -41,6 +41,19 @@ constexpr float kBlinkFade = 0.35f;
 constexpr float kPistolBarrelWidth = 6.0f;
 constexpr float kSmgBarrelWidth = 9.0f;
 constexpr float kMuzzleFlashRadius = 8.0f;
+// The dash leaves a fading trail of ghosts between where it started and the body, so a move that takes
+// seven frames still reads as a jump.
+constexpr int kDashGhosts = 4;
+// The dash bar sits under the health bar.
+constexpr int kDashBarY = 64;
+constexpr int kDashBarHeight = 6;
+// Flask icons sit to the right of the health bar; a drink shows as a ring filling around the player.
+constexpr int kFlaskIconX = 282;
+constexpr int kFlaskIconWidth = 12;
+constexpr int kFlaskIconHeight = 18;
+constexpr int kFlaskIconGap = 6;
+constexpr float kDrinkRingGap = 4.0f;
+constexpr float kDrinkRingWidth = 4.0f;
 // A bullet is drawn as a short streak behind its head, so its direction reads even in a still frame.
 constexpr float kBulletStreak = 14.0f;
 constexpr float kBulletWidth = 4.0f;
@@ -71,13 +84,15 @@ constexpr Color kGun{175, 180, 195, 255};
 constexpr Color kMuzzleFlash{255, 220, 120, 255};
 constexpr Color kCrosshair{240, 240, 245, 255};
 constexpr Color kBullet{255, 230, 140, 255};
+constexpr Color kFlask{245, 150, 45, 255};
 constexpr Color kHitFlash{255, 255, 255, 255};
 
 #ifndef NDEBUG
 constexpr const char* kControlsHint =
-    "WASD move   Mouse aim   Click fire   Q, 1, 2, wheel switch gun   Esc quit   F1 debug";
+    "WASD move  Mouse aim  Click fire  Space dash  E heal  Q/1/2/wheel swap gun  Esc quit  F1 debug";
 #else
-constexpr const char* kControlsHint = "WASD move   Mouse aim   Click fire   Q, 1, 2, wheel switch gun   Esc quit";
+constexpr const char* kControlsHint =
+    "WASD move  Mouse aim  Click fire  Space dash  E heal  Q/1/2/wheel swap gun  Esc quit";
 #endif
 
 const char* FireModeLabel(FireMode mode) {
@@ -108,10 +123,39 @@ void DrawArena(const Arena& arena) {
     DrawRectangleLinesEx(walls, kWallThickness, kWall);
 }
 
+// Ghosts fade with the dash's invulnerability, so the trail also shows how long the player is safe.
+void DrawDashTrail(const Player& player, Vec2 position) {
+    const Dash& dash = player.dash;
+    if (!IsDashInvulnerable(dash)) {
+        return;
+    }
+    const float strength = dash.invulnerableSeconds / dash.stats.invulnerability;
+    for (int i = 0; i < kDashGhosts; ++i) {
+        const float along = static_cast<float>(i) / kDashGhosts;
+        const Vec2 ghost = Lerp(dash.origin, position, along);
+        const float size = player.radius * (0.6f + 0.4f * along);
+        DrawCircleV(ToRaylib(ghost), size, Fade(kPlayerFill, 0.4f * strength * along));
+    }
+}
+
+// A ring that fills clockwise while the player drinks, so both the player and anyone watching can see
+// how long they are exposed.
+void DrawDrinkRing(const Player& player, Vec2 position) {
+    const Flasks& flasks = player.flasks;
+    if (!IsDrinking(flasks)) {
+        return;
+    }
+    const float progress = 1.0f - flasks.drinkingSeconds / flasks.stats.drinkSeconds;
+    const float inner = player.radius + kDrinkRingGap;
+    DrawRing(ToRaylib(position), inner, inner + kDrinkRingWidth, -90.0f, -90.0f + 360.0f * progress, 32, kFlask);
+}
+
 void DrawPlayer(const Player& player, float alpha) {
     // Drawn between the last two fixed steps, so movement is smooth above 60 Hz.
     const Vec2 position = Lerp(player.motion.previousPosition, player.motion.position, alpha);
     const Health& health = player.health;
+    DrawDashTrail(player, position);
+    DrawDrinkRing(player, position);
 
     Color edge = IsDead(health) ? kPlayerDeadEdge : kPlayerEdge;
     Color fill = IsDead(health) ? kPlayerDeadFill : kPlayerFill;
@@ -218,6 +262,30 @@ void DrawCrosshair(Vector2 at) {
     DrawCircleV(at, 1.5f, kCrosshair);
 }
 
+// One bottle per charge, lit while it is full.
+void DrawFlaskIcons(const Flasks& flasks) {
+    for (int i = 0; i < flasks.stats.maxCharges; ++i) {
+        const float x = static_cast<float>(kFlaskIconX + i * (kFlaskIconWidth + kFlaskIconGap));
+        const Rectangle bottle{x, 41.0f, static_cast<float>(kFlaskIconWidth), static_cast<float>(kFlaskIconHeight)};
+        const Rectangle neck{x + 3.0f, 37.0f, static_cast<float>(kFlaskIconWidth) - 6.0f, 5.0f};
+        const Color fill = i < flasks.charges ? kFlask : kBarBack;
+        DrawRectangleRec(neck, kBarEdge);
+        DrawRectangleRounded(bottle, 0.5f, 6, fill);
+        DrawRectangleRoundedLinesEx(bottle, 0.5f, 6, 1.0f, kBarEdge);
+    }
+}
+
+// Fills up as the dash recharges, and lights up when it is ready.
+void DrawDashBar(const Dash& dash) {
+    constexpr int kX = 10;
+    constexpr int kWidth = 260;
+    const float total = dash.stats.duration + dash.stats.cooldown;
+    const float ready = 1.0f - dash.cooldownSeconds / total;
+    DrawRectangle(kX, kDashBarY, kWidth, kDashBarHeight, kBarBack);
+    DrawRectangle(kX, kDashBarY, static_cast<int>(kWidth * ready), kDashBarHeight,
+                  dash.cooldownSeconds > 0.0f ? kSoftText : kPlayerFill);
+}
+
 void DrawGameOver(const Session& session) {
     DrawRectangle(0, 0, kScreenWidth, kScreenHeight, Fade(BLACK, 0.55f));
     DrawCenteredText("GAME OVER", kScreenHeight / 2 - 90, 64, kBlood);
@@ -261,9 +329,9 @@ void DrawDebugHud(const World& world, Vec2 moveInput) {
     const FollowCamera& camera = world.camera;
     const Motion& motion = player.motion;
     constexpr int kX = 10;
-    constexpr int kY = 72; // Below the health bar.
+    constexpr int kY = 80; // Below the health and dash bars.
     constexpr int kLine = 20;
-    DrawRectangle(kX - 4, kY - 4, 300, 11 * kLine + 8, Fade(BLACK, 0.6f));
+    DrawRectangle(kX - 4, kY - 4, 300, 13 * kLine + 8, Fade(BLACK, 0.6f));
     DrawText(TextFormat("input  %5.2f %5.2f  len %4.2f", moveInput.x, moveInput.y, Length(moveInput)), kX, kY,
              18, RAYWHITE);
     DrawText(TextFormat("speed  %5.0f / %.0f", Length(motion.velocity), player.stats.maxSpeed), kX, kY + kLine, 18,
@@ -285,6 +353,11 @@ void DrawDebugHud(const World& world, Vec2 moveInput) {
     DrawText(TextFormat("weapon %s  cd %.2f", std::string(weapon.stats.name).c_str(), weapon.cooldownSeconds), kX,
              kY + 9 * kLine, 18, RAYWHITE);
     DrawText(TextFormat("shots  %d  kills %d", world.shotsFired, world.kills), kX, kY + 10 * kLine, 18, RAYWHITE);
+    DrawText(TextFormat("dash   cd %.2f  inv %.2f", player.dash.cooldownSeconds, player.dash.invulnerableSeconds), kX,
+             kY + 11 * kLine, 18, RAYWHITE);
+    DrawText(TextFormat("flasks %d / %d  drink %.2f", player.flasks.charges, player.flasks.stats.maxCharges,
+                        player.flasks.drinkingSeconds),
+             kX, kY + 12 * kLine, 18, RAYWHITE);
 }
 #endif
 
@@ -340,7 +413,9 @@ void Game::Update(float dt) {
                                   .fireHeld = ReadFireHeld(),
                                   .firePressed = _pendingPresses.fire,
                                   .selectSlot = _pendingPresses.weaponSlot,
-                                  .cycleWeapon = _pendingPresses.cycleWeapon};
+                                  .cycleWeapon = _pendingPresses.cycleWeapon,
+                                  .dashPressed = _pendingPresses.dash,
+                                  .healPressed = _pendingPresses.heal};
     // Presses are events: only the first step of a frame uses them, so a frame that runs two steps does
     // not fire twice for one click.
     _pendingPresses = {};
@@ -390,6 +465,8 @@ void Game::Draw(float alpha) const {
 #endif
 
     DrawHealthBar(player.health);
+    DrawDashBar(player.dash);
+    DrawFlaskIcons(player.flasks);
     DrawWeaponPanel(player.loadout);
     DrawFPS(10, 10);
     DrawText("Horde Carnage v" HORDE_VERSION, kScreenWidth - 230, 10, 20, kSoftText);

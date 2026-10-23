@@ -24,6 +24,8 @@ struct ButtonPresses {
     bool fire = false;              ///< Left mouse button.
     std::optional<int> weaponSlot;  ///< Keys 1 and 2 pick slots 0 and 1.
     bool cycleWeapon = false;       ///< Q or the mouse wheel.
+    bool dash = false;              ///< Space or left Shift.
+    bool heal = false;              ///< E.
 };
 
 /// Adds this frame's presses to `presses`. Call it once per frame: a frame that runs no fixed step keeps

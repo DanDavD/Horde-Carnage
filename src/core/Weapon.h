@@ -74,7 +74,9 @@ void TickWeapon(Weapon& weapon, float dt);
 /// A semi-automatic weapon fires on a press (or a press buffered a moment ago). An automatic weapon
 /// also fires while the button is held. Both wait for the cooldown between shots.
 ///
+/// @param canFire False while something else has the player's hands (a dash). The press is still
+///        buffered, so a click during a dash fires as soon as the dash ends.
 /// @return Whether a shot was fired.
-bool PullTrigger(Weapon& weapon, bool held, bool pressed);
+bool PullTrigger(Weapon& weapon, bool held, bool pressed, bool canFire = true);
 
 } // namespace horde

@@ -21,7 +21,7 @@ Every fixed step, `StepWorld`:
 
 1. **Counts the invulnerability window down** with `TickHealth`, at the start of the step.
 2. Moves everyone and resolves collisions (see [Collisions](COLLISIONS.md)).
-3. **Applies contact damage:** for every hairball, if `AreTouching` says it touches the player (the sum of the radii plus `kContactSlack`), `ApplyDamage(player.health, enemy.contactDamage)`.
+3. **Applies contact damage:** for every hairball, if `AreTouching` says it touches the player (the sum of the radii plus `kContactSlack`), it hurts the player through `HurtPlayer`, the single door for damage to the player. `HurtPlayer` ignores the damage while a dash makes the player invulnerable (see [Player abilities](ABILITIES.md)), and otherwise calls `ApplyDamage(player.health, enemy.contactDamage)`. A hit that lands also interrupts a flask in progress.
 
 `ApplyDamage` does nothing if the body is dead or still inside its invulnerability window. Otherwise it takes the damage, never going below 0, and opens a new window of `invulnerabilityAfterHit` seconds.
 
@@ -65,6 +65,6 @@ In a Debug build, `F1` shows the health and the time left in the window.
 
 ## Limitations
 
-- **Nothing heals.** Healing comes with the power-ups on day 10.
+- **The only healing is the three flasks per attempt** (see [Player abilities](ABILITIES.md)). `Heal` restores health up to the maximum and never revives.
 - **Hairballs use the same `Health` component with no invulnerability window**, so every bullet counts. See [Bullets and hits](BULLETS.md).
 - **The bar has no animation.** It jumps to the new value. A trailing "damage" bar that drains behind it is part of the game feel pass on day 12.

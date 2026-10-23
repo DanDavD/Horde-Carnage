@@ -30,6 +30,8 @@ Every moving entity has a `Motion` component: `position`, `previousPosition` and
    3. **Integrate the position** with the new velocity, after saving the old one in `previousPosition`.
 4. **Confine it to the arena** with `ConfineToArena`. This happens after every body has moved and collisions have pushed overlapping bodies apart (see [Collisions](COLLISIONS.md)), so a body pushed into a wall is put back too. On each axis, if the body (a circle of `radius`) went through a wall, it is put back against the wall, and the part of the velocity that points into that wall is set to zero. The other axis is not touched, so the player slides along walls.
 
+During a dash, the burst replaces `StepMovement` for the player. See [Player abilities](ABILITIES.md).
+
 Enemies go through the same movement and wall steps with their own input and numbers. See [Enemies](ENEMIES.md).
 
 The renderer draws the player at `Lerp(previousPosition, position, alpha)`, where `alpha` comes from `FixedTimestep::Alpha`. That keeps movement smooth on monitors faster than 60 Hz. A dark eye on the player's edge shows `facing`.

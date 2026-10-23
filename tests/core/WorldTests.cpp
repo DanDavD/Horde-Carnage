@@ -400,3 +400,150 @@ TEST_CASE("a cleared arena gets a new ring of hairballs after the delay") {
     Step(world, Vec2{}, 12);
     CHECK(world.enemies.Size() == static_cast<std::size_t>(horde::kStartingHairballs));
 }
+
+TEST_CASE("a dash carries the player its distance and leaves it at running speed") {
+    World world = horde::CreateWorld(kArena, kView);
+    world.enemies.Clear();
+    const Vec2 start = world.player.motion.position;
+    Step(world, PlayerCommands{.move = {1.0f, 0.0f}, .dashPressed = true}, 1);
+    Step(world, PlayerCommands{.move = {1.0f, 0.0f}}, 7);
+
+    CHECK_FALSE(horde::IsDashing(world.player.dash));
+    // The dash distance plus the little the player ran after it in the same eight steps.
+    const float travelled = world.player.motion.position.x - start.x;
+    CHECK(travelled >= world.player.dash.stats.distance);
+    CHECK(travelled < world.player.dash.stats.distance + 10.0f);
+    CHECK(world.player.motion.velocity.x == doctest::Approx(world.player.stats.maxSpeed));
+}
+
+TEST_CASE("a dash with no movement input goes where the player faces") {
+    World world = horde::CreateWorld(kArena, kView);
+    world.enemies.Clear();
+    const Vec2 start = world.player.motion.position;
+    const Vec2 above = start + Vec2{0.0f, -500.0f};
+    Step(world, PlayerCommands{.aimAt = above, .dashPressed = true}, 1);
+    Step(world, PlayerCommands{.aimAt = above}, 10);
+    CHECK(world.player.motion.position.y < start.y - 150.0f);
+    CHECK(world.player.motion.position.x == doctest::Approx(start.x));
+}
+
+TEST_CASE("a dash stops at a wall") {
+    World world = horde::CreateWorld(kArena, kView);
+    world.enemies.Clear();
+    world.player.motion = horde::MotionAt(Vec2{kArena.max.x - 60.0f, 800.0f});
+    Step(world, PlayerCommands{.move = {1.0f, 0.0f}, .dashPressed = true}, 10);
+    CHECK(world.player.motion.position.x == doctest::Approx(kArena.max.x - world.player.radius));
+}
+
+TEST_CASE("a dash goes through a hairball instead of shoving it") {
+    World world = horde::CreateWorld(kArena, kView);
+    const Vec2 start = world.player.motion.position;
+    Enemy& hairball = OnlyEnemyAt(world, start + Vec2{80.0f, 0.0f});
+    hairball.stunSeconds = 1.0f; // Keep it in place, so only the dash moves anything.
+
+    Step(world, PlayerCommands{.move = {1.0f, 0.0f}, .dashPressed = true}, 8);
+    CHECK(world.player.motion.position.x > hairball.motion.position.x);
+    CHECK(hairball.motion.position.x == doctest::Approx(start.x + 80.0f).epsilon(0.02));
+}
+
+TEST_CASE("a dashing player cannot be hurt") {
+    World world = horde::CreateWorld(kArena, kView);
+    horde::Player& player = world.player;
+    OnlyEnemyAt(world, player.motion.position + Vec2{player.radius + 18.0f, 0.0f});
+
+    // Dash straight through the hairball: every step of the dash the bodies overlap or touch.
+    Step(world, PlayerCommands{.move = {1.0f, 0.0f}, .dashPressed = true}, 1);
+    CHECK(horde::IsDashInvulnerable(player.dash));
+    CHECK(player.health.current == player.health.max);
+}
+
+TEST_CASE("the gun does not fire during a dash, but a click in it fires right after") {
+    World world = horde::CreateWorld(kArena, kView);
+    world.enemies.Clear();
+    Step(world, PlayerCommands{.move = {1.0f, 0.0f}, .dashPressed = true}, 1);
+    Step(world, PlayerCommands{.move = {1.0f, 0.0f}, .firePressed = true}, 1);
+    CHECK(world.shotsFired == 0);
+
+    Step(world, PlayerCommands{.move = {1.0f, 0.0f}}, 7);
+    CHECK(world.shotsFired == 1);
+}
+
+TEST_CASE("a dash with the cursor right on the player goes where the player faces") {
+    World world = horde::CreateWorld(kArena, kView);
+    world.enemies.Clear();
+    const Vec2 start = world.player.motion.position;
+    // The player starts facing down, and the cursor gives no direction.
+    Step(world, PlayerCommands{.aimAt = start, .dashPressed = true}, 10);
+    CHECK(world.player.motion.position.y > start.y + 150.0f);
+}
+
+TEST_CASE("a drink heals the player when it finishes and spends a flask") {
+    World world = horde::CreateWorld(kArena, kView);
+    world.enemies.Clear();
+    horde::Player& player = world.player;
+    player.health.current = 50;
+
+    Step(world, PlayerCommands{.healPressed = true}, 1);
+    CHECK(horde::IsDrinking(player.flasks));
+    CHECK(player.flasks.charges == player.flasks.stats.maxCharges - 1);
+    Step(world, Vec2{}, 50);
+    CHECK(player.health.current == 50);
+
+    Step(world, Vec2{}, 10);
+    CHECK(player.health.current == 50 + player.flasks.stats.heal);
+}
+
+TEST_CASE("a drink at full health is refused and keeps the flask") {
+    World world = horde::CreateWorld(kArena, kView);
+    world.enemies.Clear();
+    Step(world, PlayerCommands{.healPressed = true}, 1);
+    CHECK_FALSE(horde::IsDrinking(world.player.flasks));
+    CHECK(world.player.flasks.charges == world.player.flasks.stats.maxCharges);
+}
+
+TEST_CASE("while drinking the player is slow and cannot dash or shoot") {
+    World world = horde::CreateWorld(kArena, kView);
+    world.enemies.Clear();
+    horde::Player& player = world.player;
+    player.health.current = 50;
+
+    Step(world, PlayerCommands{.healPressed = true}, 1);
+    Step(world, PlayerCommands{.move = {1.0f, 0.0f}, .firePressed = true, .dashPressed = true}, 1);
+    Step(world, PlayerCommands{.move = {1.0f, 0.0f}}, 40);
+
+    CHECK_FALSE(horde::IsDashing(player.dash));
+    CHECK(world.shotsFired == 0);
+    const float slowSpeed = player.stats.maxSpeed * player.flasks.stats.moveSpeedFactor;
+    CHECK(player.motion.velocity.x == doctest::Approx(slowSpeed));
+}
+
+TEST_CASE("a hit while drinking wastes the flask") {
+    World world = horde::CreateWorld(kArena, kView);
+    horde::Player& player = world.player;
+    player.health.current = 50;
+    Step(world, PlayerCommands{.healPressed = true}, 1);
+
+    // A hairball touches the player in the middle of the drink.
+    OnlyEnemyAt(world, player.motion.position + Vec2{player.radius + 18.0f, 0.0f});
+    Step(world, Vec2{}, 1);
+    CHECK_FALSE(horde::IsDrinking(player.flasks));
+    CHECK(player.health.current == 40);
+
+    world.enemies.Clear();
+    Step(world, Vec2{}, 60);
+    CHECK(player.health.current == 40);
+    CHECK(player.flasks.charges == player.flasks.stats.maxCharges - 1);
+}
+
+TEST_CASE("the flasks run out after three drinks") {
+    World world = horde::CreateWorld(kArena, kView);
+    world.enemies.Clear();
+    horde::Player& player = world.player;
+    for (int drink = 0; drink < 4; ++drink) {
+        player.health.current = 10;
+        Step(world, PlayerCommands{.healPressed = true}, 1);
+        Step(world, Vec2{}, 61);
+    }
+    CHECK(player.flasks.charges == 0);
+    CHECK(player.health.current == 10);
+}
