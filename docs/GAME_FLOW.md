@@ -24,7 +24,7 @@ The game executable connects it to the screen and the buttons:
 ```
 
 - **Playing:** `StepSession` calls `StepWorld` every fixed step. If the player's health is 0 after the step, the session enters `GameOver`.
-- **GameOver:** the world is not stepped any more. It stays frozen on the moment of death, so the player can see what got them. The screen darkens and shows "GAME OVER", how long the player survived (`World::elapsedSeconds`), and how to restart.
+- **GameOver:** the world is not stepped any more. It stays frozen on the moment of death, so the player can see what got them. The screen darkens and shows "GAME OVER", how long the player survived (`World::elapsedSeconds`), how many hairballs they killed (`World::kills`), and how to restart.
 - **Restart:** `TryRestart` works only in `GameOver`, and only after `kRestartDelaySeconds` (1 s). It replaces the world with a brand new one from `CreateWorld` and goes back to `Playing`. Until the delay has passed, the restart prompt is dimmed.
 
 Every state change goes through one helper, `EnterState`, which also resets the clock of the state (`stateSeconds`). That clock is what the restart delay reads.

@@ -30,10 +30,12 @@ This is day 3 of 15. Progress is tracked in the [roadmap](docs/ROADMAP.md) and t
 - A health bar. Each hairball that touches you takes 10 of your 100 hit points, and after a hit you blink and cannot be hurt for 0.8 seconds. See [Health](docs/HEALTH.md).
 - A game over screen that shows how long you survived, and a restart into a fresh arena. See [Game flow](docs/GAME_FLOW.md).
 - Aiming with the mouse, independent of where you walk, and two guns: a semi-automatic pistol (one shot per click) and an automatic SMG (hold to fire). A panel shows the gun in hand. See [Aiming and weapons](docs/WEAPONS.md).
+- Bullets that fly, hit the first hairball in their path, flash it white and knock it back. Three pistol bullets or five SMG bullets kill a hairball, and a new ring arrives once you clear the arena. Kills are counted on screen and on the game over screen. See [Bullets and hits](docs/BULLETS.md).
+- Enemies and bullets live in fixed object pools, so the game never allocates memory while you play. See [Object pool](docs/OBJECT_POOL.md).
 - Unit tests for the pure logic, and a GitHub Actions workflow that builds and tests every push and pull request on Windows.
 - Warnings are errors for the project's own code (`/W4 /WX` on MSVC).
 
-**Still to do:** the guns do not fire bullets yet. Next are bullets that hit and kill (the rest of day 4) and enemy waves (day 5), then everything else that makes it a game. See the [roadmap](docs/ROADMAP.md).
+**Still to do:** enemy waves (day 5), then data-driven content, more enemy types, levels, more guns, power-ups, the boss and the polish. See the roadmap for the order. See the [roadmap](docs/ROADMAP.md).
 
 ## Tech stack
 

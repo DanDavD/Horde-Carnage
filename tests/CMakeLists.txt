@@ -11,6 +11,8 @@ add_executable(horde_tests
     core/HealthTests.cpp
     core/LoadoutTests.cpp
     core/MovementTests.cpp
+    core/ObjectPoolTests.cpp
+    core/ProjectileTests.cpp
     core/SessionTests.cpp
     core/Vec2Tests.cpp
     core/WeaponTests.cpp

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/Health.h"
 #include "core/Movement.h"
 
 namespace horde {
@@ -18,6 +19,12 @@ struct Enemy {
     /// Hit points taken from the player on touch. Ten touches kill a player at full health, and the
     /// player's invulnerability window spaces them out to at most one every 0.8 s.
     int contactDamage = 10;
+    /// Three pistol bullets or five SMG bullets. No invulnerability window: every bullet counts, and a
+    /// stream of SMG fire must not be cut down to one hit every 0.8 s.
+    Health health{.current = 30, .max = 30, .invulnerabilityAfterHit = 0.0f};
+    float hitFlashSeconds = 0.0f; ///< Time left on the white flash of the last hit.
+    /// Time left in which it does not chase, so a hit staggers it before it comes back.
+    float stunSeconds = 0.0f;
 };
 
 } // namespace horde

@@ -1,3 +1,5 @@
+#include <optional>
+
 #include <doctest/doctest.h>
 
 #include "core/Collision.h"
@@ -91,4 +93,33 @@ TEST_CASE("bodies count as touching up to the contact slack, and not past it") {
     CHECK(horde::AreTouching(Vec2{0.0f, 0.0f}, kRadius, Vec2{20.0f, 0.0f}, kRadius));
     CHECK(horde::AreTouching(Vec2{0.0f, 0.0f}, kRadius, Vec2{20.0f + horde::kContactSlack, 0.0f}, kRadius));
     CHECK_FALSE(horde::AreTouching(Vec2{0.0f, 0.0f}, kRadius, Vec2{22.0f, 0.0f}, kRadius));
+}
+
+TEST_CASE("a moving circle sweeping into a still one touches it partway along the move") {
+    // Radius 2 moving from x = 0 to x = 100, toward a radius 8 circle at x = 50: they touch at x = 40.
+    const std::optional<float> fraction = horde::SweepCircle(Vec2{0.0f, 0.0f}, Vec2{100.0f, 0.0f}, 2.0f,
+                                                             Vec2{50.0f, 0.0f}, 8.0f);
+    REQUIRE(fraction.has_value());
+    CHECK(*fraction == doctest::Approx(0.4f));
+}
+
+TEST_CASE("a sweep that passes beside a circle, or stops short of it, misses") {
+    CHECK_FALSE(horde::SweepCircle(Vec2{0.0f, 20.0f}, Vec2{100.0f, 20.0f}, 2.0f, Vec2{50.0f, 0.0f}, 8.0f));
+    CHECK_FALSE(horde::SweepCircle(Vec2{0.0f, 0.0f}, Vec2{30.0f, 0.0f}, 2.0f, Vec2{50.0f, 0.0f}, 8.0f));
+}
+
+TEST_CASE("a sweep that starts already touching hits at once") {
+    const std::optional<float> fraction = horde::SweepCircle(Vec2{45.0f, 0.0f}, Vec2{100.0f, 0.0f}, 2.0f,
+                                                             Vec2{50.0f, 0.0f}, 8.0f);
+    REQUIRE(fraction.has_value());
+    CHECK(*fraction == 0.0f);
+}
+
+TEST_CASE("a fast circle cannot skip over a thin one between two steps") {
+    // Both ends of the move are clear of the circle, but the path goes straight through it.
+    CHECK(horde::SweepCircle(Vec2{0.0f, 0.0f}, Vec2{100.0f, 0.0f}, 1.0f, Vec2{50.0f, 0.0f}, 2.0f).has_value());
+}
+
+TEST_CASE("a circle that does not move only hits what it already touches") {
+    CHECK_FALSE(horde::SweepCircle(Vec2{0.0f, 0.0f}, Vec2{0.0f, 0.0f}, 2.0f, Vec2{50.0f, 0.0f}, 8.0f));
 }

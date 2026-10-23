@@ -4,7 +4,7 @@
 
 How the player aims and fires. The player moves with WASD and aims with the mouse, independently, like a twin-stick shooter (SAS: Zombie Assault 4, the "Dead Ops Arcade" mode of Call of Duty: Black Ops). They carry two guns: a semi-automatic pistol that fires once per click, and an automatic SMG that fires while the button is held. The gun in hand is shown in a panel in the bottom right corner, and Q, the keys 1 and 2, or the mouse wheel switch guns.
 
-This step covers aiming, the trigger and switching. Bullets come in the next step, with the projectile pool; for now a shot shows as a muzzle flash and counts in the Debug overlay.
+This document covers aiming, the trigger and switching. What a bullet does after it leaves the gun is in [Bullets and hits](BULLETS.md).
 
 The rules live in `horde_core`:
 
@@ -62,7 +62,8 @@ The game executable reads the hardware and draws:
 | SMG fire rate and mode | `kSmg` (`src/core/Weapon.h`) | 10 per second, automatic |
 | Early press buffer | `kTriggerBufferSeconds` | 0.15 s |
 | Muzzle flash | `kMuzzleFlashSeconds` | 0.05 s |
-| Barrel length and width | `kPistolBarrelLength`, `kSmgBarrelLength`, ... (`src/app/Game.cpp`) | 14 and 22 units |
+| Barrel length (where bullets start) | `WeaponStats::barrelLength` (`src/core/Weapon.h`) | 14 and 22 units |
+| Damage, bullet speed, range, knockback | `WeaponStats` (`src/core/Weapon.h`) | See [Bullets and hits](BULLETS.md#how-to-tune-it) |
 | Controls | `CollectButtonPresses`, `ReadFireHeld` (`src/app/PlayerInput.cpp`) | Left click; 1, 2, Q, wheel |
 
 In a Debug build, `F1` shows the gun in hand, its cooldown, and the shots fired this run.
@@ -78,7 +79,6 @@ The crosshair, the barrel, the flash and the panel are not unit tested, because 
 
 ## Limitations
 
-- **Shots do not hit anything yet.** Bullets, damage and enemy death are the next steps of day 4.
 - **Fire rates that are not a whole number of steps are rounded.** 7 shots per second would become 6.67. None of the planned guns needs that.
 - **The mouse is turned into a world point with the camera of the last step**, while the screen shows a camera interpolated a fraction of a step behind. The difference is well under a pixel.
 - **The mouse wheel cycles once per frame it moves.** A touchpad that scrolls for several frames can switch more than once.

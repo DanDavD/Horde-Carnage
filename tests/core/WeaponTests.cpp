@@ -6,6 +6,7 @@
 #include "core/Weapon.h"
 
 using horde::FireMode;
+using horde::Vec2;
 using horde::Weapon;
 using horde::WeaponStats;
 
@@ -102,4 +103,14 @@ TEST_CASE("the timers never count below zero") {
 TEST_CASE("a gun with no press and no held button does not fire") {
     Weapon weapon{.stats = WeaponStats{.name = "Test", .mode = FireMode::Auto, .shotsPerSecond = 5.0f}};
     CHECK_FALSE(Step(weapon, false, false));
+}
+
+TEST_CASE("the muzzle is at the end of the barrel, outside the body") {
+    const Vec2 muzzle = horde::MuzzlePoint(Vec2{100.0f, 100.0f}, Vec2{0.0f, 1.0f}, 20.0f, horde::kSmg);
+    CHECK(muzzle == Vec2{100.0f, 100.0f + 20.0f + horde::kSmg.barrelLength});
+}
+
+TEST_CASE("the pistol hits harder per bullet and the SMG fires faster") {
+    CHECK(horde::kPistol.damage > horde::kSmg.damage);
+    CHECK(horde::kSmg.shotsPerSecond > horde::kPistol.shotsPerSecond);
 }

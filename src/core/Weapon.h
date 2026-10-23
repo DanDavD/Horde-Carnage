@@ -2,6 +2,8 @@
 
 #include <string_view>
 
+#include "core/Vec2.h"
+
 namespace horde {
 
 /// How a gun responds to the fire button.
@@ -16,12 +18,38 @@ struct WeaponStats {
     FireMode mode = FireMode::SemiAuto;
     /// Highest fire rate. A semi-automatic gun cannot go faster however fast the player clicks.
     float shotsPerSecond = 6.0f;
+    int damage = 10;             ///< Hit points one bullet takes.
+    float bulletSpeed = 950.0f;  ///< Units per second.
+    float range = 750.0f;        ///< How far a bullet flies before it is gone.
+    float knockback = 300.0f;    ///< Speed a bullet adds to what it hits.
+    float barrelLength = 14.0f;  ///< How far the muzzle sticks out of the body. Bullets start there.
 };
 
-/// The starting guns. The pistol rewards clicking; the SMG fires a steadier stream just by holding.
-/// At 60 Hz both rates are a whole number of steps (10 and 6), so they are exact.
-inline constexpr WeaponStats kPistol{.name = "Pistol", .mode = FireMode::SemiAuto, .shotsPerSecond = 6.0f};
-inline constexpr WeaponStats kSmg{.name = "SMG", .mode = FireMode::Auto, .shotsPerSecond = 10.0f};
+/// The starting guns. The pistol rewards clicking with harder, longer shots; the SMG fires a steadier
+/// stream of weaker bullets just by holding. At 60 Hz both fire rates are a whole number of steps
+/// (10 and 6), so they are exact. Against a 30 hit point hairball the pistol needs 3 bullets, the SMG 5.
+inline constexpr WeaponStats kPistol{.name = "Pistol",
+                                     .mode = FireMode::SemiAuto,
+                                     .shotsPerSecond = 6.0f,
+                                     .damage = 10,
+                                     .bulletSpeed = 950.0f,
+                                     .range = 750.0f,
+                                     .knockback = 300.0f,
+                                     .barrelLength = 14.0f};
+inline constexpr WeaponStats kSmg{.name = "SMG",
+                                  .mode = FireMode::Auto,
+                                  .shotsPerSecond = 10.0f,
+                                  .damage = 6,
+                                  .bulletSpeed = 850.0f,
+                                  .range = 600.0f,
+                                  .knockback = 120.0f,
+                                  .barrelLength = 22.0f};
+
+/// Where the muzzle of `weapon` is, held by a body of `bodyRadius` at `center` that faces `facing`.
+/// The simulation fires bullets from here and the renderer draws the barrel up to here, so both agree.
+[[nodiscard]] constexpr Vec2 MuzzlePoint(Vec2 center, Vec2 facing, float bodyRadius, const WeaponStats& weapon) {
+    return center + facing * (bodyRadius + weapon.barrelLength);
+}
 
 /// A press that arrives a little before the gun is ready is kept this long and fires as soon as it is.
 /// Without it, a quick double click on the pistol would lose the second shot without telling the player.

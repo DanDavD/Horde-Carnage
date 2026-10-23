@@ -66,5 +66,5 @@ In a Debug build, `F1` shows the health and the time left in the window.
 ## Limitations
 
 - **Nothing heals.** Healing comes with the power-ups on day 10.
-- **Only the player has health.** Enemies get it with combat on day 4, through the same `Health` component.
+- **Hairballs use the same `Health` component with no invulnerability window**, so every bullet counts. See [Bullets and hits](BULLETS.md).
 - **The bar has no animation.** It jumps to the new value. A trailing "damage" bar that drains behind it is part of the game feel pass on day 12.
