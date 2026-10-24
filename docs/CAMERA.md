@@ -2,7 +2,7 @@
 
 ## What it is
 
-The camera that follows the player around an arena bigger than the screen. It chases the player smoothly, looks a little ahead in the direction the player is moving, and stops at the walls so the view does not wander into empty space.
+The camera that follows the player around an arena bigger than the screen. It chases the player smoothly, looks a little ahead in the direction the player is moving, leans toward the boss so the boss stays in view, and stops at the walls so the view does not wander into empty space.
 
 The rules live in `horde_core` and know nothing about raylib:
 
@@ -10,15 +10,18 @@ The rules live in `horde_core` and know nothing about raylib:
 
 The game executable turns it into a raylib `Camera2D`:
 
-- `src/app/Game.cpp`: `ToRaylibCamera` builds the `Camera2D`, and `Draw` wraps the arena, the enemies and the player in `BeginMode2D` and `EndMode2D`. The HUD (FPS, version, controls, the Debug overlay text) is drawn after `EndMode2D`, so it stays fixed on screen.
+- `src/core/World.cpp`: `CameraFocus` picks the point the camera follows, between the player and the boss.
+- `src/app/Game.cpp`: `ToRaylibCamera` builds the `Camera2D`, and `Draw` wraps the arena, the boss, the hairballs and the player in `BeginMode2D` and `EndMode2D`. The HUD (FPS, version, controls, the Debug overlay text) is drawn after `EndMode2D`, so it stays fixed on screen.
 
 ## How it works
 
-The camera has a `center`, a `previousCenter` and a `viewSize` (how much of the world fits on screen; at zoom 1 it is the window size, 1280x720). It is created with `FollowCameraAt`, already settled on the player, so the first frame does not slide in from somewhere else.
+The camera has a `center`, a `previousCenter` and a `viewSize` (how much of the world fits on screen; at zoom 1 it is the window size, 1280x720). It is created with `FollowCameraAt`, already settled on its target, so the first frame does not slide in from somewhere else.
 
-Once per fixed step, as the last part of `StepWorld` (after the player and the enemies have moved), `StepFollowCamera` does three things:
+**The target** comes from `CameraFocus` in `World.cpp`: the player's position, moved toward the living boss by 40% of the distance between them, but never by more than 200 units. With the boss dead, it is the player's position. The camera itself does not know about the boss; it follows whatever point it is given.
 
-1. **Pick a goal:** the player's position plus `velocity * lookAhead`. When the player runs right, the goal is to the right of the player, so the player sees more of where they are going. When the player stops, the velocity drops to zero and the goal slides back onto the player.
+Once per fixed step, as the last part of `StepWorld` (after the player, the hairballs and the boss have moved), `StepFollowCamera` does three things:
+
+1. **Pick a goal:** the target plus the player's `velocity * lookAhead`. When the player runs right, the goal is to the right of the player, so the player sees more of where they are going. When the player stops, the velocity drops to zero and the goal slides back onto the player.
 2. **Clamp the goal** with `ClampViewToArena`, against the arena grown by `wallMargin` on every side. The view can show the walls and a strip of the outside, but not more. On an axis where the arena is smaller than the view, the view is centred on the arena.
 3. **Move toward the goal** by the fraction `1 - exp(-sharpness * dt)` of the remaining distance, after saving the old center in `previousCenter`.
 
@@ -36,7 +39,8 @@ The renderer centres the `Camera2D` on `Lerp(previousCenter, center, alpha)`, th
 - **The goal is clamped, not the result.** The current center is always inside the allowed range, and a blend of two points inside a range stays inside it. So the camera eases into the wall and stops there, and is never pushed back after a step.
 - **A margin past the walls.** Without it the edge of the screen would stop exactly on the edge of the arena. The walls are drawn just outside the arena, so they would never be on screen, and the player would bump into something invisible. With 64 units the wall and a strip of the outside are visible, and the controls text sits over the outside instead of over the floor.
 - **The camera is stepped in the fixed update and interpolated like the player.** Stepping it once per frame instead would make its follow speed depend on the frame rate, and the tests could not pin it down. Stepping it at 60 Hz without interpolation would make the view jump once per step while the player moves smoothly, which shows up as jitter on a 165 Hz monitor.
-- **The camera is a component plus free functions in `horde_core`, like `Motion`.** It is tested without a window, and screen shake on day 12 can be added as an offset on top without touching the follow logic.
+- **The camera is a component plus free functions in `horde_core`, like `Motion`.** It is tested without a window, and screen shake on day 10 can be added as an offset on top without touching the follow logic.
+- **Lean toward the boss, with a cap.** In a fight against one boss, losing sight of it is the worst thing the camera can do. 40% of the way keeps both on screen at the start and through most of the fight, and the 200 unit cap keeps the player away from the edge of the screen when the boss is across the arena. The world picks the target, so `FollowCamera` stays a plain follow camera. See [The boss](BOSS.md) for the rejected options.
 
 ## How to tune it
 
@@ -52,8 +56,9 @@ Other values:
 
 | Value | Where | Default |
 |---|---|---|
-| Arena rectangle | `kArena` (`src/app/Game.cpp`) | (0, 0) to (2400, 1600) |
+| Arena rectangle | `kBossArena` (`src/core/World.h`) | (0, 0) to (1640, 1040) |
 | View size | `kViewSize` (`src/app/Game.cpp`) | The window size, 1280x720 |
+| Lean toward the boss, and its cap | `kBossFraming`, `kMaxBossFramingOffset` (`src/core/World.cpp`) | 40%, 200 units |
 
 In a Debug build, `F1` shows the camera center in the overlay, and an orange cross where the camera is centred. The gap between the cross and the player is the look-ahead minus the follow lag.
 
@@ -63,11 +68,13 @@ In a Debug build, `F1` shows the camera center in the overlay, and an orange cro
 
 Most tests set `wallMargin` to 0 so the expected centers are easy to read. The margin has its own test.
 
+- `tests/core/BossTests.cpp`: a new fight starts with the camera settled between the player and the boss, nearer the player and with both in view; a boss in the far corner does not push the player off screen; and once the boss is dead the camera goes back to the player.
+
 `ToRaylibCamera` and the drawing are not unit tested, because they need a window. I check them by playing.
 
 ## Limitations
 
 - Zoom is fixed at 1, so one world unit is one pixel. A zoom setting would scale `viewSize`, and nothing else in the camera would change.
-- The camera follows only the player. A boss fight on day 11 may want it to frame both the player and the boss.
+- The boss can still leave the screen. With the 200 unit cap, its centre leaves the view when it is more than about 560 units above or below the player, or about 840 units to the side. In a 1640x1040 arena that takes the two of them near opposite walls.
 - The camera position is not rounded to whole pixels. Thin grid lines can shimmer at sub-pixel positions. I have not checked for it in motion yet, only in still screenshots. If it shows up, rounding the `Camera2D` target is the fix.
 - The window is not resizable. If it becomes resizable, `viewSize` has to follow the window size.

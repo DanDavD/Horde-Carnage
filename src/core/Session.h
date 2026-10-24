@@ -6,7 +6,7 @@
 
 namespace horde {
 
-/// Where the game is in a run. Day 12 adds the main menu and pause as more states.
+/// Where the game is in a run. Day 11 adds the main menu and pause as more states.
 enum class SessionState {
     Playing,  ///< The world steps every fixed step.
     GameOver, ///< The player died. The world is frozen until a restart.

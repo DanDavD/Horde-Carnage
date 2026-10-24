@@ -12,7 +12,7 @@ enum class FireMode {
     Auto,     ///< Keeps firing while the button is held.
 };
 
-/// What a gun is, as opposed to its state. Day 6 moves these numbers to JSON.
+/// What a gun is, as opposed to its state. Day 9 moves these numbers to JSON.
 struct WeaponStats {
     std::string_view name;
     FireMode mode = FireMode::SemiAuto;

@@ -1,18 +1,15 @@
-#include <cstddef>
-
 #include <doctest/doctest.h>
 
 #include "core/Session.h"
 
 using horde::Arena;
-using horde::Enemy;
 using horde::Session;
 using horde::SessionState;
 using horde::Vec2;
 
 namespace {
 
-constexpr Arena kArena{{0.0f, 0.0f}, {2400.0f, 1600.0f}};
+constexpr Arena kArena = horde::kBossArena;
 constexpr Vec2 kView{1280.0f, 720.0f};
 constexpr float kDt = 1.0f / 60.0f;
 
@@ -22,14 +19,13 @@ void Step(Session& session, Vec2 move, int steps) {
     }
 }
 
-// One hairball already touching the player, and the player one hit from death.
+// The boss already touching the player, and the player one touch from death.
 Session OneHitFromDeath() {
     Session session = horde::StartSession(kArena, kView);
-    horde::Player& player = session.world.player;
-    player.health.current = 10;
-    session.world.enemies.Clear();
-    const Vec2 touching = player.motion.position + Vec2{player.radius + 18.0f, 0.0f};
-    session.world.enemies.Spawn(Enemy{.motion = horde::MotionAt(touching)});
+    horde::World& world = session.world;
+    world.player.health.current = world.boss.contactDamage;
+    const float contact = world.boss.radius + world.player.radius;
+    world.boss.motion = horde::MotionAt(world.player.motion.position - Vec2{0.0f, contact});
     return session;
 }
 
@@ -63,12 +59,12 @@ TEST_CASE("once the game is over the world is frozen") {
     Session session = OneHitFromDeath();
     Step(session, Vec2{}, 1);
     const Vec2 player = session.world.player.motion.position;
-    const Vec2 enemy = session.world.enemies[0].motion.position;
+    const Vec2 boss = session.world.boss.motion.position;
     const float survived = session.world.elapsedSeconds;
 
     Step(session, Vec2{1.0f, 0.0f}, 120);
     CHECK(session.world.player.motion.position == player);
-    CHECK(session.world.enemies[0].motion.position == enemy);
+    CHECK(session.world.boss.motion.position == boss);
     CHECK(session.world.elapsedSeconds == survived);
 }
 
@@ -98,15 +94,14 @@ TEST_CASE("after the delay a restart starts a fresh world") {
     CHECK(session.world.player.health.current == session.world.player.health.max);
     CHECK(session.world.elapsedSeconds == 0.0f);
     CHECK(session.world.player.motion.position == fresh.player.motion.position);
-    REQUIRE(session.world.enemies.Size() == fresh.enemies.Size());
+    CHECK(session.world.boss.motion.position == fresh.boss.motion.position);
+    CHECK(session.world.boss.health.current == fresh.boss.health.max);
+    CHECK(session.world.enemies.Empty());
     CHECK(session.world.bullets.Empty());
-    for (std::size_t i = 0; i < fresh.enemies.Size(); ++i) {
-        CHECK(session.world.enemies[i].motion.position == fresh.enemies[i].motion.position);
-    }
 }
 
-TEST_CASE("standing still among the hairballs ends in a game over") {
-    // Six hairballs, 10 damage per touch, one hit landing every 0.8 s: dead in well under a minute.
+TEST_CASE("standing still in front of the boss ends in a game over") {
+    // The boss walks over in about 3 s, then lands 20 damage every 0.8 s: the fifth touch kills.
     Session session = horde::StartSession(kArena, kView);
     int steps = 0;
     while (session.state == SessionState::Playing && steps < 60 * 60) {
@@ -115,4 +110,5 @@ TEST_CASE("standing still among the hairballs ends in a game over") {
     }
     CHECK(session.state == SessionState::GameOver);
     CHECK(session.world.elapsedSeconds > 5.0f);
+    CHECK(session.world.elapsedSeconds < 8.0f);
 }

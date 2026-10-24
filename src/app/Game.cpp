@@ -17,9 +17,7 @@ namespace {
 constexpr int kScreenWidth = 1280;
 constexpr int kScreenHeight = 720;
 
-// The arena is bigger than the screen, so the fight has room to move around and the camera has a job.
 // At zoom 1 one world unit is one pixel, so the view is the screen size.
-constexpr Arena kArena{{0.0f, 0.0f}, {2400.0f, 1600.0f}};
 constexpr Vec2 kViewSize{static_cast<float>(kScreenWidth), static_cast<float>(kScreenHeight)};
 constexpr float kGridSpacing = 80.0f;
 constexpr float kWallThickness = 4.0f;
@@ -27,12 +25,17 @@ constexpr float kPlayerOutline = 3.0f;
 // The eye sits toward the facing direction, so the player reads as pointing somewhere.
 constexpr float kEyeOffset = 0.55f;
 constexpr float kEyeRadius = 0.28f;
-// Hairballs: a round body with short tufts around it, and two eyes that look at the player.
-constexpr int kHairTufts = 12;
+// Hairballs and the boss: a round body with short tufts around it, and two eyes that look at the player.
+// Sizes are fractions of the body radius, so the boss is the same drawing, scaled up.
 constexpr float kTuftLength = 0.35f;
 constexpr float kHairballEyeOffset = 0.45f;
 constexpr float kHairballEyeSpread = 0.35f;
 constexpr float kHairballEyeRadius = 0.22f;
+// The boss's health bar runs along the bottom of the screen, under its name, above the controls line.
+constexpr const char* kBossName = "The Matriarch";
+constexpr int kBossBarWidth = 640;
+constexpr int kBossBarHeight = 12;
+constexpr int kBossBarY = kScreenHeight - 96;
 // While invulnerable the player blinks: faded for one period, solid for the next.
 constexpr float kBlinkPeriod = 0.1f;
 constexpr float kBlinkFade = 0.35f;
@@ -74,6 +77,11 @@ constexpr Color kPlayerDeadEdge{45, 45, 52, 255};
 constexpr Color kHairballFill{150, 92, 70, 255};
 constexpr Color kHairballEdge{70, 40, 32, 255};
 constexpr Color kHairballEye{235, 225, 200, 255};
+// The boss is darker and redder than its children, with eyes that glow.
+constexpr Color kBossFill{112, 58, 64, 255};
+constexpr Color kBossEdge{48, 24, 30, 255};
+constexpr Color kBossEye{255, 190, 90, 255};
+constexpr Color kBossBar{170, 32, 40, 255};
 constexpr Color kSoftText{170, 165, 180, 255};
 constexpr Color kBlood{220, 60, 50, 255};
 constexpr Color kBarBack{50, 20, 24, 255};
@@ -86,6 +94,24 @@ constexpr Color kCrosshair{240, 240, 245, 255};
 constexpr Color kBullet{255, 230, 140, 255};
 constexpr Color kFlask{245, 150, 45, 255};
 constexpr Color kHitFlash{255, 255, 255, 255};
+
+// How a hairy body is drawn. `flash` is how far a hit turns it toward white: all the way for a hairball,
+// which dies in a few hits, but only part of the way for the boss, which the SMG hits ten times a second
+// and which would otherwise stay white for the whole fight.
+struct HairStyle {
+    Color fill;
+    Color edge;
+    Color eye;
+    int tufts;
+    float tuftWidth;
+    float outline;
+    float flash;
+};
+
+constexpr HairStyle kHairballStyle{kHairballFill, kHairballEdge, kHairballEye, 12, 3.0f, 3.0f, 1.0f};
+constexpr HairStyle kBossStyle{kBossFill, kBossEdge, kBossEye, 28, 6.0f, 5.0f, 0.45f};
+// A dead boss turns grey like a dead player, and its eyes go dark.
+constexpr HairStyle kDeadBossStyle{kPlayerDeadFill, kPlayerDeadEdge, kPlayerDeadEdge, 28, 6.0f, 5.0f, 0.0f};
 
 #ifndef NDEBUG
 constexpr const char* kControlsHint =
@@ -183,30 +209,50 @@ void DrawPlayer(const Player& player, float alpha) {
     }
 }
 
-void DrawHairball(const Enemy& enemy, Vec2 playerPosition, float alpha) {
-    const Vec2 position = Lerp(enemy.motion.previousPosition, enemy.motion.position, alpha);
-    const float radius = enemy.radius;
-    // A hit turns the whole body white for a moment, so every bullet that lands is visible.
-    const bool flashing = enemy.hitFlashSeconds > 0.0f;
-    const Color edge = flashing ? kHitFlash : kHairballEdge;
-    const Color fill = flashing ? kHitFlash : kHairballFill;
+Color Mix(Color from, Color to, float amount) {
+    const auto channel = [amount](unsigned char a, unsigned char b) {
+        const float mixed = static_cast<float>(a) + (static_cast<float>(b) - static_cast<float>(a)) * amount;
+        return static_cast<unsigned char>(mixed);
+    };
+    return Color{channel(from.r, to.r), channel(from.g, to.g), channel(from.b, to.b), channel(from.a, to.a)};
+}
 
-    for (int i = 0; i < kHairTufts; ++i) {
-        const float angle = 2.0f * std::numbers::pi_v<float> * static_cast<float>(i) / kHairTufts;
+void DrawHairBody(Vec2 position, float radius, Vec2 lookAt, const HairStyle& style, bool flashing) {
+    // A hit turns the body toward white for a moment, so every bullet that lands is visible.
+    const float flash = flashing ? style.flash : 0.0f;
+    const Color edge = Mix(style.edge, kHitFlash, flash);
+    const Color fill = Mix(style.fill, kHitFlash, flash);
+
+    for (int i = 0; i < style.tufts; ++i) {
+        const float angle = 2.0f * std::numbers::pi_v<float> * static_cast<float>(i) / static_cast<float>(style.tufts);
         const Vec2 out{std::cos(angle), std::sin(angle)};
         const Vec2 root = position + out * (radius * 0.7f);
         const Vec2 tip = position + out * (radius * (1.0f + kTuftLength));
-        DrawLineEx(ToRaylib(root), ToRaylib(tip), 3.0f, edge);
+        DrawLineEx(ToRaylib(root), ToRaylib(tip), style.tuftWidth, edge);
     }
     DrawCircleV(ToRaylib(position), radius, edge);
-    DrawCircleV(ToRaylib(position), radius - 3.0f, fill);
+    DrawCircleV(ToRaylib(position), radius - style.outline, fill);
 
-    // The eyes look at the player, so it is clear what the hairball is after even when it stands still.
-    const Vec2 look = Normalized(playerPosition - position);
+    // The eyes look at the player, so it is clear what the body is after even when it stands still.
+    const Vec2 look = Normalized(lookAt - position);
     const Vec2 side{-look.y, look.x};
     const Vec2 eyes = position + look * (radius * kHairballEyeOffset);
-    DrawCircleV(ToRaylib(eyes + side * (radius * kHairballEyeSpread)), radius * kHairballEyeRadius, kHairballEye);
-    DrawCircleV(ToRaylib(eyes - side * (radius * kHairballEyeSpread)), radius * kHairballEyeRadius, kHairballEye);
+    DrawCircleV(ToRaylib(eyes + side * (radius * kHairballEyeSpread)), radius * kHairballEyeRadius, style.eye);
+    DrawCircleV(ToRaylib(eyes - side * (radius * kHairballEyeSpread)), radius * kHairballEyeRadius, style.eye);
+}
+
+void DrawHairball(const Enemy& enemy, Vec2 playerPosition, float alpha) {
+    const Vec2 position = Lerp(enemy.motion.previousPosition, enemy.motion.position, alpha);
+    DrawHairBody(position, enemy.radius, playerPosition, kHairballStyle, enemy.hitFlashSeconds > 0.0f);
+}
+
+void DrawBoss(const Boss& boss, Vec2 playerPosition, float alpha) {
+    const Vec2 position = Lerp(boss.motion.previousPosition, boss.motion.position, alpha);
+    if (IsDead(boss.health)) {
+        DrawHairBody(position, boss.radius, playerPosition, kDeadBossStyle, false);
+        return;
+    }
+    DrawHairBody(position, boss.radius, playerPosition, kBossStyle, boss.hitFlashSeconds > 0.0f);
 }
 
 void DrawBullet(const Projectile& bullet, float alpha) {
@@ -228,6 +274,17 @@ void DrawHealthBar(const Health& health) {
     DrawRectangle(kX, kY, static_cast<int>(kWidth * fraction), kHeight, IsInvulnerable(health) ? kBarHurt : kBlood);
     DrawRectangleLines(kX, kY, kWidth, kHeight, kBarEdge);
     DrawText(TextFormat("%d / %d", health.current, health.max), kX + 8, kY + 2, 18, RAYWHITE);
+}
+
+// Wide and thin along the bottom of the screen, with the name above it, so it reads as the one fight that
+// matters and stays out of the way of the arena.
+void DrawBossBar(const Boss& boss) {
+    constexpr int kX = (kScreenWidth - kBossBarWidth) / 2;
+    const float fraction = static_cast<float>(boss.health.current) / static_cast<float>(boss.health.max);
+    DrawText(kBossName, kX, kBossBarY - 24, 20, RAYWHITE);
+    DrawRectangle(kX, kBossBarY, kBossBarWidth, kBossBarHeight, kBarBack);
+    DrawRectangle(kX, kBossBarY, static_cast<int>(kBossBarWidth * fraction), kBossBarHeight, kBossBar);
+    DrawRectangleLines(kX, kBossBarY, kBossBarWidth, kBossBarHeight, kBarEdge);
 }
 
 // One box per slot. The gun in hand is lit, so the player can tell at a glance which one they hold.
@@ -290,8 +347,8 @@ void DrawGameOver(const Session& session) {
     DrawRectangle(0, 0, kScreenWidth, kScreenHeight, Fade(BLACK, 0.55f));
     DrawCenteredText("GAME OVER", kScreenHeight / 2 - 90, 64, kBlood);
     const World& world = session.world;
-    const char* summary = TextFormat("You survived %.1f seconds and killed %d %s", world.elapsedSeconds, world.kills,
-                                     world.kills == 1 ? "hairball" : "hairballs");
+    const char* summary = TextFormat("You lasted %.1f seconds. %s had %d of %d health left.", world.elapsedSeconds,
+                                     kBossName, world.boss.health.current, world.boss.health.max);
     DrawCenteredText(summary, kScreenHeight / 2 - 10, 28, RAYWHITE);
     // Dimmed until the restart delay has passed, so it is clear why an early press did nothing.
     const Color prompt = CanRestart(session) ? RAYWHITE : Fade(kSoftText, 0.4f);
@@ -352,7 +409,8 @@ void DrawDebugHud(const World& world, Vec2 moveInput) {
     const Weapon& weapon = Equipped(player.loadout);
     DrawText(TextFormat("weapon %s  cd %.2f", std::string(weapon.stats.name).c_str(), weapon.cooldownSeconds), kX,
              kY + 9 * kLine, 18, RAYWHITE);
-    DrawText(TextFormat("shots  %d  kills %d", world.shotsFired, world.kills), kX, kY + 10 * kLine, 18, RAYWHITE);
+    DrawText(TextFormat("shots  %d  boss %d / %d", world.shotsFired, world.boss.health.current, world.boss.health.max),
+             kX, kY + 10 * kLine, 18, RAYWHITE);
     DrawText(TextFormat("dash   cd %.2f  inv %.2f", player.dash.cooldownSeconds, player.dash.invulnerableSeconds), kX,
              kY + 11 * kLine, 18, RAYWHITE);
     DrawText(TextFormat("flasks %d / %d  drink %.2f", player.flasks.charges, player.flasks.stats.maxCharges,
@@ -363,7 +421,7 @@ void DrawDebugHud(const World& world, Vec2 moveInput) {
 
 } // namespace
 
-Game::Game() : _session{StartSession(kArena, kViewSize)} {
+Game::Game() : _session{StartSession(kBossArena, kViewSize)} {
     // Vsync caps how often we render. How often the game simulates comes from FixedTimestep.
     SetConfigFlags(FLAG_VSYNC_HINT | FLAG_MSAA_4X_HINT);
     InitWindow(kScreenWidth, kScreenHeight, "Horde Carnage");
@@ -442,6 +500,8 @@ void Game::Draw(float alpha) const {
 
     BeginMode2D(ToRaylibCamera(world.camera, alpha));
     DrawArena(world.arena);
+    // The boss goes under its children, so a dead boss lies on the floor.
+    DrawBoss(world.boss, playerPosition, alpha);
     for (const Enemy& enemy : world.enemies) {
         DrawHairball(enemy, playerPosition, alpha);
     }
@@ -468,9 +528,9 @@ void Game::Draw(float alpha) const {
     DrawDashBar(player.dash);
     DrawFlaskIcons(player.flasks);
     DrawWeaponPanel(player.loadout);
+    DrawBossBar(world.boss);
     DrawFPS(10, 10);
     DrawText("Horde Carnage v" HORDE_VERSION, kScreenWidth - 230, 10, 20, kSoftText);
-    DrawText(TextFormat("Kills %d", world.kills), kScreenWidth - 230, 36, 20, RAYWHITE);
     if (playing) {
         DrawText(kControlsHint, kHudMargin, kScreenHeight - 30, 18, kSoftText);
         DrawCrosshair(GetMousePosition());

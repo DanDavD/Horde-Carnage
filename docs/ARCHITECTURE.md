@@ -17,7 +17,7 @@ The build makes two things:
 tests/ (horde_tests)  --->  horde_core  <---  HordeCarnage  --->  raylib
 ```
 
-When a feature has rules (damage, cooldowns, wave timing), the rules go into `horde_core` with tests. The executable only connects them to the screen and the keyboard.
+When a feature has rules (damage, cooldowns, attack timing), the rules go into `horde_core` with tests. The executable only connects them to the screen and the keyboard.
 
 ### The main loop
 
@@ -36,10 +36,10 @@ The simulation never reads a key or the mouse. Every step, `Game::Update` turns 
 
 ### The world
 
-`World` (`src/core/World.h`) holds everything the simulation needs as plain data: the arena, the player, the enemies, the bullets and the camera. Enemies and bullets live in fixed-size pools inside it (see [Object pool](OBJECT_POOL.md)), so a running game never allocates memory. Two functions work on it:
+`World` (`src/core/World.h`) holds everything the simulation needs as plain data: the arena, the player, the boss, the hairballs, the bullets and the camera. Hairballs and bullets live in fixed-size pools inside it (see [Object pool](OBJECT_POOL.md)), so a running game never allocates memory. Two functions work on it:
 
-- `CreateWorld` builds the starting state: the player in the middle of the arena, the hairballs around it, the camera on the player.
-- `StepWorld` advances it by one fixed step, in this order: the invulnerability window and the dash cooldown, the player (start a dash or a drink, the drink, the dash or normal movement, aim, weapons), every enemy (chase, movement), collisions between bodies and the walls (four passes, see [Collisions](COLLISIONS.md)), bullets and their hits (see [Bullets and hits](BULLETS.md)), dead enemies removed, contact damage (see [Health](HEALTH.md)), an empty arena refilled, then the camera.
+- `CreateWorld` builds the starting state: the boss in the middle of the arena, the player south of it and facing it, and the camera on both.
+- `StepWorld` advances it by one fixed step, in this order: the invulnerability window and the dash cooldown, the player (start a dash or a drink, the drink, the dash or normal movement, aim, weapons), every hairball and then the boss (chase, movement), collisions between bodies and the walls (four passes, see [Collisions](COLLISIONS.md)), bullets and their hits (see [Bullets and hits](BULLETS.md)), dead hairballs removed, contact damage (see [Health](HEALTH.md)), then the camera, which follows a point between the player and the boss (see [Camera](CAMERA.md)).
 
 ### The session
 
@@ -49,7 +49,7 @@ The simulation never reads a key or the mouse. Every step, `Game::Update` turns 
 
 ### Components and systems
 
-Game objects are plain structs (components) that hold data, and free functions (systems) that update them. The first ones are the `Motion` component and the `StepMovement`, `UpdateFacing` and `ConfineToArena` systems, described in [Movement](MOVEMENT.md). The camera follows the same shape: a `FollowCamera` component and a `StepFollowCamera` system, described in [Camera](CAMERA.md). The app only turns it into a raylib `Camera2D` when it draws. `Player` and `Enemy` are structs of components, not classes with behaviour, and they share the same movement systems (see [Enemies](ENEMIES.md)). `horde_core` has its own `Vec2` type, so it never includes raylib; the app converts with `ToRaylib` right before drawing.
+Game objects are plain structs (components) that hold data, and free functions (systems) that update them. The first ones are the `Motion` component and the `StepMovement`, `UpdateFacing` and `ConfineToArena` systems, described in [Movement](MOVEMENT.md). The camera follows the same shape: a `FollowCamera` component and a `StepFollowCamera` system, described in [Camera](CAMERA.md). The app only turns it into a raylib `Camera2D` when it draws. `Player`, `Boss` and `Enemy` are structs of components, not classes with behaviour, and they share the same movement systems (see [Enemies](ENEMIES.md) and [The boss](BOSS.md)). `horde_core` has its own `Vec2` type, so it never includes raylib; the app converts with `ToRaylib` right before drawing.
 
 ## Design decisions
 
@@ -75,6 +75,7 @@ Game objects are plain structs (components) that hold data, and free functions (
 - `tests/core/Vec2Tests.cpp`, `MovementTests.cpp`, `FacingTests.cpp`, `ArenaTests.cpp` and `AnalogInputTests.cpp`: see [Movement](MOVEMENT.md#tests).
 - `tests/core/FollowCameraTests.cpp`: see [Camera](CAMERA.md#tests).
 - `tests/core/ChaseTests.cpp` and `WorldTests.cpp`: see [Enemies](ENEMIES.md#tests).
+- `tests/core/BossTests.cpp`: see [The boss](BOSS.md#tests).
 - `tests/core/CollisionTests.cpp` and the crowd cases in `WorldTests.cpp`: see [Collisions](COLLISIONS.md#tests).
 - `tests/core/HealthTests.cpp` and the contact damage cases in `WorldTests.cpp`: see [Health](HEALTH.md#tests).
 - `tests/core/SessionTests.cpp`: see [Game flow](GAME_FLOW.md#tests).

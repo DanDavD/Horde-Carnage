@@ -2,7 +2,7 @@
 
 ## What it is
 
-What happens around a run: playing, dying, and starting again. It is a small state machine with two states, `Playing` and `GameOver`. Day 12 adds the main menu and pause as more states.
+What happens around a run: playing, dying, and starting again. It is a small state machine with two states, `Playing` and `GameOver`. Day 11 adds the main menu and pause as more states.
 
 The rules live in `horde_core`:
 
@@ -24,7 +24,7 @@ The game executable connects it to the screen and the buttons:
 ```
 
 - **Playing:** `StepSession` calls `StepWorld` every fixed step. If the player's health is 0 after the step, the session enters `GameOver`.
-- **GameOver:** the world is not stepped any more. It stays frozen on the moment of death, so the player can see what got them. The screen darkens and shows "GAME OVER", how long the player survived (`World::elapsedSeconds`), how many hairballs they killed (`World::kills`), and how to restart.
+- **GameOver:** the world is not stepped any more. It stays frozen on the moment of death, so the player can see what got them. The screen darkens and shows "GAME OVER", how long the player lasted (`World::elapsedSeconds`), how much health the boss had left, and how to restart.
 - **Restart:** `TryRestart` works only in `GameOver`, and only after `kRestartDelaySeconds` (1 s). It replaces the world with a brand new one from `CreateWorld` and goes back to `Playing`. Until the delay has passed, the restart prompt is dimmed.
 
 Every state change goes through one helper, `EnterState`, which also resets the clock of the state (`stateSeconds`). That clock is what the restart delay reads.
@@ -32,7 +32,7 @@ Every state change goes through one helper, `EnterState`, which also resets the 
 ## Design decisions
 
 - **The state machine lives in `horde_core`, not in `Game`.** Dying, freezing and restarting are rules, and rules belong where the tests can reach them. The tests play a whole run until game over and restart it, without a window.
-- **An `enum class` and a `switch`, not a class per state.** With two states and one transition each, a class hierarchy would be more code than behaviour. When the menu and pause arrive on day 12 I will look at it again. The enemy and boss state machines (days 7 and 11) have more states with their own data, and those are a better fit for one type per state.
+- **An `enum class` and a `switch`, not a class per state.** With two states and one transition each, a class hierarchy would be more code than behaviour. When the menu and pause arrive on day 11 I will look at it again. The boss's state machines (days 6 to 8) have more states with their own data, and those are a better fit for one type per state.
 - **Restart is a brand new `World`, not a reset.** Resetting fields one by one means every new field needs a matching line in the reset, and the one that gets forgotten leaks from one run into the next. `CreateWorld` is already the single place that knows what a fresh world looks like.
 - **A one second delay before restart is accepted.** Someone mashing buttons in a fight would otherwise skip the game over screen before reading it. Attack buttons arrive on day 4, and A on a gamepad will likely be one of them.
 - **Restart buttons are read once per frame, not once per fixed step.** A press is an event. A frame that runs no fixed step (possible above 60 FPS) would lose it if it were read inside the step. Movement keys are held states, so reading them in the step is fine.
@@ -47,12 +47,13 @@ Every state change goes through one helper, `EnterState`, which also resets the 
 
 ## Tests
 
-- `tests/core/SessionTests.cpp`: a new session is playing with full health; while playing, a session step is a world step; the game is over in the step the health reaches 0; once over, the world is frozen (player, enemies and survival time do not change); restart is refused while playing and inside the delay; after the delay a restart gives a fresh world (full health, time 0, everyone back at the start); and standing still among the hairballs ends in a game over.
+- `tests/core/SessionTests.cpp`: a new session is playing with full health; while playing, a session step is a world step; the game is over in the step the health reaches 0; once over, the world is frozen (player, enemies and survival time do not change); restart is refused while playing and inside the delay; after the delay a restart gives a fresh world (full health, time 0, the player and the boss back at the start); and standing still in front of the boss ends in a game over.
 
 The game over screen and the restart buttons are not unit tested, because they need a window. I checked them in a Release build: standing still until the game over screen, then pressing Enter.
 
 ## Limitations
 
-- **There is no title screen.** The game starts playing as soon as the window opens. The main menu comes on day 12.
+- **There is no title screen.** The game starts playing as soon as the window opens. The main menu comes on day 11.
+- **Killing the boss does not end the run yet.** The victory screen comes next, together with a "YOU DIED" screen and an attempts counter.
 - **There is no best time.** The game over screen shows only the last run, and nothing is saved between launches.
-- **Esc still quits at once, even in the middle of a run.** Pause comes on day 12.
+- **Esc still quits at once, even in the middle of a run.** Pause comes on day 11.

@@ -69,7 +69,7 @@ The movement numbers are the defaults in `MovementStats` (`src/core/Movement.h`)
 | `acceleration` | 3000 units/s^2 | Time to top speed is `maxSpeed / acceleration` (0.1 s). |
 | `deceleration` | 4000 units/s^2 | Time to stop from top speed is `maxSpeed / deceleration` (0.075 s). Also used while turning back. |
 
-A very high value (for example 100000) gives instant start or stop. These values move to JSON on day 6.
+A very high value (for example 100000) gives instant start or stop. These values may move to JSON with the boss's numbers on day 9.
 
 Other values:
 
@@ -77,8 +77,8 @@ Other values:
 |---|---|---|
 | Player body radius | `Player::radius` (`src/core/Player.h`) | 20 units |
 | Stick deadzone | `kStickDeadzone` (`src/app/PlayerInput.cpp`) | 0.2 |
-| Arena rectangle | `kArena` (`src/app/Game.cpp`) | (0, 0) to (2400, 1600) |
-| Starting facing | `Player::facing` (`src/core/Player.h`) | (0, 1), facing down |
+| Arena rectangle | `kBossArena` (`src/core/World.h`) | (0, 0) to (1640, 1040) |
+| Starting facing | `Player::facing` (`src/core/Player.h`), set by `CreateWorld` (`src/core/World.cpp`) | (0, 1), facing down; a new fight turns the player up, toward the boss |
 
 ## Tests
 
