@@ -21,7 +21,16 @@ TEST_CASE("a bullet leaves the muzzle with the weapon's speed, damage and knockb
     CHECK(bullet.secondsLeft == doctest::Approx(horde::kPistol.range / horde::kPistol.bulletSpeed));
 }
 
+TEST_CASE("a launched projectile leaves its origin at its speed, with a lifetime of its range") {
+    const Projectile strand = horde::LaunchProjectile(Vec2{5.0f, 5.0f}, Vec2{0.0f, 1.0f}, 220.0f, 880.0f);
+    CHECK(strand.motion.position == Vec2{5.0f, 5.0f});
+    CHECK(strand.motion.previousPosition == strand.motion.position);
+    CHECK(strand.motion.velocity == Vec2{0.0f, 220.0f});
+    CHECK(strand.secondsLeft == doctest::Approx(4.0f));
+}
+
 TEST_CASE("a step moves a bullet in a straight line and remembers where it was") {
+
     Projectile bullet = horde::MakeBullet(Vec2{0.0f, 0.0f}, Vec2{1.0f, 0.0f}, horde::kSmg);
     CHECK(horde::StepProjectile(bullet, kDt));
     CHECK(bullet.motion.previousPosition == Vec2{0.0f, 0.0f});

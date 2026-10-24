@@ -18,7 +18,7 @@ Every layer ends with a game that runs and can be played, and every layer is one
 | 4 | Fri Oct 23 | `feat/shooting` | Mouse aim, a pistol and an SMG, pooled bullets (`ObjectPool`), damage, enemy death, hit flash and knockback |
 | 5 | Sat Oct 24 | `feat/player-abilities` | A dash with invulnerability and three healing flasks (done early, on day 4) |
 | 6 | Sun Oct 25 | `feat/boss-fight` | The Matriarch, its attack state machine (warning, active, recovery), the Charge and the Hair Ring, "YOU DIED" and "VICTORY" |
-| 7 | Mon Oct 26 | `feat/boss-patterns` | The Leap with its shadow and shockwave, a seeded random generator, and how the boss picks its next attack |
+| 7 | Mon Oct 26 | `feat/boss-patterns` | The Leap with its shadow and shockwave, a seeded random generator, how the boss picks its next attack, and combos |
 | 8 | Tue Oct 27 | `feat/boss-shield-and-phase-two` | The alternating shield, the transformation, and phase 2 with the Aimed Volley and the Summon. Release `v0.1.0` |
 | 9 | Wed Oct 28 | `feat/data-driven-boss` | The boss's and the guns' numbers in JSON, reloaded with F5 in Debug builds |
 | 10 | Thu Oct 29 | `feat/game-feel` | Hit stop, screen shake, particles, sounds, clearer warnings |
@@ -35,6 +35,19 @@ Every layer ends with a game that runs and can be played, and every layer is one
   - Out of the plan: the waves and the wave director, XP and levels, power-ups, new guns, and the charger and the spitter as separate enemies. Their ideas come back as boss attacks: the charge, the spit as a ring of hair, and the hairballs as the boss's summons.
   - The hairball stays, as the boss's summon in phase 2, so its code and its tests are still used. The boss itself reuses its components, its chase input and its movement.
   - The first release waits until the whole fight works (day 8), instead of shipping the waves on day 5.
+
+## The difficulty I am aiming for
+
+A player who has never seen the fight should need about 10 to 15 attempts to win it. Two attacks that always come in the same order, as on day 6, are far from that. The difficulty comes from how the pieces combine, and I build it in this order:
+
+- **Day 7, patterns.** The Leap. A seeded random choice of attack, weighted by distance and never the same twice in a row, so the order cannot be memorised. Combos with no rest between attacks: two Charges in a row, a Hair Ring and then a Charge through its gap, a ring on landing from the Leap. Warnings of varying length, so a dash timed to a rhythm fails. Less stalking between attacks, about 1 s instead of 2.
+- **Day 8, shield and phase 2.** The shield forces a weapon switch in the middle of the attacks. Phase 2 has shorter warnings, the Aimed Volley, the Summon, and rings with two waves or a gap that turns. The bar refills, so phase 2 is a second fight.
+- **Day 9, tuning.** With the numbers in JSON and F5 to reload them, I tune damage, timings and health while playing.
+- **Day 11, balance.** Playtests against these targets: a clean win lasts about 3 to 4 minutes (phase 1 about 1.5, phase 2 about 2), the player survives 4 or 5 hits (about 8 with the flasks), and each attack takes 1 or 2 deaths to learn.
+
+Hard, but fair: no hit lands without a visible warning. A death that does not show what killed the player is a design bug, so the "YOU DIED" screen will name the attack that landed the last hit.
+
+Someone reviewing the game may only play it for a few minutes and never reach phase 2. The README will show phase 2 in a GIF, and on day 11 I decide whether the game also needs a practice option.
 
 ## Releases
 

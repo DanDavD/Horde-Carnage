@@ -45,6 +45,16 @@ constexpr float kChargeTremble = 2.5f;
 constexpr int kChargeGhosts = 3;
 constexpr int kStunStars = 3;
 constexpr float kStunStarRadius = 5.0f;
+// The Hair Ring. During the warning the boss swells by this fraction and the ring is drawn on the floor
+// just outside the tips of its tufts, with the gap as a pale lane running out from it. As it spits, it
+// deflates for a moment. A strand is a short streak behind a round tip.
+constexpr float kRingSwell = 0.15f;
+constexpr float kRingSpitShrink = 0.08f;
+constexpr float kRingMarkGap = 8.0f;
+constexpr float kRingMarkWidth = 10.0f;
+constexpr float kRingLaneLength = 420.0f;
+constexpr float kStrandTail = 12.0f;
+constexpr float kDegreesPerRadian = 180.0f / std::numbers::pi_v<float>;
 // While invulnerable the player blinks: faded for one period, solid for the next.
 constexpr float kBlinkPeriod = 0.1f;
 constexpr float kBlinkFade = 0.35f;
@@ -99,6 +109,10 @@ constexpr Color kSoftText{170, 165, 180, 255};
 constexpr Color kBlood{220, 60, 50, 255};
 constexpr Color kVictoryGold{230, 185, 95, 255};
 constexpr Color kStunStar{255, 225, 130, 255};
+// Paler and redder than the boss's body, so a strand reads against the dark floor and as something that
+// hurts. The gap lane is the one pale, safe thing in the warning.
+constexpr Color kStrand{225, 130, 110, 255};
+constexpr Color kRingLane{205, 205, 220, 255};
 constexpr Color kBarBack{50, 20, 24, 255};
 constexpr Color kBarHurt{255, 140, 120, 255};
 constexpr Color kBarEdge{120, 100, 110, 255};
@@ -261,15 +275,15 @@ void DrawHairball(const Enemy& enemy, Vec2 playerPosition, float alpha) {
     DrawHairBody(position, enemy.radius, playerPosition, kHairballStyle, enemy.hitFlashSeconds > 0.0f);
 }
 
-bool InAttackStage(const Boss& boss, AttackStage stage) {
-    return boss.attack && boss.attack->stage == stage;
+bool InAttack(const Boss& boss, AttackKind kind, AttackStage stage) {
+    return boss.attack && boss.attack->kind == kind && boss.attack->stage == stage;
 }
 
 // The charge's path on the floor, drawn by the same `PlanChargePath` the run follows. Faint while it still
 // follows the player, bright once it locks, which is the moment to get out of the way. A bar across the
 // end marks where the boss will hit the wall and be stunned.
 void DrawChargeTelegraph(const Boss& boss, const Arena& arena) {
-    if (IsDead(boss.health) || !InAttackStage(boss, AttackStage::Warning)) {
+    if (IsDead(boss.health) || !InAttack(boss, AttackKind::Charge, AttackStage::Warning)) {
         return;
     }
     const BossAttack& charge = *boss.attack;
@@ -292,28 +306,48 @@ void DrawChargeTelegraph(const Boss& boss, const Arena& arena) {
     }
 }
 
+// The Hair Ring on the floor while the boss swells: a red band around the body wherever a strand will leave,
+// thicker and brighter as the spit comes closer, and the gap as a pale lane running out from the body, so
+// the player can see from anywhere which way is safe.
+void DrawHairRingTelegraph(const Boss& boss) {
+    if (IsDead(boss.health) || !InAttack(boss, AttackKind::HairRing, AttackStage::Warning)) {
+        return;
+    }
+    const BossAttack& ring = *boss.attack;
+    const HairRingStats& stats = boss.hairRing;
+    const float progress = std::min(ring.stageSeconds / stats.warningSeconds, 1.0f);
+    const Vector2 center = ToRaylib(boss.motion.position);
+    // In degrees, clockwise on screen, the way raylib draws arcs.
+    const float gapMiddle = std::atan2(ring.direction.y, ring.direction.x) * kDegreesPerRadian;
+    const float gapHalf = 180.0f * static_cast<float>(stats.gapSlots) / static_cast<float>(stats.slots);
+
+    DrawCircleSector(center, kRingLaneLength, gapMiddle - gapHalf, gapMiddle + gapHalf, 24,
+                     Fade(kRingLane, 0.06f + 0.08f * progress));
+    for (const float edge : {gapMiddle - gapHalf, gapMiddle + gapHalf}) {
+        const Vec2 out = Rotated(Vec2{1.0f, 0.0f}, edge / kDegreesPerRadian);
+        DrawLineEx(ToRaylib(boss.motion.position + out * boss.radius),
+                   ToRaylib(boss.motion.position + out * kRingLaneLength), 2.0f, Fade(kRingLane, 0.5f));
+    }
+
+    // Outside the tips of the swollen tufts, so the hair never covers it.
+    const float inner = boss.radius * (1.0f + kRingSwell) * (1.0f + kTuftLength) + kRingMarkGap;
+
+    DrawRing(center, inner, inner + kRingMarkWidth * (0.4f + 0.6f * progress), gapMiddle + gapHalf,
+             gapMiddle + 360.0f - gapHalf, 64, Fade(kBlood, 0.3f + 0.6f * progress));
+}
+
 void DrawStunStars(Vec2 position, float radius, float seconds) {
     for (int i = 0; i < kStunStars; ++i) {
         const float angle = seconds * 5.0f + 2.0f * std::numbers::pi_v<float> * static_cast<float>(i) / kStunStars;
         const Vec2 orbit{std::cos(angle) * radius * 0.6f, std::sin(angle) * radius * 0.2f};
         const Vec2 star = position + Vec2{0.0f, -radius * 1.15f} + orbit;
-
         DrawCircleV(ToRaylib(star), kStunStarRadius, kStunStar);
     }
 }
 
-void DrawBoss(const Boss& boss, Vec2 playerPosition, float alpha) {
-    Vec2 position = Lerp(boss.motion.previousPosition, boss.motion.position, alpha);
-    if (IsDead(boss.health)) {
-        DrawHairBody(position, boss.radius, playerPosition, kDeadBossStyle, false);
-        return;
-    }
-    if (!boss.attack) {
-        DrawHairBody(position, boss.radius, playerPosition, kBossStyle, boss.hitFlashSeconds > 0.0f);
-        return;
-    }
-
-    // During an attack the eyes look down its path instead of at the player.
+// Crouched and trembling through the warning, with ghosts behind it while it runs and stars over its head
+// while it is stunned. The eyes look down its path instead of at the player.
+void DrawChargingBoss(const Boss& boss, Vec2 position) {
     const BossAttack& attack = *boss.attack;
     const ChargeStats& stats = boss.charge;
     float radius = boss.radius;
@@ -342,11 +376,54 @@ void DrawBoss(const Boss& boss, Vec2 playerPosition, float alpha) {
     }
 }
 
+// Swells through the warning, deflates as it spits, and is back to its size while it recovers. It watches
+// the player the whole time.
+void DrawSpittingBoss(const Boss& boss, Vec2 position, Vec2 playerPosition) {
+    const BossAttack& ring = *boss.attack;
+    float radius = boss.radius;
+    if (ring.stage == AttackStage::Warning) {
+        radius *= 1.0f + kRingSwell * std::min(ring.stageSeconds / boss.hairRing.warningSeconds, 1.0f);
+    } else if (ring.stage == AttackStage::Active) {
+        radius *= 1.0f - kRingSpitShrink;
+    }
+    DrawHairBody(position, radius, playerPosition, kBossStyle, boss.hitFlashSeconds > 0.0f);
+}
+
+void DrawBoss(const Boss& boss, Vec2 playerPosition, float alpha) {
+    const Vec2 position = Lerp(boss.motion.previousPosition, boss.motion.position, alpha);
+    if (IsDead(boss.health)) {
+        DrawHairBody(position, boss.radius, playerPosition, kDeadBossStyle, false);
+        return;
+    }
+    if (!boss.attack) {
+        DrawHairBody(position, boss.radius, playerPosition, kBossStyle, boss.hitFlashSeconds > 0.0f);
+        return;
+    }
+    switch (boss.attack->kind) {
+    case AttackKind::Charge:
+        DrawChargingBoss(boss, position);
+        break;
+    case AttackKind::HairRing:
+        DrawSpittingBoss(boss, position, playerPosition);
+        break;
+    }
+}
+
 void DrawBullet(const Projectile& bullet, float alpha) {
     const Vec2 head = Lerp(bullet.motion.previousPosition, bullet.motion.position, alpha);
     const Vec2 tail = head - Normalized(bullet.motion.velocity) * kBulletStreak;
     DrawLineEx(ToRaylib(tail), ToRaylib(head), kBulletWidth, kBullet);
     DrawCircleV(ToRaylib(head), bullet.radius, kBullet);
+}
+
+// A dark streak behind a pale tip, as wide as the strand's hit circle, so what the player sees is what can
+// hurt them.
+void DrawHairStrand(const Projectile& strand, float alpha) {
+    const Vec2 head = Lerp(strand.motion.previousPosition, strand.motion.position, alpha);
+    const Vec2 tail = head - Normalized(strand.motion.velocity) * kStrandTail;
+    DrawLineEx(ToRaylib(tail), ToRaylib(head), strand.radius * 1.2f, kBossEdge);
+    DrawCircleV(ToRaylib(head), strand.radius, kBossEdge);
+    DrawCircleV(ToRaylib(head), strand.radius - 3.0f, kStrand);
 }
 
 void DrawHealthBar(const Health& health) {
@@ -510,6 +587,16 @@ void DrawDebugWorld(const Player& player, const FollowCamera& camera, float alph
     DrawLineEx(ToRaylib(center + Vec2{0.0f, -8.0f}), ToRaylib(center + Vec2{0.0f, 8.0f}), 2.0f, ORANGE);
 }
 
+const char* AttackKindLabel(AttackKind kind) {
+    switch (kind) {
+    case AttackKind::Charge:
+        return "charge";
+    case AttackKind::HairRing:
+        return "ring";
+    }
+    return "";
+}
+
 const char* AttackStageLabel(AttackStage stage) {
     switch (stage) {
     case AttackStage::Warning:
@@ -531,12 +618,13 @@ const char* BossStateLabel(const Boss& boss) {
         return TextFormat("stalk, attack in %.2f", boss.secondsUntilAttack);
     }
     const BossAttack& attack = *boss.attack;
-    return TextFormat("charge %s %.2f%s", AttackStageLabel(attack.stage), attack.stageSeconds,
-                      attack.stunned ? " stunned" : "");
+    return TextFormat("%s %s %.2f%s", AttackKindLabel(attack.kind), AttackStageLabel(attack.stage),
+                      attack.stageSeconds, attack.stunned ? " stunned" : "");
 }
 
 // Debug builds only, in screen space. The numbers I tune against: what the input asks for, what the
-// body does, where the camera is, how many enemies there are, and the player's health window.
+// body does, where the camera is, how many enemies and projectiles there are, the player's health window,
+// and what the boss is doing.
 void DrawDebugHud(const World& world, Vec2 moveInput) {
     const Player& player = world.player;
     const FollowCamera& camera = world.camera;
@@ -555,8 +643,8 @@ void DrawDebugHud(const World& world, Vec2 moveInput) {
     DrawText(TextFormat("pos    %5.0f %5.0f", motion.position.x, motion.position.y), kX, kY + 4 * kLine, 18,
              RAYWHITE);
     DrawText(TextFormat("camera %5.0f %5.0f", camera.center.x, camera.center.y), kX, kY + 5 * kLine, 18, ORANGE);
-    DrawText(TextFormat("enemies %d  bullets %d", static_cast<int>(world.enemies.Size()),
-                        static_cast<int>(world.bullets.Size())),
+    DrawText(TextFormat("enemies %d  bullets %d  hair %d", static_cast<int>(world.enemies.Size()),
+                        static_cast<int>(world.bullets.Size()), static_cast<int>(world.hostileProjectiles.Size())),
              kX, kY + 6 * kLine, 18, RAYWHITE);
     DrawText(TextFormat("health %d / %d  inv %.2f", player.health.current, player.health.max,
                         player.health.invulnerableSeconds),
@@ -664,6 +752,7 @@ void Game::Draw(float alpha) const {
     DrawArena(world.arena);
     // On the floor, under every body.
     DrawChargeTelegraph(world.boss, world.arena);
+    DrawHairRingTelegraph(world.boss);
 
     // The boss goes under its children, so a dead boss lies on the floor.
     DrawBoss(world.boss, playerPosition, alpha);
@@ -672,6 +761,9 @@ void Game::Draw(float alpha) const {
     }
     for (const Projectile& bullet : world.bullets) {
         DrawBullet(bullet, alpha);
+    }
+    for (const Projectile& strand : world.hostileProjectiles) {
+        DrawHairStrand(strand, alpha);
     }
     // The player is drawn last, so it is never hidden under a crowd.
     DrawPlayer(player, alpha);

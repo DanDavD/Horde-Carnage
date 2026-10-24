@@ -1,3 +1,5 @@
+#include <numbers>
+
 #include <doctest/doctest.h>
 
 #include "core/Vec2.h"
@@ -49,4 +51,15 @@ TEST_CASE("Lerp goes from a to b") {
     CHECK(horde::Lerp(a, b, 0.0f) == a);
     CHECK(horde::Lerp(a, b, 1.0f) == b);
     CHECK(horde::Lerp(a, b, 0.5f) == Vec2{2.0f, 15.0f});
+}
+
+TEST_CASE("Rotated turns from +x toward +y, clockwise on screen, and keeps the length") {
+    const Vec2 quarter = horde::Rotated(Vec2{2.0f, 0.0f}, std::numbers::pi_v<float> / 2.0f);
+    CHECK(quarter.x == doctest::Approx(0.0f));
+    CHECK(quarter.y == doctest::Approx(2.0f));
+
+    const Vec2 back = horde::Rotated(Vec2{0.0f, 1.0f}, -std::numbers::pi_v<float> / 2.0f);
+    CHECK(back.x == doctest::Approx(1.0f));
+    CHECK(back.y == doctest::Approx(0.0f));
+    CHECK(horde::Length(horde::Rotated(Vec2{3.0f, 4.0f}, 1.0f)) == doctest::Approx(5.0f));
 }

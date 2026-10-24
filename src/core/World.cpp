@@ -224,6 +224,16 @@ void HitBoss(Boss& boss, const Projectile& bullet) {
     boss.hitFlashSeconds = kHitFlashSeconds;
 }
 
+// A ring around the gap the boss's attack points to, one strand per slot outside the gap. A full pool drops
+// the strands that find no slot, like a bullet that is not fired.
+void SpitHairRing(World& world) {
+    const Boss& boss = world.boss;
+    const Vec2 gap = boss.attack->direction;
+    for (int i = 0; i < HairRingStrands(boss.hairRing); ++i) {
+        world.hostileProjectiles.Spawn(MakeHairStrand(boss, HairStrandDirection(gap, i, boss.hairRing)));
+    }
+}
+
 // One pass moves every bullet, resolves its hit and removes the ones that are done, so a bullet is never
 // checked in a step it no longer flies in.
 void StepBullets(World& world, float dt) {
@@ -280,6 +290,25 @@ void ApplyContactDamage(World& world) {
     }
 }
 
+// The boss's strands fly like bullets but hit only the player, with the same swept test. A dashing player
+// is not there for them: they fly on, the way an attack passes through a roll in Dark Souls. Otherwise a
+// strand that touches the player is spent, like a bullet that hits a body, even when the window after an
+// earlier hit keeps it from hurting.
+void StepHostileProjectiles(World& world, float dt) {
+    Player& player = world.player;
+    world.hostileProjectiles.RemoveIf([&world, &player, dt](Projectile& strand) {
+        const bool stillFlying = StepProjectile(strand, dt);
+        const bool touches = SweepCircle(strand.motion.previousPosition, strand.motion.position, strand.radius,
+                                         player.motion.position, player.radius)
+                                 .has_value();
+        if (touches && !IsDashInvulnerable(player.dash)) {
+            HurtPlayer(player, strand.damage);
+            return true;
+        }
+        return !stillFlying || !Contains(world.arena, strand.motion.position);
+    });
+}
+
 // What the camera follows: the player, pulled toward a living boss.
 Vec2 CameraFocus(const World& world) {
     const Vec2 player = world.player.motion.position;
@@ -321,8 +350,9 @@ void StepWorld(World& world, const PlayerCommands& commands, float dt) {
     }
     HandleWeapons(world, commands, dt);
     StepEnemies(world, dt);
-    StepBoss(world.boss, player.motion.position, player.radius, world.arena, dt);
-
+    if (StepBoss(world.boss, player.motion.position, player.radius, world.arena, dt).spitHairRing) {
+        SpitHairRing(world);
+    }
 
     // Collisions run after everyone has moved, so the order in which bodies moved does not decide who
     // gets pushed.
@@ -336,6 +366,9 @@ void StepWorld(World& world, const PlayerCommands& commands, float dt) {
     StepBullets(world, dt);
     RemoveDeadEnemies(world);
     ApplyContactDamage(world);
+    // After the bodies, so when the boss's body and one of its strands reach the player in the same step,
+    // the heavier hit is the one that lands.
+    StepHostileProjectiles(world, dt);
 
     // Last, so the camera follows where everything ended up in this step.
     StepFollowCamera(world.camera, CameraFocus(world), player.motion.velocity, world.arena, dt);

@@ -95,7 +95,6 @@ TEST_CASE("the charge runs in a straight line at its speed") {
 
 TEST_CASE("a charge into a wall stops at the wall and stuns the boss for the long recovery") {
     // From the middle, the east wall is 760 units away for the body, inside the 800 unit run.
-
     Boss boss = AboutToChargeFrom(kCenter);
     const Vec2 player = kCenter + Vec2{300.0f, 0.0f};
     StepUntil(boss, player, AttackStage::Recovery);
@@ -113,7 +112,6 @@ TEST_CASE("a charge into a wall stops at the wall and stuns the boss for the lon
     }
     CHECK(steps == doctest::Approx(30).epsilon(0.05));
     CHECK(boss.secondsUntilAttack == boss.attackInterval);
-
 }
 
 TEST_CASE("a charge that runs out in the open stops after its distance and recovers quickly") {

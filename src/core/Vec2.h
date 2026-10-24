@@ -79,6 +79,14 @@ struct Vec2 {
     return current + toTarget * (maxDelta / distance);
 }
 
+/// Returns `v` turned by `radians`. Positive angles turn from +x toward +y, which is clockwise on screen,
+/// where y points down. The same convention as `std::atan2(v.y, v.x)` and raylib's angles.
+[[nodiscard]] inline Vec2 Rotated(Vec2 v, float radians) {
+    const float cosine = std::cos(radians);
+    const float sine = std::sin(radians);
+    return {v.x * cosine - v.y * sine, v.x * sine + v.y * cosine};
+}
+
 /// Linear interpolation: `t` = 0 gives `a`, `t` = 1 gives `b`.
 [[nodiscard]] constexpr Vec2 Lerp(Vec2 a, Vec2 b, float t) {
     return a + (b - a) * t;

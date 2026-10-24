@@ -6,7 +6,7 @@ What happens after the trigger: a bullet leaves the muzzle, flies in a straight 
 
 The rules live in `horde_core`:
 
-- `src/core/Projectile.h`, `src/core/Projectile.cpp`: the `Projectile` component, `MakeBullet` and `StepProjectile`.
+- `src/core/Projectile.h`, `src/core/Projectile.cpp`: the `Projectile` component, `LaunchProjectile`, `MakeBullet` and `StepProjectile`. The boss's strands are the same component, in a pool of their own (see [The boss](BOSS.md)).
 - `src/core/Weapon.h`: each gun's damage, bullet speed, range, knockback and barrel length, and `MuzzlePoint`.
 - `src/core/Collision.h`, `src/core/Collision.cpp`: `SweepCircle`, the hit test.
 - `src/core/Enemy.h`: the hairball's `Health` (30 hit points), and its hit flash and stun timers.
@@ -16,7 +16,7 @@ The game executable draws bullets as short yellow streaks and flashes the bodies
 
 ## How it works
 
-**Firing.** When `PullTrigger` fires (see [Aiming and weapons](WEAPONS.md)), `HandleWeapons` spawns a bullet into the bullet pool (see [Object pool](OBJECT_POOL.md)) at `MuzzlePoint`: the player's centre, plus the facing direction times the body radius plus the barrel length. Its velocity is the facing direction times the gun's bullet speed, and its lifetime is the gun's range divided by that speed.
+**Firing.** When `PullTrigger` fires (see [Aiming and weapons](WEAPONS.md)), `HandleWeapons` spawns a bullet into the bullet pool (see [Object pool](OBJECT_POOL.md)) at `MuzzlePoint`: the player's centre, plus the facing direction times the body radius plus the barrel length. `MakeBullet` builds it with `LaunchProjectile`: its velocity is the facing direction times the gun's bullet speed, and its lifetime is the gun's range divided by that speed. Then it takes the gun's damage and knockback.
 
 **Flight and hits.** Every fixed step, after bodies have moved and collided, `StepBullets` goes through the pool once. For each bullet:
 
@@ -40,6 +40,7 @@ The game executable draws bullets as short yellow streaks and flashes the bodies
 - **Knockback is a velocity, not a teleport.** It goes through the same movement and collision code as everything else, so a knocked-back hairball slows down naturally, pushes the ones behind it, and stops at the wall.
 - **The muzzle position is one function.** `MuzzlePoint` uses the barrel length from `WeaponStats`, and both the simulation (where bullets start) and the renderer (where the barrel ends) call it, so they cannot drift apart.
 - **A dead hairball stays in the pool until all bullets of the step have flown, but cannot be hit.** Removing it in the middle of `StepBullets` would move other enemies around while bullets are being tested against them. Skipping dead ones in `FirstHit` keeps a second bullet from being wasted on a corpse.
+- **The boss's projectiles are `Projectile`s too, in another pool.** A strand of the Hair Ring moves exactly like a bullet, so it shares the component, `LaunchProjectile` and `StepProjectile`. The pool decides who it can hit: `StepBullets` only sees the player's bullets, and the boss's strands are handled by `StepHostileProjectiles`, so a bullet can never hit the player and a strand can never hit the boss.
 
 ## How to tune it
 
@@ -59,17 +60,18 @@ In a Debug build, `F1` shows the number of live enemies and bullets, the shots f
 
 ## Tests
 
-- `tests/core/ProjectileTests.cpp`: a bullet leaves the muzzle with the gun's speed, damage and knockback; a step moves it in a straight line and remembers where it was; and it flies its range, within one step, and then stops.
+- `tests/core/ProjectileTests.cpp`: a launched projectile leaves its origin at its speed, with a lifetime of its range; a bullet leaves the muzzle with the gun's speed, damage and knockback; a step moves it in a straight line and remembers where it was; and it flies its range, within one step, and then stops.
 - `tests/core/CollisionTests.cpp`: a sweep touches a circle at the right fraction of the move; a sweep that passes beside a circle or stops short misses; a sweep that starts touching hits at once; a fast circle cannot skip over a thin one between two steps; and a circle that does not move only hits what it already touches.
 - `tests/core/ArenaTests.cpp`: an arena contains the points inside it and on its edge, and nothing outside.
 - `tests/core/WeaponTests.cpp`: the muzzle is at the end of the barrel; the pistol hits harder per bullet and the SMG fires faster.
 - `tests/core/WorldTests.cpp`: a shot leaves the muzzle and flies where the player aims; a bullet that hits nothing is gone after its range; a bullet that reaches a wall is gone at once; three pistol bullets kill a hairball and it is removed; a hit flashes, stuns and knocks a hairball back along the bullet; a bullet hits only the nearest of two hairballs in a line; and a hairball killed in a step is gone before it can touch the player. The determinism test fires too, and compares the bullets and the boss's health.
-- `tests/core/BossTests.cpp`: a bullet takes health from the boss and flashes it without pushing it, and a hairball in front of the boss takes the bullet meant for the boss.
+- `tests/core/BossTests.cpp`: a bullet takes health from the boss and flashes it without pushing it; a hairball in front of the boss takes the bullet meant for the boss; and a bullet and a strand of the boss's ring fly through each other.
 
 The drawing is not unit tested, because it needs a window. In a Debug build, holding the SMG toward a hairball killed it, and the overlay counted the enemies, bullets and shots.
 
 ## Limitations
 
 - **The SMG has no spread.** Every bullet goes exactly where the player aims. Spread needs a seeded random generator in the world, so that the simulation stays deterministic. The generator arrives with the boss's attack patterns (day 7).
-- **Bullets ignore the player and each other.** There is no friendly fire, and bullets do not collide in the air.
+- **Bullets ignore the player and each other.** There is no friendly fire, and bullets do not collide in the air, with each other or with the boss's strands. Shooting the Hair Ring does nothing.
+
 - **No sound, impact particles or screen shake yet.** Those are day 10.

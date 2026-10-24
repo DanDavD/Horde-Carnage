@@ -23,8 +23,7 @@ The game executable reads Space or left Shift for the dash and E for a flask. It
 1. **Start.** When `dashPressed` is set, the dash is off cooldown and the player is not drinking, `TryStartDash` picks a direction: the movement input if there is one, otherwise the point the player aims at in this step, or the facing if the cursor is right on the player. It starts a burst of 0.12 s, an invulnerability window of 0.15 s, and a cooldown of 0.62 s (the burst plus 0.5 s), all counted from the start.
 2. **Burst.** While dashing, `MovePlayer` does not call `StepMovement`. Each step, `StepDash` returns how far to move at 1500 units per second. The last step moves only for the time that was left, so a dash always covers exactly 180 units.
 3. **Bodies and walls.** A dashing player is left out of the body collisions, so it passes through hairballs and the boss. The walls still apply, so a dash into a wall stops at it.
-4. **Damage.** `HurtPlayer` ignores all damage while the dash's invulnerability lasts. Contact damage and the boss's Charge go through it, and the boss's later attacks will too.
-
+4. **Damage.** `HurtPlayer` ignores all damage while the dash's invulnerability lasts. Contact damage, the boss's Charge and the strands of its Hair Ring go through it, and the boss's later attacks will too. A strand that meets a dashing player is not spent: it flies on, so the dash carries the player through the ring.
 5. **Guns.** The gun cannot fire during the burst. A click during it is still buffered by `PullTrigger` (the `canFire` parameter), so it fires as soon as the dash ends.
 6. **After.** The player leaves the dash at running speed in the dash direction, and normal movement takes over.
 
@@ -84,6 +83,8 @@ In a Debug build, `F1` shows the dash cooldown, the dash invulnerability left, t
 - `tests/core/WeaponTests.cpp`: a trigger that cannot fire still remembers a press for when it can.
 - `tests/core/WorldTests.cpp`:
   - Dash: it carries the player its distance and leaves it at running speed; with no movement input it goes where the player aims, or where it faces if the cursor is on the player; it stops at a wall; it goes through a hairball instead of shoving it; a dashing player cannot be hurt; and the gun does not fire during a dash, but a click in it fires right after.
+- `tests/core/BossTests.cpp`: a dash goes through the boss without a scratch, through the Charge without damage, and through the Hair Ring without damage while the strands fly on.
+
   - Flasks: a drink heals when it finishes and spends a flask; a drink at full health is refused; while drinking the player is slow and cannot dash or shoot; a hit while drinking wastes the flask; and the flasks run out after three drinks.
 
 The trail, the bar, the bottles and the ring are not unit tested, because they need a window. I checked them in Release and Debug builds: the ghosts appear behind the player during a dash, the ring fills during a drink, the bottles go from three to two, and a hairball that caught the player in the middle of a drink left the flask spent and the health unchanged.

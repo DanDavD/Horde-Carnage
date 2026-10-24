@@ -221,7 +221,12 @@ TEST_CASE("the same inputs always give the same world") {
     CHECK(a.boss.health.current == b.boss.health.current);
     CHECK(a.shotsFired == b.shotsFired);
     REQUIRE(a.bullets.Size() == b.bullets.Size());
+    REQUIRE(a.hostileProjectiles.Size() == b.hostileProjectiles.Size());
+    for (std::size_t i = 0; i < a.hostileProjectiles.Size(); ++i) {
+        CHECK(a.hostileProjectiles[i].motion.position == b.hostileProjectiles[i].motion.position);
+    }
     REQUIRE(a.enemies.Size() == b.enemies.Size());
+
     for (std::size_t i = 0; i < a.enemies.Size(); ++i) {
         CHECK(a.enemies[i].motion.position == b.enemies[i].motion.position);
     }
