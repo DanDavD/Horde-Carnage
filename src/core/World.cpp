@@ -31,10 +31,14 @@ constexpr float kMaxBossFramingOffset = 200.0f;
 
 // Every source of damage to the player goes through here, so a dash protects from all of them, and a hit
 // that lands spoils any drink in progress.
-void HurtPlayer(Player& player, int damage) {
+//
+// @return Whether the hit landed, so a hit with extra effects (the charge's knockback) applies them once.
+bool HurtPlayer(Player& player, int damage) {
     if (!IsDashInvulnerable(player.dash) && ApplyDamage(player.health, damage)) {
         InterruptDrinking(player.flasks);
+        return true;
     }
+    return false;
 }
 
 // The dash and the drink exclude each other: drinking is a commitment, and a dash cannot be cancelled into
@@ -128,19 +132,6 @@ void StepEnemies(World& world, float dt) {
     }
 }
 
-// Until its attacks arrive, the boss walks at the player like a big, slow hairball. A dead boss only
-// brakes to a stop.
-void StepBoss(World& world, float dt) {
-    Boss& boss = world.boss;
-    const Player& player = world.player;
-    boss.hitFlashSeconds = std::max(boss.hitFlashSeconds - dt, 0.0f);
-
-    const float stopDistance = boss.radius + player.radius + kContactSlack;
-    const Vec2 input =
-        IsDead(boss.health) ? Vec2{} : ChaseInput(boss.motion.position, player.motion.position, stopDistance);
-    StepMovement(boss.motion, input, boss.stats, dt);
-}
-
 void ConfineEveryone(World& world) {
     ConfineToArena(world.player.motion, world.player.radius, world.arena);
     ConfineToArena(world.boss.motion, world.boss.radius, world.arena);
@@ -153,12 +144,15 @@ void ConfineEveryone(World& world) {
 // hairball against the ones after it. With a few dozen bodies that is a few hundred checks per pass, so a
 // spatial grid would cost more than it saves. A dashing player passes through bodies, so a dash can escape
 // a crowd or go through the boss, and a dead boss is not a body any more.
+//
+// A charging boss runs through the player rather than pushing them: at its speed a shove would carry the
+// player across the arena and pin them against the wall. It still bowls hairballs out of its way.
 void SeparateEveryone(World& world) {
     Player& player = world.player;
     Boss& boss = world.boss;
     const bool playerIsSolid = !IsDashing(player.dash);
     const bool bossIsSolid = !IsDead(boss.health);
-    if (playerIsSolid && bossIsSolid) {
+    if (playerIsSolid && bossIsSolid && !IsCharging(boss)) {
         SeparateCircles(player.motion, player.radius, boss.motion, boss.radius, PushShare(player.weight, boss.weight));
     }
 
@@ -254,6 +248,17 @@ void RemoveDeadEnemies(World& world) {
     world.enemies.RemoveIf([](const Enemy& enemy) { return IsDead(enemy.health); });
 }
 
+// Sideways out of the charge's path, on the side the player already is, so the hit throws them clear of
+// the rest of the run instead of along it.
+Vec2 ChargeKnockback(const Boss& boss, Vec2 playerPosition) {
+    const Vec2 direction = boss.attack->direction;
+    Vec2 side{-direction.y, direction.x};
+    if (Dot(playerPosition - boss.motion.position, side) < 0.0f) {
+        side = side * -1.0f;
+    }
+    return side * boss.charge.knockback;
+}
+
 // After collisions, so contact means the bodies really ended the step touching. The invulnerability
 // window lets only the first touch land. The boss is checked first, so when the boss and a hairball reach
 // the player in the same step, the heavier hit is the one that lands.
@@ -262,7 +267,11 @@ void ApplyContactDamage(World& world) {
     const Boss& boss = world.boss;
     if (!IsDead(boss.health) &&
         AreTouching(player.motion.position, player.radius, boss.motion.position, boss.radius)) {
-        HurtPlayer(player, boss.contactDamage);
+        if (!IsCharging(boss)) {
+            HurtPlayer(player, boss.contactDamage);
+        } else if (HurtPlayer(player, boss.charge.damage)) {
+            player.motion.velocity += ChargeKnockback(boss, player.motion.position);
+        }
     }
     for (const Enemy& enemy : world.enemies) {
         if (AreTouching(player.motion.position, player.radius, enemy.motion.position, enemy.radius)) {
@@ -312,7 +321,8 @@ void StepWorld(World& world, const PlayerCommands& commands, float dt) {
     }
     HandleWeapons(world, commands, dt);
     StepEnemies(world, dt);
-    StepBoss(world, dt);
+    StepBoss(world.boss, player.motion.position, player.radius, world.arena, dt);
+
 
     // Collisions run after everyone has moved, so the order in which bodies moved does not decide who
     // gets pushed.

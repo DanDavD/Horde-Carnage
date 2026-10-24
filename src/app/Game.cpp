@@ -37,6 +37,14 @@ constexpr const char* kBossName = "The Matriarch";
 constexpr int kBossBarWidth = 640;
 constexpr int kBossBarHeight = 12;
 constexpr int kBossBarY = kScreenHeight - 96;
+// The charge. During the warning the boss crouches (its body shrinks by this fraction) and, once the aim
+// locks, trembles sideways. While it runs it leaves a few ghosts behind. Stunned against a wall, it has
+// stars circling over its head.
+constexpr float kChargeCrouch = 0.12f;
+constexpr float kChargeTremble = 2.5f;
+constexpr int kChargeGhosts = 3;
+constexpr int kStunStars = 3;
+constexpr float kStunStarRadius = 5.0f;
 // While invulnerable the player blinks: faded for one period, solid for the next.
 constexpr float kBlinkPeriod = 0.1f;
 constexpr float kBlinkFade = 0.35f;
@@ -90,6 +98,7 @@ constexpr Color kBossBar{170, 32, 40, 255};
 constexpr Color kSoftText{170, 165, 180, 255};
 constexpr Color kBlood{220, 60, 50, 255};
 constexpr Color kVictoryGold{230, 185, 95, 255};
+constexpr Color kStunStar{255, 225, 130, 255};
 constexpr Color kBarBack{50, 20, 24, 255};
 constexpr Color kBarHurt{255, 140, 120, 255};
 constexpr Color kBarEdge{120, 100, 110, 255};
@@ -252,13 +261,85 @@ void DrawHairball(const Enemy& enemy, Vec2 playerPosition, float alpha) {
     DrawHairBody(position, enemy.radius, playerPosition, kHairballStyle, enemy.hitFlashSeconds > 0.0f);
 }
 
+bool InAttackStage(const Boss& boss, AttackStage stage) {
+    return boss.attack && boss.attack->stage == stage;
+}
+
+// The charge's path on the floor, drawn by the same `PlanChargePath` the run follows. Faint while it still
+// follows the player, bright once it locks, which is the moment to get out of the way. A bar across the
+// end marks where the boss will hit the wall and be stunned.
+void DrawChargeTelegraph(const Boss& boss, const Arena& arena) {
+    if (IsDead(boss.health) || !InAttackStage(boss, AttackStage::Warning)) {
+        return;
+    }
+    const BossAttack& charge = *boss.attack;
+    const ChargeStats& stats = boss.charge;
+    const Vec2 start = boss.motion.position;
+    const ChargePath path = PlanChargePath(start, charge.direction, stats.distance, boss.radius, arena);
+    // To the front of the body where the run ends, not to its centre.
+    const Vec2 end = path.end + charge.direction * boss.radius;
+    const Vec2 side = Vec2{-charge.direction.y, charge.direction.x} * boss.radius;
+    const bool locked = charge.stageSeconds > stats.warningSeconds - stats.aimLockSeconds;
+    const float progress = std::min(charge.stageSeconds / stats.warningSeconds, 1.0f);
+
+    DrawLineEx(ToRaylib(start), ToRaylib(end), boss.radius * 2.0f,
+               Fade(kBlood, locked ? 0.3f : 0.06f + 0.12f * progress));
+    const Color edge = Fade(kBlood, locked ? 0.95f : 0.4f);
+    DrawLineEx(ToRaylib(start + side), ToRaylib(end + side), 2.0f, edge);
+    DrawLineEx(ToRaylib(start - side), ToRaylib(end - side), 2.0f, edge);
+    if (path.endsAtWall) {
+        DrawLineEx(ToRaylib(end + side), ToRaylib(end - side), 6.0f, edge);
+    }
+}
+
+void DrawStunStars(Vec2 position, float radius, float seconds) {
+    for (int i = 0; i < kStunStars; ++i) {
+        const float angle = seconds * 5.0f + 2.0f * std::numbers::pi_v<float> * static_cast<float>(i) / kStunStars;
+        const Vec2 orbit{std::cos(angle) * radius * 0.6f, std::sin(angle) * radius * 0.2f};
+        const Vec2 star = position + Vec2{0.0f, -radius * 1.15f} + orbit;
+
+        DrawCircleV(ToRaylib(star), kStunStarRadius, kStunStar);
+    }
+}
+
 void DrawBoss(const Boss& boss, Vec2 playerPosition, float alpha) {
-    const Vec2 position = Lerp(boss.motion.previousPosition, boss.motion.position, alpha);
+    Vec2 position = Lerp(boss.motion.previousPosition, boss.motion.position, alpha);
     if (IsDead(boss.health)) {
         DrawHairBody(position, boss.radius, playerPosition, kDeadBossStyle, false);
         return;
     }
-    DrawHairBody(position, boss.radius, playerPosition, kBossStyle, boss.hitFlashSeconds > 0.0f);
+    if (!boss.attack) {
+        DrawHairBody(position, boss.radius, playerPosition, kBossStyle, boss.hitFlashSeconds > 0.0f);
+        return;
+    }
+
+    // During an attack the eyes look down its path instead of at the player.
+    const BossAttack& attack = *boss.attack;
+    const ChargeStats& stats = boss.charge;
+    float radius = boss.radius;
+    switch (attack.stage) {
+    case AttackStage::Warning: {
+        radius *= 1.0f - kChargeCrouch * std::min(attack.stageSeconds / stats.warningSeconds, 1.0f);
+        if (attack.stageSeconds > stats.warningSeconds - stats.aimLockSeconds) {
+            const Vec2 side{-attack.direction.y, attack.direction.x};
+            position += side * (kChargeTremble * std::sin(attack.stageSeconds * 90.0f));
+        }
+        break;
+    }
+    case AttackStage::Active:
+        for (int i = kChargeGhosts; i >= 1; --i) {
+            const Vec2 ghost = position - attack.direction * (radius * 0.5f * static_cast<float>(i));
+            DrawCircleV(ToRaylib(ghost), radius * (1.0f - 0.1f * static_cast<float>(i)),
+                        Fade(kBossFill, 0.35f / static_cast<float>(i)));
+        }
+        break;
+    case AttackStage::Recovery:
+        break;
+    }
+    DrawHairBody(position, radius, position + attack.direction, kBossStyle, boss.hitFlashSeconds > 0.0f);
+    if (attack.stage == AttackStage::Recovery && attack.stunned) {
+        DrawStunStars(position, radius, attack.stageSeconds);
+    }
 }
 
 void DrawBullet(const Projectile& bullet, float alpha) {
@@ -429,6 +510,31 @@ void DrawDebugWorld(const Player& player, const FollowCamera& camera, float alph
     DrawLineEx(ToRaylib(center + Vec2{0.0f, -8.0f}), ToRaylib(center + Vec2{0.0f, 8.0f}), 2.0f, ORANGE);
 }
 
+const char* AttackStageLabel(AttackStage stage) {
+    switch (stage) {
+    case AttackStage::Warning:
+        return "warning";
+    case AttackStage::Active:
+        return "active";
+    case AttackStage::Recovery:
+        return "recovery";
+    }
+    return "";
+}
+
+// What the boss is doing, and for how long, so attack timings can be tuned against numbers.
+const char* BossStateLabel(const Boss& boss) {
+    if (IsDead(boss.health)) {
+        return "dead";
+    }
+    if (!boss.attack) {
+        return TextFormat("stalk, attack in %.2f", boss.secondsUntilAttack);
+    }
+    const BossAttack& attack = *boss.attack;
+    return TextFormat("charge %s %.2f%s", AttackStageLabel(attack.stage), attack.stageSeconds,
+                      attack.stunned ? " stunned" : "");
+}
+
 // Debug builds only, in screen space. The numbers I tune against: what the input asks for, what the
 // body does, where the camera is, how many enemies there are, and the player's health window.
 void DrawDebugHud(const World& world, Vec2 moveInput) {
@@ -438,7 +544,7 @@ void DrawDebugHud(const World& world, Vec2 moveInput) {
     constexpr int kX = 10;
     constexpr int kY = 80; // Below the health and dash bars.
     constexpr int kLine = 20;
-    DrawRectangle(kX - 4, kY - 4, 340, 13 * kLine + 8, Fade(BLACK, 0.6f));
+    DrawRectangle(kX - 4, kY - 4, 340, 14 * kLine + 8, Fade(BLACK, 0.6f));
     DrawText(TextFormat("input  %5.2f %5.2f  len %4.2f", moveInput.x, moveInput.y, Length(moveInput)), kX, kY,
              18, RAYWHITE);
     DrawText(TextFormat("speed  %5.0f / %.0f", Length(motion.velocity), player.stats.maxSpeed), kX, kY + kLine, 18,
@@ -467,6 +573,7 @@ void DrawDebugHud(const World& world, Vec2 moveInput) {
     DrawText(TextFormat("flasks %d / %d  drink %.2f", player.flasks.charges, player.flasks.stats.maxCharges,
                         player.flasks.drinkingSeconds),
              kX, kY + 12 * kLine, 18, RAYWHITE);
+    DrawText(TextFormat("boss   %s", BossStateLabel(world.boss)), kX, kY + 13 * kLine, 18, ORANGE);
 }
 #endif
 
@@ -555,6 +662,9 @@ void Game::Draw(float alpha) const {
 
     BeginMode2D(ToRaylibCamera(world.camera, alpha));
     DrawArena(world.arena);
+    // On the floor, under every body.
+    DrawChargeTelegraph(world.boss, world.arena);
+
     // The boss goes under its children, so a dead boss lies on the floor.
     DrawBoss(world.boss, playerPosition, alpha);
     for (const Enemy& enemy : world.enemies) {

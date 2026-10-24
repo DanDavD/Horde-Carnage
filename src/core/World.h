@@ -51,9 +51,10 @@ struct World {
 [[nodiscard]] World CreateWorld(const Arena& arena, Vec2 viewSize);
 
 /// Advances the whole simulation by one fixed step of `dt` seconds, in this order: the player moves,
-/// aims and fires; hairballs and the boss chase; bodies are pushed apart and held inside the arena;
-/// bullets fly and hit; dead hairballs are removed; bodies that touch the player hurt it; and the camera
-/// follows.
+/// aims and fires; hairballs chase and the boss stalks or attacks; bodies are pushed apart and held
+/// inside the arena; bullets fly and hit; dead hairballs are removed; bodies that touch the player hurt
+/// it; and the camera follows.
+
 ///
 /// @param commands What the player asks for in this step: movement, aim, fire and weapon switching.
 void StepWorld(World& world, const PlayerCommands& commands, float dt);

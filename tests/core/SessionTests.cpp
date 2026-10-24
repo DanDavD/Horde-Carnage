@@ -198,7 +198,9 @@ TEST_CASE("a new fight after a victory starts the attempts over") {
 }
 
 TEST_CASE("standing still in front of the boss ends in death") {
-    // The boss walks over in about 3 s, then lands 20 damage every 0.8 s: the fifth touch kills.
+    // The boss stalks for 2 s and charges: the run hits for 30 at about 2.9 s and ends stunned against the
+    // south wall, next to the player. Once the stun is over, four touches 0.8 s apart finish the player off
+    // at about 7.1 s, before the second charge.
     Session session = horde::StartSession(kArena, kView);
     int steps = 0;
     while (session.state == SessionState::Playing && steps < 60 * 60) {
@@ -206,6 +208,7 @@ TEST_CASE("standing still in front of the boss ends in death") {
         ++steps;
     }
     CHECK(session.state == SessionState::Dead);
-    CHECK(session.world.elapsedSeconds > 5.0f);
-    CHECK(session.world.elapsedSeconds < 8.0f);
+    CHECK(session.world.elapsedSeconds > 6.5f);
+    CHECK(session.world.elapsedSeconds < 7.5f);
+
 }

@@ -1,10 +1,12 @@
 #include <cmath>
+#include <limits>
 
 #include <doctest/doctest.h>
 
 #include "core/Collision.h"
 #include "core/World.h"
 
+using horde::AttackStage;
 using horde::Boss;
 using horde::Enemy;
 using horde::PlayerCommands;
@@ -36,6 +38,29 @@ void PlayerTouchingBoss(World& world) {
     world.player.motion = horde::MotionAt(world.boss.motion.position + Vec2{0.0f, contact});
 }
 
+// A boss that never attacks, for the tests about its walk and its body.
+void OnlyWalks(Boss& boss) {
+    boss.secondsUntilAttack = std::numeric_limits<float>::infinity();
+}
+
+// The boss in the middle, starting its charge warning on the next step, with the player standing still
+// `distance` units south of it, right in its path.
+World AboutToCharge(float distance) {
+    World world = NewFight();
+    world.player.motion = horde::MotionAt(world.boss.motion.position + Vec2{0.0f, distance});
+    world.boss.secondsUntilAttack = 0.0f;
+    return world;
+}
+
+// Steps until the boss's attack reaches `stage`, for at most two seconds.
+void StepUntilStage(World& world, const PlayerCommands& commands, AttackStage stage) {
+    for (int i = 0; i < 120 && !(world.boss.attack && world.boss.attack->stage == stage); ++i) {
+        horde::StepWorld(world, commands, kDt);
+    }
+    REQUIRE(world.boss.attack);
+    REQUIRE(world.boss.attack->stage == stage);
+}
+
 // Whether `point` is on the screen, `inset` units or more from every edge of the view.
 bool InView(const World& world, Vec2 point, float inset) {
     const Vec2 half = world.camera.viewSize * 0.5f;
@@ -57,6 +82,7 @@ TEST_CASE("the boss walks toward the player, slower than a hairball") {
 
 TEST_CASE("the boss stops when it touches the player, and pushes the player rather than being pushed") {
     World world = NewFight();
+    OnlyWalks(world.boss);
     // The player stands still until the boss arrives, then runs straight into it for a second.
     Step(world, PlayerCommands{}, 360);
     const float contact = world.boss.radius + world.player.radius;
@@ -156,6 +182,8 @@ TEST_CASE("the camera keeps a far boss in mind without pushing the player off sc
     // the camera leans toward the boss, the player would end up at the edge of the screen.
     world.boss.motion = horde::MotionAt(world.arena.min + Vec2{100.0f, 100.0f});
     world.boss.stats.maxSpeed = 0.0f;
+    OnlyWalks(world.boss);
+
     world.player.motion = horde::MotionAt(world.arena.max - Vec2{100.0f, 100.0f});
     Step(world, PlayerCommands{}, 120);
     CHECK(InView(world, world.player.motion.position, 150.0f));
@@ -169,4 +197,47 @@ TEST_CASE("once the boss is dead, the camera goes back to the player alone") {
     Step(world, PlayerCommands{}, 120);
     CHECK(world.camera.center.x == doctest::Approx(world.player.motion.position.x).epsilon(0.01));
     CHECK(world.camera.center.y == doctest::Approx(world.player.motion.position.y).epsilon(0.01));
+}
+
+TEST_CASE("a charge that catches the player takes the charge's damage and throws them out of its path") {
+    World world = AboutToCharge(200.0f);
+    const horde::Player& player = world.player;
+    StepUntilStage(world, PlayerCommands{}, AttackStage::Active);
+    for (int i = 0; i < 30 && player.health.current == player.health.max; ++i) {
+        Step(world, PlayerCommands{}, 1);
+    }
+    CHECK(player.health.current == player.health.max - world.boss.charge.damage);
+    // The charge runs south, so out of its path is sideways.
+    CHECK(std::abs(player.motion.velocity.x) >= world.boss.charge.knockback * 0.9f);
+}
+
+TEST_CASE("the charge runs through the player instead of carrying them along") {
+    World world = AboutToCharge(200.0f);
+    const float startY = world.player.motion.position.y;
+    StepUntilStage(world, PlayerCommands{}, AttackStage::Recovery);
+
+    // The boss ran from the middle to the south wall, 460 units, right through where the player stood.
+    const Boss& boss = world.boss;
+    CHECK(boss.attack->stunned);
+    CHECK(boss.motion.position.y == doctest::Approx(world.arena.max.y - boss.radius));
+    CHECK(std::abs(world.player.motion.position.y - startY) < 30.0f);
+}
+
+TEST_CASE("a dash through the charge takes no damage") {
+    World world = AboutToCharge(200.0f);
+    StepUntilStage(world, PlayerCommands{}, AttackStage::Active);
+    Step(world, PlayerCommands{.move = {0.0f, -1.0f}, .dashPressed = true}, 1);
+    Step(world, PlayerCommands{}, 60);
+    CHECK(world.player.health.current == world.player.health.max);
+    CHECK(world.player.motion.position.y < world.boss.motion.position.y);
+}
+
+TEST_CASE("the boss counts as charging only while it runs") {
+    World world = AboutToCharge(200.0f);
+    StepUntilStage(world, PlayerCommands{}, AttackStage::Warning);
+    CHECK_FALSE(horde::IsCharging(world.boss));
+    StepUntilStage(world, PlayerCommands{}, AttackStage::Active);
+    CHECK(horde::IsCharging(world.boss));
+    StepUntilStage(world, PlayerCommands{}, AttackStage::Recovery);
+    CHECK_FALSE(horde::IsCharging(world.boss));
 }

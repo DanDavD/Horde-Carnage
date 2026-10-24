@@ -88,7 +88,8 @@ Everything fades in over the restart delay, and the prompt to try again (or to f
   - standing still in front of the boss ends in death.
 - `tests/core/WorldTests.cpp`: a bullet that hits counts toward accuracy, and a miss does not.
 
-The end screens and the restart buttons are not unit tested, because they need a window. I checked the screens in Release and Debug builds with window captures: standing still until "YOU DIED" (it read "Attempt 1. You lasted 0:06." and "The Matriarch kept 100% of her health."), both screens halfway through the fade, and "VICTORY" after an `F4` key message sent straight to the window. Retrying from each screen, and winning with real bullets, I check by playing.
+The end screens and the restart buttons are not unit tested, because they need a window. I checked the screens in Release and Debug builds with window captures: standing still until "YOU DIED" (it read "Attempt 1. You lasted 0:07." and "The Matriarch kept 100% of her health.")
+, both screens halfway through the fade, and "VICTORY" after an `F4` key message sent straight to the window. Retrying from each screen, and winning with real bullets, I check by playing.
 
 
 ## Limitations

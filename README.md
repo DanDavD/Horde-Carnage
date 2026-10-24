@@ -25,7 +25,8 @@ This is day 4 of 15, and the boss fight is in progress. Progress is tracked in t
 - A window with a fixed-timestep main loop: the game simulates at 60 Hz whatever the monitor's refresh rate, and renders once per frame.
 - A player you move around an arena with the keyboard or a gamepad. It speeds up and stops over a fraction of a second, turns back quickly, is never faster on a diagonal, faces the way you push, and slides along the walls. See [Movement](docs/MOVEMENT.md).
 - An arena bigger than the screen, with a camera that follows the player smoothly, looks a little ahead of where you run, leans toward the boss so you can see it, and stops at the walls. See [Camera](docs/CAMERA.md).
-- The Matriarch, a boss three times the size of a hairball, waiting in the middle of the arena. For now it only walks at you: it is slower than you, shoves you out of its way, takes 20 hit points per touch, and needs 120 pistol bullets to go down. Its health bar runs along the bottom of the screen. See [The boss](docs/BOSS.md).
+- The Matriarch, a boss three times the size of a hairball, waiting in the middle of the arena. It walks at you slower than you run, shoves you out of its way, takes 20 hit points per touch, and needs 120 pistol bullets to go down. Its health bar runs along the bottom of the screen. See [The boss](docs/BOSS.md).
+- Its first attack, the Charge. Every 2 seconds of stalking it crouches and draws its path on the floor; the path follows you, then locks 0.3 s before it runs at 1000 units/s. A hit takes 30 and throws you aside. If the run ends at a wall, it is stunned for 1.5 s. See [The boss](docs/BOSS.md).
 - The hairball, the boss's small child: it walks straight at you and stops when it touches you. It is no longer in the fight; the boss will summon hairballs in its second phase. See [Enemies](docs/ENEMIES.md).
 - Bodies push each other apart instead of stacking. You can shove a hairball out of your way but not the boss, and a crowd slows you down. See [Collisions](docs/COLLISIONS.md).
 - A health bar. A touch of the boss takes 20 of your 100 hit points (a hairball's takes 10), and after a hit you blink and cannot be hurt for 0.8 seconds. See [Health](docs/HEALTH.md).
@@ -38,7 +39,8 @@ This is day 4 of 15, and the boss fight is in progress. Progress is tracked in t
 - Unit tests for the pure logic, and a GitHub Actions workflow that builds and tests every push and pull request on Windows.
 - Warnings are errors for the project's own code (`/W4 /WX` on MSVC).
 
-**Still to do:** the boss's attacks (the Charge, the Hair Ring and the Leap), its alternating shield and its second phase, then the numbers in JSON, game feel and menus. See the [roadmap](docs/ROADMAP.md) for the order.
+**Still to do:** the boss's other attacks (the Hair Ring and the Leap),
+ its alternating shield and its second phase, then the numbers in JSON, game feel and menus. See the [roadmap](docs/ROADMAP.md) for the order.
 
 ## Tech stack
 
