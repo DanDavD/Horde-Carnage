@@ -1,6 +1,9 @@
 #pragma once
 
+#include <cstdint>
+
 #include "core/Arena.h"
+#include "core/Random.h"
 #include "core/Vec2.h"
 #include "core/World.h"
 
@@ -27,10 +30,14 @@ struct Session {
     float stateSeconds = 0.0f; ///< Simulated time spent in the current state.
     /// Which try at the boss this is, from 1. It lives here and not in the World, so a restart keeps it.
     int attempt = 1;
+    /// Hands out the seed of every new World, so each attempt plays out differently, and a whole run of
+    /// attempts follows from the session's one seed.
+    Random seeds;
 };
 
-/// A session that starts playing straight away, in a fresh world, on the first attempt.
-[[nodiscard]] Session StartSession(const Arena& arena, Vec2 viewSize);
+/// A session that starts playing straight away, in a fresh world, on the first attempt. The game passes
+/// a seed from the system; tests that do not depend on chance leave the default.
+[[nodiscard]] Session StartSession(const Arena& arena, Vec2 viewSize, std::uint64_t seed = 0);
 
 /// Advances the session by one fixed step: steps the world while playing, then ends the fight if the boss
 /// or the player has fallen. When both fall in the same step, the fight is won. Once the fight is over,
@@ -40,8 +47,8 @@ void StepSession(Session& session, const PlayerCommands& commands, float dt);
 /// Whether `TryRestart` would restart now: the fight is over and the restart delay has passed.
 [[nodiscard]] bool CanRestart(const Session& session);
 
-/// Starts a new fight in a fresh world if `CanRestart` allows it. A retry after a death is the next
-/// attempt; a new fight after a victory starts the count again from 1.
+/// Starts a new fight in a fresh world, with the next seed, if `CanRestart` allows it. A retry after a
+/// death is the next attempt; a new fight after a victory starts the count again from 1.
 ///
 /// @return Whether the session restarted.
 bool TryRestart(Session& session);

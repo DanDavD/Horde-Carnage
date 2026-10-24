@@ -4,16 +4,17 @@
 
 The Matriarch, the one boss the game is about: a giant hairball, mother of the small ones, in the middle of the arena. The whole game is one fight against it, in the spirit of Gun Bros and Dark Souls 1: a boss that is hard on purpose, whose patterns you learn by dying. See the [roadmap](ROADMAP.md#changes-to-the-plan) for why.
 
-This document describes what exists today. The boss stalks the player, shoves them, hurts on touch, soaks up bullets, and has two attacks that take turns: the Charge and the Hair Ring. The Leap comes on day 7, then the shield and the second phase.
+This document describes what exists today. The boss stalks the player, shoves them, hurts on touch, soaks up bullets, and has the three attacks of its first phase, which take turns: the Charge, the Hair Ring and the Leap. A seeded random choice between them comes next, then the shield and the second phase.
 
 The rules live in `horde_core`:
 
-- `src/core/Boss.h`, `src/core/Boss.cpp`: the `Boss` struct, with the same body components as the player and the hairballs (`Motion`, `MovementStats`, a radius and a weight) and the boss's numbers; its attack state (`BossAttack`, `AttackStage`, `ChargeStats`, `HairRingStats`); and the systems that run it: `StepBoss`, which returns the `BossActions` the world has to carry out, `IsCharging`, `PlanChargePath`, and the ring's `HairRingStrands`, `HairStrandDirection` and `MakeHairStrand`.
-- `src/core/World.h`, `src/core/World.cpp`: `kBossArena` and `kStartingDistance`; `CreateWorld` places the boss; `StepWorld` calls `StepBoss`, and `SpitHairRing` spawns the ring's strands into `World::hostileProjectiles`, where `StepHostileProjectiles` flies them and hurts the player; the collision, bullet and contact damage systems include the boss; and `CameraFocus` keeps it in view.
+- `src/core/Boss.h`, `src/core/Boss.cpp`: the `Boss` struct, with the same body components as the player and the hairballs (`Motion`, `MovementStats`, a radius and a weight) and the boss's numbers; its attack state (`BossAttack`, `AttackStage`, `ChargeStats`, `HairRingStats`, `LeapStats`); and the systems that run it: `StepBoss`, which returns the `BossActions` the world has to carry out, `IsCharging`, `IsAirborne`, `PlanChargePath`, and the ring's `HairRingStrands`, `HairStrandDirection` and `MakeHairStrand`.
+- `src/core/Shockwave.h`, `src/core/Shockwave.cpp`: the `Shockwave` the Leap sends out, with `MakeShockwave`, `StepShockwave` and `ShockwaveTouches`.
+- `src/core/World.h`, `src/core/World.cpp`: `kBossArena` and `kStartingDistance`; `CreateWorld` places the boss; `StepWorld` calls `StepBoss`; `SpitHairRing` spawns the ring's strands into `World::hostileProjectiles`, where `StepHostileProjectiles` flies them and hurts the player; `LandLeap` applies the Leap's impact and spawns its shockwave into `World::shockwaves`, where `StepShockwaves` grows it; the collision, bullet and contact damage systems include the boss, unless it is dead or in the air (`IsBossABody`); and `CameraFocus` keeps it in view.
 
 The game executable draws it:
 
-- `src/app/Game.cpp`: `DrawBoss` draws the same hairy body as a hairball (`DrawHairBody`), three times bigger, darker, with glowing eyes, plus the crouch, the ghosts and the stun stars of the Charge (`DrawChargingBoss`) and the swell of the Hair Ring (`DrawSpittingBoss`). `DrawChargeTelegraph` and `DrawHairRingTelegraph` draw the warnings on the floor, and `DrawHairStrand` draws the strands. `DrawBossBar` draws its health along the bottom of the screen, under its name.
+- `src/app/Game.cpp`: `DrawBoss` draws the same hairy body as a hairball (`DrawHairBody`), three times bigger, darker, with glowing eyes, plus the crouch, the ghosts and the stun stars of the Charge (`DrawChargingBoss`), the swell of the Hair Ring (`DrawSpittingBoss`), and the jump of the Leap (`DrawLeapingBoss`). `DrawChargeTelegraph`, `DrawHairRingTelegraph` and `DrawLeapTelegraph` draw the warnings on the floor, `DrawHairStrand` draws the strands, and `DrawShockwave` the shockwaves. `DrawBossBar` draws its health along the bottom of the screen, under its name.
 
 ## How it works
 
@@ -26,10 +27,10 @@ The game executable draws it:
       ^                                                                 |
       +---------------------------- recovery over ----------------------+
 
-  The attacks take turns: Charge, Hair Ring, Charge, Hair Ring...
+  The attacks take turns: Charge, Hair Ring, Leap, Charge...
 ```
 
-- **Stalking** (`Boss::attack` is empty): it walks at the player with the same `ChaseInput` as a hairball, stopping at contact, at 120 units/s at most and slow to get going (400 units/s^2). `secondsUntilAttack` counts down from `attackInterval` (2 s). Then it starts `nextAttack`: a Charge first, then a Hair Ring, and so on.
+- **Stalking** (`Boss::attack` is empty): it walks at the player with the same `ChaseInput` as a hairball, stopping at contact, at 120 units/s at most and slow to get going (400 units/s^2). `secondsUntilAttack` counts down from `attackInterval` (2 s). Then it starts `nextAttack`: a Charge first, then a Hair Ring, then a Leap, and round again.
 - **Attacking** (`Boss::attack` holds a `BossAttack`): every attack runs through the same three stages, `Warning`, `Active` and `Recovery`, and `stageSeconds` is the clock of the current one. When the recovery ends, the boss stalks again for another 2 s.
 
 **The Charge,** stage by stage:
@@ -44,6 +45,14 @@ The game executable draws it:
 2. **Active, 0.15 s.** On its first step the boss spits: `StepBoss` returns `spitHairRing`, and `SpitHairRing` spawns one strand for each of 48 directions 7.5 degrees apart, minus the 6 around the gap. That is 42 strands and a 45 degree gap. Each strand leaves the edge of the body at 220 units/s, with a radius of 8, and flies 900 units at most.
 3. **Recovery, 0.8 s.** The boss stands still, deflated: the opening to punish it.
 
+**The Leap,** stage by stage:
+
+1. **Warning, 1.35 s.** The boss crouches for 0.35 s. Its shadow appears under the player, with the edge of the landing zone (100 units around it) drawn faintly on the floor. Then the boss leaves the ground for 1 s. In the air it is not a body: it does not collide, take bullets or hurt on touch, and it is drawn above everything, in an arc over the floor. Its shadow grows and follows the player at 200 units/s, a third slower than the player runs, then locks for the last 0.35 s, and the zone's edge turns bright.
+2. **Active, 0.15 s.** It lands on the shadow: `StepBoss` returns `landed`, and `LandLeap` hurts a player inside the landing zone for 35 and throws them out at 600 units/s. A shockwave leaves the edge of the body: a ring that grows at 380 units/s, faster than the player runs, up to 420 units. Its band, 20 units wide, hurts for 20 once.
+3. **Recovery, 1 s.** The boss sits where it landed: the opening to punish it.
+
+The landing zone can be escaped on foot only by moving from the start of the jump: the shadow is slower than the player, so it falls behind. A player who only starts running when it locks covers about 100 units before the landing, not enough to leave the 120 unit reach of the zone (its radius plus the player's), so then only the dash helps. The shockwave cannot be outrun at all: it is dashed through, or it reaches the end of its range first.
+
 **The strands** fly in their own pool, `World::hostileProjectiles`. Every step, after contact damage, `StepHostileProjectiles` moves each one and sweeps it against the player with `SweepCircle`, the test bullets use. A dashing player is not there for them: the strand flies on. Otherwise the strand hurts the player for 15 through `HurtPlayer` and is spent, even when the invulnerability window keeps it from hurting. A strand is also gone at a wall or at the end of its range. Strands ignore hairballs, the boss and the player's bullets.
 
 **Every fixed step,** after the player and the hairballs have moved:
@@ -52,7 +61,7 @@ The game executable draws it:
 2. **Collide.** The collision passes treat the boss as one more body (see [Collisions](COLLISIONS.md)). At weight 40 against the player's 4, the player takes 91% of any overlap, so the boss shoves the player and the player cannot shove it. A dashing player passes through it, and a charging boss passes through the player.
 3. **Take bullets.** For each bullet, `FirstHit` sweeps it against every hairball and the boss, and the body it touches first takes it. `HitBoss` takes the bullet's damage and starts a 0.1 s flash. No stun and no knockback.
 4. **Hurt on touch.** `ApplyContactDamage` checks the boss before the hairballs. A touch takes 20, or 30 plus the knockback while it charges, through `HurtPlayer`, the single door for damage (see [Health](HEALTH.md)). A dash protects from both.
-5. **Fly the strands.** After the bodies, so when the boss's body and a strand reach the player in the same step, the heavier hit is the one that lands.
+5. **Fly the strands and grow the shockwaves.** After the bodies, so when the boss's body and a strand or a wave reach the player in the same step, the heavier hit is the one that lands. A wave hurts once, the first time its band reaches the player; like a strand, it passes a dashing player by, and any other touch spends it, even inside the invulnerability window. So a player caught by the impact is not hit again by the wave that leaves under them.
 
 **The camera** follows `CameraFocus`: the player, pulled 40% of the way toward the boss, but never more than 200 units. See [Camera](CAMERA.md).
 
@@ -83,6 +92,11 @@ The game executable draws it:
 - **The dash goes through strands.** The ring is the attack that teaches the dash timing: dash into the ring just before it reaches you, and come out inside it, like a roll through an attack in Dark Souls.
 - **The ring is slower than the player.** At 220 units/s it is something to read and walk away from, not a bullet. Its danger is its size.
 - **Dense close up, sparse far away.** At 250 units from the boss the strands are 33 units apart, which leaves 17 units between them, too narrow for the player's 40 unit body. Past about 430 units the openings are wide enough to slip through. I left it that way: distance is a fair defence, and the Charge punishes standing far away.
+- **The Leap's shadow follows, then locks, like the Charge's aim.** The same rule in a new shape: the warning shows where, and it stops following just before the hit, so the answer is to move at the right moment. The shadow is slower than the player, so moving early is a second answer, and the dash is the third.
+- **In the air the boss is not a body.** Bullets would hit a boss high above the floor, and a body in the collisions would shove the player around from the sky. Out of reach for a second, it gives the player time to look at the shadow instead of shooting.
+- **The landing is two hits, but costs one.** The impact punishes standing under the shadow, and the shockwave punishes standing anywhere near. A player caught by the impact is still blinking when the wave passes, and the wave is spent, so one mistake costs one hit.
+- **A shockwave cannot be outrun.** At 380 units/s against the player's 300, the only answers are being far enough away (420 units) or dashing through its band. That makes the Leap the attack that tests the dash timing against something that comes at the player, where the Hair Ring tests it against something to walk through.
+- **Shockwaves are a component and a pool of their own.** They grow instead of flying, and they hit with a band instead of a circle, so they are not `Projectile`s. A pool of 8 keeps the second phase's leaps, and any other attack that needs a wave, free of allocations.
 - **Waves and a turning gap are already numbers.** `waves`, `waveIntervalSeconds` and `gapTurnDegrees` are 1, 0.4 s and 0 degrees today. Rings in quick succession, or a gap that sweeps around the boss, are for the combos on day 7 and the second phase, and they will need new numbers, not new code.
 - **No stagger and no knockback from bullets.** The SMG hits ten times a second. If each bullet staggered the boss, the SMG would lock it in place, and the fight would be about holding the button. The openings to punish it come from its own attacks (the recovery after each one) and will come from its shield.
 - **Heavy, but not immovable.** Weight 40 means the boss wins every shove, which is what a giant should feel like. An infinite weight would need a special case in `SeparateCircles`, and nothing in the fight needs it.
@@ -115,12 +129,18 @@ The game executable draws it:
 | Strand speed, range, radius and damage | `HairRingStats::speed`, `range`, `strandRadius`, `damage` | 220 units/s, 900 units, 8 units, 15 |
 | Rings per attack, time between them, turn of the gap | `HairRingStats::waves`, `waveIntervalSeconds`, `gapTurnDegrees` | 1, 0.4 s, 0 degrees |
 | Strands in flight at most | `kMaxHostileProjectiles` (`src/core/World.h`) | 128, three rings |
+| Leap crouch, air time, and the locked part of it | `LeapStats::crouchSeconds`, `airSeconds`, `lockSeconds` | 0.35 s, 1 s, the last 0.35 s |
+| Shadow speed | `LeapStats::shadowSpeed` | 200 units/s |
+| Landing zone, impact damage and knockback | `LeapStats::impactRadius`, `impactDamage`, `impactKnockback` | 100 units, 35, 600 units/s |
+| Landing and recovery | `LeapStats::landingSeconds`, `recoverySeconds` | 0.15 s, 1 s |
+| Shockwave speed, reach, band and damage | `LeapStats::shockwave` (`ShockwaveStats`, `src/core/Shockwave.h`) | 380 units/s, 420 units, 20 units, 20 |
+| Shockwaves at once at most | `kMaxShockwaves` (`src/core/World.h`) | 8 |
 | Arena | `kBossArena` (`src/core/World.h`) | 1640x1040 |
 | Starting distance | `kStartingDistance` (`src/core/World.h`) | 400 units |
 | Camera lean and its cap | `kBossFraming`, `kMaxBossFramingOffset` (`src/core/World.cpp`) | 40%, 200 units |
-| Look | `kBossStyle`, `kBossBar`, the boss bar constants and the `kCharge...`, `kStun...`, `kRing...` and `kStrand...` constants (`src/app/Game.cpp`) | |
+| Look | `kBossStyle`, `kBossBar`, the boss bar constants and the `kCharge...`, `kStun...`, `kRing...`, `kStrand...`, `kLeap...` and `kShockwave` constants (`src/app/Game.cpp`) | |
 
-In a Debug build, `F1` shows the boss's health next to the shots fired and hit, the strands in flight (`hair`), and what the boss is doing: stalking and the time to its next attack, or the attack, its stage and its clock. `F4` defeats the boss at once (`DefeatBoss`), to reach the victory screen without shooting.
+In a Debug build, `F1` shows the boss's health next to the shots fired and hit, the strands in flight (`hair`), the shockwaves (`waves`), and what the boss is doing: stalking and the time to its next attack, or the attack, its stage, its clock, and whether it is in the air. `F4` defeats the boss at once (`DefeatBoss`), to reach the victory screen without shooting.
 
 ## Tests
 
@@ -133,13 +153,20 @@ In a Debug build, `F1` shows the boss's health next to the shots fired and hit, 
   - a charge path runs its full distance in the open and stops at the first wall, also on a diagonal;
   - a dead boss drops its attack and stays where it fell.
 - `tests/core/BossHairRingTests.cpp`, on the boss alone:
-  - the attacks take turns: a charge, then a hair ring, then a charge again;
+  - the attacks take turns: a charge, a hair ring, a leap, then a charge again;
   - during the warning the boss holds its ground, and the gap opens 90 degrees from the player and stays there when the player moves;
   - the gap opens on one side of the player, and on the other side the next time;
   - the ring is spat once, as the warning ends, and the boss stalks again after the recovery;
   - a ring has a strand in every slot but the gap, evenly spaced, and none inside the gap;
   - a strand leaves the edge of the body and flies at the ring's speed for its range;
   - with more waves, each ring leaves after the wave interval and turns the gap.
+- `tests/core/BossLeapTests.cpp`, on the boss alone:
+  - the leap crouches on the ground, then takes off;
+  - the shadow appears under the player, follows them at its speed, then locks;
+  - the boss flies to its shadow and lands on it, once;
+  - the shadow stays where the whole body fits inside the arena;
+  - after landing the boss recovers for a second, then stalks with the whole interval ahead.
+- `tests/core/ShockwaveTests.cpp`: a shockwave grows at its speed and dies out past its reach; only the band of the ring touches, not inside it and not outside it.
 - `tests/core/BossTests.cpp`, in a world:
   - the boss walks toward the player, slower than a hairball;
   - it stops when it touches the player, and pushes the player rather than being pushed;
@@ -157,18 +184,25 @@ In a Debug build, `F1` shows the boss's health next to the shots fired and hit, 
   - a dash through the ring takes no damage, and the strands fly on;
   - the strands hurt only the player: hairballs, the boss and bullets let them through;
   - a strand that reaches a wall is gone at once;
+  - landing on the player takes the impact's damage once and throws them out from under the boss;
+  - in the air the boss is not a body: it does not block, take bullets or hurt;
+  - the shockwave hurts a player outside the landing zone once, when its band arrives;
+  - a dash through the shockwave takes no damage;
+  - beyond the shockwave's reach the landing is harmless;
+  - running from the takeoff escapes the landing, but starting only when the shadow locks does not;
   - a new fight starts with the camera settled between the player and the boss, with both in view;
   - the camera keeps a far boss in mind without pushing the player off screen;
   - once the boss is dead, the camera goes back to the player alone.
 - `tests/core/WorldTests.cpp`: a new world has the boss in the middle and the player south of it, facing it; nobody leaves the arena, the boss included; and two worlds with the boss, hairballs and the same inputs end in exactly the same state, strands included.
 - `tests/core/SessionTests.cpp`: standing still in front of the boss ends in death between 6.5 and 7.5 seconds in (7.1 in practice: the charge hits for 30 at about 2.9 s and ends stunned against the wall next to the player, then four touches 0.8 s apart; the Hair Ring that comes next starts its warning at 6.6 s, too late to matter); and the last bullet into the boss wins the fight in the step it lands.
 
-The drawing is not unit tested, because it needs a window. I checked it in a Release build with captures that never touch the real keyboard or mouse. For the Charge, standing still from the start: the path following the player, the brighter locked path with the boss crouched, the ghosts behind the running boss, the stun stars with the player's health at 70, and the "YOU DIED" screen at 0:07. For the Hair Ring, standing still dies before the first ring, so I drove the player with key presses posted to the game's window: a sidestep out of the Charge, a walk north, then a run into the gap. The captures show the swollen boss with the red ring and the pale lane, the ring leaving the boss, and the ring passing the player in the gap at full health. A first run that stopped at the edge of the gap took 15. In a Debug build, `F1` read "ring warning" during the warning and 42 strands in flight after the spit. Dodging with the dash, punishing the recovery and how the timing feels need someone playing, so I check them by playing.
+The drawing is not unit tested, because it needs a window. I checked it in a Release build with captures that never touch the real keyboard or mouse. For the Charge, standing still from the start: the path following the player, the brighter locked path with the boss crouched, the ghosts behind the running boss, the stun stars with the player's health at 70, and the "YOU DIED" screen at 0:07. For the Hair Ring, standing still dies before the first ring, so I drove the player with key presses posted to the game's window: a sidestep out of the Charge, a walk north, then a run into the gap. The captures show the swollen boss with the red ring and the pale lane, the ring leaving the boss, and the ring passing the player in the gap at full health. A first run that stopped at the edge of the gap took 15. For the Leap, the same run went on: the shadow under the player, the boss in the air with the shadow lagging behind the running player, the landing next to the player at 60 health, and a dash through the shockwave that left the player at 60 and the wave unspent. Runs that started running too late took the impact (60 to 25), and a dash pressed too late took the wave (60 to 40). In a Debug build, `F1` read "leap warning 0.90 airborne" and showed the seed. In a Debug build, `F1` read "ring warning" during the warning and 42 strands in flight after the spit. Dodging with the dash, punishing the recovery and how the timing feels need someone playing, so I check them by playing.
 
 ## Limitations
 
-- **The attacks always come in the same order.** Charge, then Hair Ring. The Leap and the choice between attacks (weighted, seeded, never the same twice in a row) come on day 7.
+- **The attacks always come in the same order.** Charge, Hair Ring, Leap. The choice between them (weighted, seeded, never the same twice in a row) comes next.
 - **One bar is the whole fight.** Emptying it wins at once. The transformation and the second phase come on day 8.
+- **The Leap's arc is drawn, not simulated.** The body's position moves straight from the takeoff to the shadow, and the height is only an offset in the drawing. Nothing in the fight needs a third dimension.
 - **The crouch and the swell change the size, not the shape.** The body is drawn with circles, so it gets smaller or bigger instead of flatter or rounder. Squash and stretch come with the art pass.
 - **A strand is a dot with a short tail.** Real hair, and strands that fall to the floor at the end of their range, come with the art pass.
 - **At the south wall the boss is partly hidden by the HUD.** The boss bar and the controls line cover the bottom of the screen, where the camera stops for the south wall. The art pass will rework the HUD.

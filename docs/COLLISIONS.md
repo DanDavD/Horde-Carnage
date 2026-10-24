@@ -14,7 +14,7 @@ The rules live in `horde_core`:
 
 Every fixed step, `StepWorld` first moves everyone (the player with its input, the hairballs with their chase input, and the boss as it stalks or attacks). Only then does it resolve collisions, in 4 passes. Each pass:
 
-1. **Checks every pair once:** the player against the boss, the player and the boss against each hairball, and each hairball against every hairball after it in the list. A dashing player is left out, so a dash passes through bodies (see [Player abilities](ABILITIES.md)). A dead boss is left out too, and so is the pair of the player and a charging boss: at the charge's speed a shove would carry the player across the arena, so the run goes through them instead (see [The boss](BOSS.md)).
+1. **Checks every pair once:** the player against the boss, the player and the boss against each hairball, and each hairball against every hairball after it in the list. A dashing player is left out, so a dash passes through bodies (see [Player abilities](ABILITIES.md)). A dead boss is left out too, and so is a boss in the air during its Leap, and the pair of the player and a charging boss: at the charge's speed a shove would carry the player across the arena, so the run goes through them instead (see [The boss](BOSS.md)).
 
 2. **Separates each overlapping pair** with `SeparateCircles`:
    1. If the distance between the centres is less than the sum of the radii, the circles overlap by the difference.

@@ -68,12 +68,12 @@ float DegreesBetween(Vec2 a, Vec2 b) {
 
 } // namespace
 
-TEST_CASE("the attacks take turns: a charge, then a hair ring, then a charge again") {
+TEST_CASE("the attacks take turns: a charge, a hair ring, a leap, then a charge again") {
     Boss boss;
     boss.motion = horde::MotionAt(kCenter);
     std::vector<AttackKind> started;
     bool attacking = false;
-    for (int i = 0; i < 60 * 30 && started.size() < 4; ++i) {
+    for (int i = 0; i < 60 * 40 && started.size() < 4; ++i) {
         Step(boss, kSouth, 1);
         if (boss.attack && !attacking) {
             started.push_back(boss.attack->kind);
@@ -83,8 +83,8 @@ TEST_CASE("the attacks take turns: a charge, then a hair ring, then a charge aga
     REQUIRE(started.size() == 4);
     CHECK(started[0] == AttackKind::Charge);
     CHECK(started[1] == AttackKind::HairRing);
-    CHECK(started[2] == AttackKind::Charge);
-    CHECK(started[3] == AttackKind::HairRing);
+    CHECK(started[2] == AttackKind::Leap);
+    CHECK(started[3] == AttackKind::Charge);
 }
 
 TEST_CASE("during the warning the boss holds its ground, and the gap opens 90 degrees from the player") {
@@ -139,7 +139,7 @@ TEST_CASE("the ring is spat once, as the warning ends, and the boss stalks again
     CHECK(rings == 0);
     CHECK(steps == doctest::Approx(57).epsilon(0.05));
     CHECK(boss.secondsUntilAttack == boss.attackInterval);
-    CHECK(boss.nextAttack == AttackKind::Charge);
+    CHECK(boss.nextAttack == AttackKind::Leap);
 }
 
 TEST_CASE("a ring has a strand in every slot but the gap, evenly spaced, and none inside the gap") {

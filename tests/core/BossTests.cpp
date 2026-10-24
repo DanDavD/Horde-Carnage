@@ -65,6 +65,42 @@ World AboutToSpit(Vec2 offset) {
     return world;
 }
 
+// The boss in the middle, starting a Leap on the next step, with the player standing `offset` away. Its
+// shadow is pinned where the player starts, so the test knows where the boss comes down: `Landing`.
+World AboutToLeap(Vec2 offset) {
+    World world = NewFight();
+    world.player.motion = horde::MotionAt(world.boss.motion.position + offset);
+    world.boss.nextAttack = horde::AttackKind::Leap;
+    world.boss.secondsUntilAttack = 0.0f;
+    world.boss.leap.shadowSpeed = 0.0f;
+    return world;
+}
+
+Vec2 Landing(const World& world) {
+    REQUIRE(world.boss.attack);
+    return world.boss.attack->target;
+}
+
+// Plays a Leap to its landing with the player running east, starting `delay` seconds after the boss
+// leaves the ground. The shadow follows, as in the game.
+void LeapRunningEast(World& world, float delay) {
+    world.boss.leap.shadowSpeed = horde::LeapStats{}.shadowSpeed;
+    Step(world, PlayerCommands{}, 1);
+    float airborne = 0.0f;
+    while (world.boss.attack && world.boss.attack->stage == AttackStage::Warning) {
+        const bool run = horde::IsAirborne(world.boss) && airborne >= delay;
+        Step(world, PlayerCommands{.move = run ? Vec2{1.0f, 0.0f} : Vec2{}}, 1);
+        airborne += horde::IsAirborne(world.boss) ? kDt : 0.0f;
+    }
+}
+
+// How far the shockwave's front is from reaching the player. Negative once it has.
+float ShockwaveGap(const World& world) {
+    REQUIRE(world.shockwaves.Size() == 1);
+    const horde::Shockwave& wave = world.shockwaves[0];
+    return Distance(wave.center, world.player.motion.position) - world.player.radius - wave.radius;
+}
+
 // How far the strand nearest to the player is from touching them. Negative once it overlaps.
 float NearestStrandGap(const World& world) {
     float nearest = std::numeric_limits<float>::infinity();
@@ -340,4 +376,89 @@ TEST_CASE("a strand that reaches a wall is gone at once") {
                                                            world.boss.hairRing.speed, world.boss.hairRing.range));
     Step(world, PlayerCommands{}, 1);
     CHECK(world.hostileProjectiles.Empty());
+}
+
+TEST_CASE("landing on the player takes the impact's damage once and throws them out from under the boss") {
+    World world = AboutToLeap(Vec2{0.0f, 200.0f});
+    const horde::Player& player = world.player;
+    for (int i = 0; i < 120 && player.health.current == player.health.max; ++i) {
+        Step(world, PlayerCommands{}, 1);
+    }
+    const horde::LeapStats& leap = world.boss.leap;
+    REQUIRE(player.health.current == player.health.max - leap.impactDamage);
+    CHECK(horde::Length(player.motion.velocity) > leap.impactKnockback * 0.5f);
+
+    // The shockwave leaves through the player inside the window after the impact: one landing, one hit.
+    Step(world, PlayerCommands{}, 30);
+    CHECK(player.health.current == player.health.max - leap.impactDamage);
+    CHECK(Distance(player.motion.position, world.boss.motion.position) >= world.boss.radius + player.radius - 0.1f);
+}
+
+TEST_CASE("in the air the boss is not a body: it does not block, take bullets or hurt") {
+    World world = AboutToLeap(Vec2{0.0f, 200.0f});
+    for (int i = 0; i < 60 && !horde::IsAirborne(world.boss); ++i) {
+        Step(world, PlayerCommands{}, 1);
+    }
+    REQUIRE(horde::IsAirborne(world.boss));
+
+    // The player stands right under the flying boss and shoots straight up through it.
+    world.player.motion = horde::MotionAt(world.boss.motion.position);
+    world.bullets.Spawn(horde::MakeBullet(world.boss.motion.position + Vec2{0.0f, 100.0f}, Vec2{0.0f, -1.0f},
+                                          horde::kPistol));
+    const Vec2 under = world.player.motion.position;
+    Step(world, PlayerCommands{}, 10);
+    REQUIRE(horde::IsAirborne(world.boss));
+    CHECK(world.player.motion.position == under);
+    CHECK(world.player.health.current == world.player.health.max);
+    CHECK(world.boss.health.current == world.boss.health.max);
+}
+
+TEST_CASE("the shockwave hurts a player outside the landing zone once, when its band arrives") {
+    World world = AboutToLeap(Vec2{0.0f, 200.0f});
+    Step(world, PlayerCommands{}, 1);
+    world.player.motion = horde::MotionAt(Landing(world) + Vec2{220.0f, 0.0f});
+    const horde::Player& player = world.player;
+    for (int i = 0; i < 180 && player.health.current == player.health.max; ++i) {
+        Step(world, PlayerCommands{}, 1);
+    }
+    CHECK(player.health.current == player.health.max - world.boss.leap.shockwave.damage);
+    // Long after the window has closed, the same wave cannot hurt again.
+    Step(world, PlayerCommands{}, 60);
+    CHECK(player.health.current == player.health.max - world.boss.leap.shockwave.damage);
+}
+
+TEST_CASE("a dash through the shockwave takes no damage") {
+    World world = AboutToLeap(Vec2{0.0f, 200.0f});
+    Step(world, PlayerCommands{}, 1);
+    world.player.motion = horde::MotionAt(Landing(world) + Vec2{350.0f, 0.0f});
+    for (int i = 0; i < 180 && (world.shockwaves.Empty() || ShockwaveGap(world) > 8.0f); ++i) {
+        Step(world, PlayerCommands{}, 1);
+    }
+    REQUIRE(ShockwaveGap(world) <= 8.0f);
+
+    // Toward the landing point, through the band.
+    Step(world, PlayerCommands{.move = {-1.0f, 0.0f}, .dashPressed = true}, 1);
+    Step(world, PlayerCommands{}, 40);
+    CHECK(world.player.health.current == world.player.health.max);
+}
+
+TEST_CASE("beyond the shockwave's reach the landing is harmless") {
+    World world = AboutToLeap(Vec2{0.0f, 200.0f});
+    Step(world, PlayerCommands{}, 1);
+    world.player.motion = horde::MotionAt(Landing(world) + Vec2{500.0f, 0.0f});
+    world.boss.stats.maxSpeed = 0.0f; // So it does not walk over once the leap is done.
+    Step(world, PlayerCommands{}, 180);
+    CHECK(world.shockwaves.Empty());
+    CHECK(world.player.health.current == world.player.health.max);
+}
+
+TEST_CASE("running from the takeoff escapes the landing, but starting only when the shadow locks does not") {
+    World early = AboutToLeap(Vec2{0.0f, 200.0f});
+    LeapRunningEast(early, 0.0f);
+    CHECK(early.player.health.current == early.player.health.max);
+
+    World late = AboutToLeap(Vec2{0.0f, 200.0f});
+    const horde::LeapStats& leap = late.boss.leap;
+    LeapRunningEast(late, leap.airSeconds - leap.lockSeconds);
+    CHECK(late.player.health.current == late.player.health.max - leap.impactDamage);
 }

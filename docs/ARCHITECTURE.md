@@ -36,14 +36,14 @@ The simulation never reads a key or the mouse. Every step, `Game::Update` turns 
 
 ### The world
 
-`World` (`src/core/World.h`) holds everything the simulation needs as plain data: the arena, the player, the boss, the hairballs, the player's bullets, the boss's projectiles and the camera. Hairballs and both kinds of projectile live in fixed-size pools inside it (see [Object pool](OBJECT_POOL.md)), so a running game never allocates memory. Two functions work on it:
+`World` (`src/core/World.h`) holds everything the simulation needs as plain data: the arena, the player, the boss, the hairballs, the player's bullets, the boss's projectiles and shockwaves, the camera, and a seeded random generator (see [Random numbers](RANDOM.md)). Hairballs, projectiles and shockwaves live in fixed-size pools inside it (see [Object pool](OBJECT_POOL.md)), so a running game never allocates memory. Two functions work on it:
 
-- `CreateWorld` builds the starting state: the boss in the middle of the arena, the player south of it and facing it, and the camera on both.
-- `StepWorld` advances it by one fixed step, in this order: the invulnerability window and the dash cooldown, the player (start a dash or a drink, the drink, the dash or normal movement, aim, weapons), every hairball (chase, movement) and then the boss (`StepBoss`: stalking, or the stage of its attack, and the strands of a Hair Ring spawned into their pool when it spits), collisions between bodies and the walls (four passes, see [Collisions](COLLISIONS.md)), bullets and their hits (see [Bullets and hits](BULLETS.md)), dead hairballs removed, contact damage (see [Health](HEALTH.md)), the boss's strands and their hits on the player (see [The boss](BOSS.md)), then the camera, which follows a point between the player and the boss (see [Camera](CAMERA.md)).
+- `CreateWorld` builds the starting state: the boss in the middle of the arena, the player south of it and facing it, the camera on both, and the random generator seeded with the seed it is given.
+- `StepWorld` advances it by one fixed step, in this order: the invulnerability window and the dash cooldown, the player (start a dash or a drink, the drink, the dash or normal movement, aim, weapons), every hairball (chase, movement) and then the boss (`StepBoss`: stalking, or the stage of its attack, the strands of a Hair Ring spawned into their pool when it spits, and the impact and shockwave of a Leap when it lands), collisions between bodies and the walls (four passes, see [Collisions](COLLISIONS.md)), bullets and their hits (see [Bullets and hits](BULLETS.md)), dead hairballs removed, contact damage (see [Health](HEALTH.md)), the boss's strands and shockwaves and their hits on the player (see [The boss](BOSS.md)), then the camera, which follows a point between the player and the boss (see [Camera](CAMERA.md)).
 
 ### The session
 
-`Session` (`src/core/Session.h`) wraps the world in a small state machine: `Playing` steps the world, `Victory` freezes it once the boss is defeated, and `Dead` freezes it once the player's health reaches 0. `TryRestart` replaces the world with a fresh one from `CreateWorld`, and the session keeps the attempt count across it. See [Game flow](GAME_FLOW.md).
+`Session` (`src/core/Session.h`) wraps the world in a small state machine: `Playing` steps the world, `Victory` freezes it once the boss is defeated, and `Dead` freezes it once the player's health reaches 0. `TryRestart` replaces the world with a fresh one from `CreateWorld`, with the next seed, and the session keeps the attempt count across it. See [Game flow](GAME_FLOW.md).
 
 `Game` owns one `Session`. It reads the input, calls `StepSession`, and draws the result. It never changes the world itself.
 
@@ -75,7 +75,8 @@ Game objects are plain structs (components) that hold data, and free functions (
 - `tests/core/Vec2Tests.cpp`, `MovementTests.cpp`, `FacingTests.cpp`, `ArenaTests.cpp` and `AnalogInputTests.cpp`: see [Movement](MOVEMENT.md#tests).
 - `tests/core/FollowCameraTests.cpp`: see [Camera](CAMERA.md#tests).
 - `tests/core/ChaseTests.cpp` and `WorldTests.cpp`: see [Enemies](ENEMIES.md#tests).
-- `tests/core/BossTests.cpp`, `BossChargeTests.cpp` and `BossHairRingTests.cpp`: see [The boss](BOSS.md#tests).
+- `tests/core/BossTests.cpp`, `BossChargeTests.cpp`, `BossHairRingTests.cpp`, `BossLeapTests.cpp` and `ShockwaveTests.cpp`: see [The boss](BOSS.md#tests).
+- `tests/core/RandomTests.cpp`: see [Random numbers](RANDOM.md#tests).
 - `tests/core/CollisionTests.cpp`
  and the crowd cases in `WorldTests.cpp`: see [Collisions](COLLISIONS.md#tests).
 - `tests/core/HealthTests.cpp` and the contact damage cases in `WorldTests.cpp`: see [Health](HEALTH.md#tests).

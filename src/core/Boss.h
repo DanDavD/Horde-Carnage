@@ -6,14 +6,16 @@
 #include "core/Health.h"
 #include "core/Movement.h"
 #include "core/Projectile.h"
+#include "core/Shockwave.h"
 #include "core/Vec2.h"
 
 namespace horde {
 
-/// The boss's attacks. The Leap joins them on day 7.
+/// The boss's three attacks of the first phase.
 enum class AttackKind {
     Charge,   ///< Crouches, then runs in a straight line across the arena.
     HairRing, ///< Swells, then spits a ring of hair in every direction but one gap.
+    Leap,     ///< Jumps, comes down on its shadow and sends a shockwave across the floor.
 };
 
 /// Every attack runs through the same three stages, so the player learns one rhythm: a warning that shows
@@ -35,6 +37,9 @@ struct BossAttack {
     float distanceLeft = 0.0f; ///< Charge: how much of the run is left while it is active.
     bool stunned = false;      ///< Charge: it ran into a wall, so the recovery is the long one.
     int wavesSpat = 0;         ///< Hair Ring: how many of its rings it has spat so far.
+    Vec2 takeoff; ///< Leap: where it left the ground.
+    /// Leap: where it will land, drawn as its shadow. It follows the player through the air until it locks.
+    Vec2 target;
 };
 
 /// The numbers of the Charge.
@@ -70,7 +75,6 @@ struct HairRingStats {
     float gapAngleDegrees = 90.0f;
     float speed = 220.0f; ///< Units per second. Slower than the player, so the gap can be reached on foot.
     float range = 900.0f; ///< Units a strand flies at most, unless a wall stops it first.
-
     float strandRadius = 8.0f;
     int damage = 15; ///< Per strand. The invulnerability window after a hit lets only one land.
     int waves = 1;   ///< Rings per attack.
@@ -78,10 +82,34 @@ struct HairRingStats {
     float gapTurnDegrees = 0.0f;      ///< How far the gap turns from one ring to the next.
 };
 
-/// What a boss step asks of the world. The boss decides when to spit, but its projectiles live in the
-/// world's pool, so the world spawns them.
+/// The numbers of the Leap.
+struct LeapStats {
+    float crouchSeconds = 0.35f; ///< On the ground, gathering itself, before it leaves it.
+    /// In the air, out of reach, while its shadow on the floor shows where it will land.
+    float airSeconds = 1.0f;
+    /// The last part of the air time, in which the shadow stops following the player. Running out from
+    /// under it before then only drags it along.
+    float lockSeconds = 0.35f;
+    /// How fast the shadow follows the player, in units per second. A third slower than the player runs, so
+    /// a player who keeps moving from the takeoff gets out from under it. One who only starts running when
+    /// it locks covers about 100 units, not enough to leave the landing zone: then only the dash helps.
+    float shadowSpeed = 200.0f;
+    /// The landing zone around the shadow's centre, a little wider than the body. A player inside it when
+    /// the boss lands takes the impact.
+    float impactRadius = 100.0f;
+    int impactDamage = 35;
+    float impactKnockback = 600.0f; ///< Units per second added to the player, away from the landing.
+    float landingSeconds = 0.15f;   ///< The impact itself, the active stage.
+    float recoverySeconds = 1.0f;   ///< Sunk into the floor after landing: the opening to punish it.
+    ShockwaveStats shockwave;       ///< The ring that leaves the landing point.
+};
+
+/// What a boss step asks of the world. The boss decides when to spit and when it lands, but its
+/// projectiles and shockwaves live in the world's pools, and the impact hurts the player, so the world
+/// does those.
 struct BossActions {
     bool spitHairRing = false; ///< Spawn a ring now, around the gap in `BossAttack::direction`.
+    bool landed = false;       ///< It just came down from a Leap: the impact, and a shockwave from its body.
 };
 
 /// Where a charge would end: after its full distance, or earlier, where the body meets a wall.
@@ -99,7 +127,7 @@ struct ChargePath {
 ///
 /// Between attacks it stalks: it walks at the player for `attackInterval` seconds. Then it attacks, and
 /// the attack runs through its warning, active and recovery stages before it stalks again. For now the
-/// attacks take turns: a Charge, then a Hair Ring.
+/// attacks take turns: a Charge, a Hair Ring, then a Leap.
 ///
 /// A dead boss takes no part in the simulation: it does not chase, attack, block, take bullets or hurt.
 struct Boss {
@@ -124,6 +152,7 @@ struct Boss {
     int ringsStarted = 0; ///< Hair Rings started this fight. The gap opens on one side, then the other.
     ChargeStats charge;
     HairRingStats hairRing;
+    LeapStats leap;
 };
 
 /// Advances the boss by one fixed step: the walk while it stalks, and every stage of its attack. Pushing
@@ -135,6 +164,10 @@ BossActions StepBoss(Boss& boss, Vec2 playerPosition, float playerRadius, const 
 /// Whether the boss is in the middle of a run. A running boss goes through the player instead of shoving
 /// them, and hits harder.
 [[nodiscard]] bool IsCharging(const Boss& boss);
+
+/// Whether the boss is in the air during a Leap. Up there it is not a body: it does not collide, take
+/// bullets or hurt on touch.
+[[nodiscard]] bool IsAirborne(const Boss& boss);
 
 /// The path of a charge from `start` along `direction` (length 1), for a body of `radius`: the full
 /// `distance`, or less if a wall comes first. The simulation runs along it and the warning draws it, so

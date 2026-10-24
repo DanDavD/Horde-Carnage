@@ -4,6 +4,7 @@
 #include <cmath>
 #include <cstddef>
 #include <numbers>
+#include <random>
 #include <string>
 
 #include <raylib.h>
@@ -55,6 +56,14 @@ constexpr float kRingMarkWidth = 10.0f;
 constexpr float kRingLaneLength = 420.0f;
 constexpr float kStrandTail = 12.0f;
 constexpr float kDegreesPerRadian = 180.0f / std::numbers::pi_v<float>;
+// The Leap. The boss crouches by this fraction before it jumps, then flies in an arc this high above the
+// floor, drawn up to this much bigger at the top, as if closer to the camera. It lands a little squashed.
+// Its shadow grows from a fraction of the body to the whole landing zone.
+constexpr float kLeapCrouch = 0.15f;
+constexpr float kLeapHeight = 220.0f;
+constexpr float kLeapGrow = 0.3f;
+constexpr float kLeapLandingSquash = 0.12f;
+constexpr float kLeapShadowStart = 0.3f;
 // While invulnerable the player blinks: faded for one period, solid for the next.
 constexpr float kBlinkPeriod = 0.1f;
 constexpr float kBlinkFade = 0.35f;
@@ -113,6 +122,8 @@ constexpr Color kStunStar{255, 225, 130, 255};
 // hurts. The gap lane is the one pale, safe thing in the warning.
 constexpr Color kStrand{225, 130, 110, 255};
 constexpr Color kRingLane{205, 205, 220, 255};
+// The shockwave is dust thrown up by the landing, red where it still hurts.
+constexpr Color kShockwave{230, 120, 95, 255};
 constexpr Color kBarBack{50, 20, 24, 255};
 constexpr Color kBarHurt{255, 140, 120, 255};
 constexpr Color kBarEdge{120, 100, 110, 255};
@@ -306,6 +317,26 @@ void DrawChargeTelegraph(const Boss& boss, const Arena& arena) {
     }
 }
 
+// The Leap's landing on the floor: a shadow that grows as the boss comes down, and the edge of the landing
+// zone around it, faint while it still follows the player and bright once it locks.
+void DrawLeapTelegraph(const Boss& boss) {
+    if (IsDead(boss.health) || !InAttack(boss, AttackKind::Leap, AttackStage::Warning)) {
+        return;
+    }
+    const BossAttack& leap = *boss.attack;
+    const LeapStats& stats = boss.leap;
+    const float airborne = std::max(leap.stageSeconds - stats.crouchSeconds, 0.0f);
+    const float progress = std::min(airborne / stats.airSeconds, 1.0f);
+    const bool locked = airborne > stats.airSeconds - stats.lockSeconds;
+    const Vector2 center = ToRaylib(leap.target);
+
+    const float shadow = stats.impactRadius * (kLeapShadowStart + (1.0f - kLeapShadowStart) * progress);
+    DrawCircleV(center, shadow, Fade(BLACK, 0.2f + 0.35f * progress));
+    const float edge = locked ? 4.0f : 2.0f;
+    DrawRing(center, stats.impactRadius - edge, stats.impactRadius, 0.0f, 360.0f, 64,
+             Fade(kBlood, locked ? 0.95f : 0.25f + 0.25f * progress));
+}
+
 // The Hair Ring on the floor while the boss swells: a red band around the body wherever a strand will leave,
 // thicker and brighter as the spit comes closer, and the gap as a pale lane running out from the body, so
 // the player can see from anywhere which way is safe.
@@ -389,6 +420,33 @@ void DrawSpittingBoss(const Boss& boss, Vec2 position, Vec2 playerPosition) {
     DrawHairBody(position, radius, playerPosition, kBossStyle, boss.hitFlashSeconds > 0.0f);
 }
 
+// Crouches, flies up in an arc toward its shadow, growing as it rises, and lands squashed. In the air it is
+// drawn above everything else, since it is over the player's head.
+void DrawLeapingBoss(const Boss& boss, Vec2 position, Vec2 playerPosition) {
+    const BossAttack& leap = *boss.attack;
+    const LeapStats& stats = boss.leap;
+    float radius = boss.radius;
+    switch (leap.stage) {
+    case AttackStage::Warning: {
+        const float airborne = leap.stageSeconds - stats.crouchSeconds;
+        if (airborne <= 0.0f) {
+            radius *= 1.0f - kLeapCrouch * leap.stageSeconds / stats.crouchSeconds;
+            break;
+        }
+        const float arc = std::sin(std::numbers::pi_v<float> * std::min(airborne / stats.airSeconds, 1.0f));
+        position.y -= kLeapHeight * arc;
+        radius *= 1.0f + kLeapGrow * arc;
+        break;
+    }
+    case AttackStage::Active:
+        radius *= 1.0f + kLeapLandingSquash;
+        break;
+    case AttackStage::Recovery:
+        break;
+    }
+    DrawHairBody(position, radius, playerPosition, kBossStyle, boss.hitFlashSeconds > 0.0f);
+}
+
 void DrawBoss(const Boss& boss, Vec2 playerPosition, float alpha) {
     const Vec2 position = Lerp(boss.motion.previousPosition, boss.motion.position, alpha);
     if (IsDead(boss.health)) {
@@ -406,7 +464,20 @@ void DrawBoss(const Boss& boss, Vec2 playerPosition, float alpha) {
     case AttackKind::HairRing:
         DrawSpittingBoss(boss, position, playerPosition);
         break;
+    case AttackKind::Leap:
+        DrawLeapingBoss(boss, position, playerPosition);
+        break;
     }
+}
+
+// The band that hurts, fading as the ring spreads out. A wave that already hit the player is drawn faint,
+// so it is clear it cannot hurt again.
+void DrawShockwave(const Shockwave& wave) {
+    const ShockwaveStats& stats = wave.stats;
+    const float left = 1.0f - std::min(wave.radius / stats.reach, 1.0f);
+    const float inner = std::max(wave.radius - stats.thickness, 0.0f);
+    DrawRing(ToRaylib(wave.center), inner, wave.radius, 0.0f, 360.0f, 96,
+             Fade(kShockwave, (wave.spent ? 0.25f : 0.9f) * (0.3f + 0.7f * left)));
 }
 
 void DrawBullet(const Projectile& bullet, float alpha) {
@@ -593,6 +664,8 @@ const char* AttackKindLabel(AttackKind kind) {
         return "charge";
     case AttackKind::HairRing:
         return "ring";
+    case AttackKind::Leap:
+        return "leap";
     }
     return "";
 }
@@ -618,8 +691,8 @@ const char* BossStateLabel(const Boss& boss) {
         return TextFormat("stalk, attack in %.2f", boss.secondsUntilAttack);
     }
     const BossAttack& attack = *boss.attack;
-    return TextFormat("%s %s %.2f%s", AttackKindLabel(attack.kind), AttackStageLabel(attack.stage),
-                      attack.stageSeconds, attack.stunned ? " stunned" : "");
+    return TextFormat("%s %s %.2f%s%s", AttackKindLabel(attack.kind), AttackStageLabel(attack.stage),
+                      attack.stageSeconds, attack.stunned ? " stunned" : "", IsAirborne(boss) ? " airborne" : "");
 }
 
 // Debug builds only, in screen space. The numbers I tune against: what the input asks for, what the
@@ -632,7 +705,7 @@ void DrawDebugHud(const World& world, Vec2 moveInput) {
     constexpr int kX = 10;
     constexpr int kY = 80; // Below the health and dash bars.
     constexpr int kLine = 20;
-    DrawRectangle(kX - 4, kY - 4, 340, 14 * kLine + 8, Fade(BLACK, 0.6f));
+    DrawRectangle(kX - 4, kY - 4, 340, 15 * kLine + 8, Fade(BLACK, 0.6f));
     DrawText(TextFormat("input  %5.2f %5.2f  len %4.2f", moveInput.x, moveInput.y, Length(moveInput)), kX, kY,
              18, RAYWHITE);
     DrawText(TextFormat("speed  %5.0f / %.0f", Length(motion.velocity), player.stats.maxSpeed), kX, kY + kLine, 18,
@@ -662,12 +735,16 @@ void DrawDebugHud(const World& world, Vec2 moveInput) {
                         player.flasks.drinkingSeconds),
              kX, kY + 12 * kLine, 18, RAYWHITE);
     DrawText(TextFormat("boss   %s", BossStateLabel(world.boss)), kX, kY + 13 * kLine, 18, ORANGE);
+    DrawText(TextFormat("seed   %08X  waves %d", static_cast<unsigned>(world.seed),
+                        static_cast<int>(world.shockwaves.Size())),
+             kX, kY + 14 * kLine, 18, RAYWHITE);
 }
 #endif
 
 } // namespace
 
-Game::Game() : _session{StartSession(kBossArena, kViewSize)} {
+// Every launch starts from a seed the system picks, so no two runs of the game repeat the same fights.
+Game::Game() : _session{StartSession(kBossArena, kViewSize, std::random_device{}())} {
     // Vsync caps how often we render. How often the game simulates comes from FixedTimestep.
     SetConfigFlags(FLAG_VSYNC_HINT | FLAG_MSAA_4X_HINT);
     InitWindow(kScreenWidth, kScreenHeight, "Horde Carnage");
@@ -753,9 +830,17 @@ void Game::Draw(float alpha) const {
     // On the floor, under every body.
     DrawChargeTelegraph(world.boss, world.arena);
     DrawHairRingTelegraph(world.boss);
+    DrawLeapTelegraph(world.boss);
+    for (const Shockwave& wave : world.shockwaves) {
+        DrawShockwave(wave);
+    }
 
-    // The boss goes under its children, so a dead boss lies on the floor.
-    DrawBoss(world.boss, playerPosition, alpha);
+    // The boss goes under its children, so a dead boss lies on the floor. In the air it goes over
+    // everything, the player included.
+    const bool bossAirborne = IsAirborne(world.boss);
+    if (!bossAirborne) {
+        DrawBoss(world.boss, playerPosition, alpha);
+    }
     for (const Enemy& enemy : world.enemies) {
         DrawHairball(enemy, playerPosition, alpha);
     }
@@ -765,8 +850,11 @@ void Game::Draw(float alpha) const {
     for (const Projectile& strand : world.hostileProjectiles) {
         DrawHairStrand(strand, alpha);
     }
-    // The player is drawn last, so it is never hidden under a crowd.
+    // The player is drawn after every body on the floor, so it is never hidden under a crowd.
     DrawPlayer(player, alpha);
+    if (bossAirborne) {
+        DrawBoss(world.boss, playerPosition, alpha);
+    }
 #ifndef NDEBUG
     if (_showDebugOverlay) {
         DrawDebugWorld(player, world.camera, alpha);

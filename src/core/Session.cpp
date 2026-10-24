@@ -6,6 +6,8 @@ namespace horde {
 
 namespace {
 
+constexpr std::uint64_t kSeedStream = 7;
+
 void EnterState(Session& session, SessionState state) {
     session.state = state;
     session.stateSeconds = 0.0f;
@@ -13,8 +15,11 @@ void EnterState(Session& session, SessionState state) {
 
 } // namespace
 
-Session StartSession(const Arena& arena, Vec2 viewSize) {
-    return Session{.world = CreateWorld(arena, viewSize)};
+Session StartSession(const Arena& arena, Vec2 viewSize, std::uint64_t seed) {
+    // Its own stream, so the world seeds it hands out are not the numbers the first world draws.
+    Random seeds = SeedRandom(seed, kSeedStream);
+    const std::uint32_t first = NextU32(seeds);
+    return Session{.world = CreateWorld(arena, viewSize, first), .seeds = seeds};
 }
 
 void StepSession(Session& session, const PlayerCommands& commands, float dt) {
@@ -52,7 +57,7 @@ bool TryRestart(Session& session) {
     session.attempt = session.state == SessionState::Victory ? 1 : session.attempt + 1;
     // A brand new World instead of resetting fields one by one, so a field added later cannot be
     // forgotten in the reset and leak from one run into the next.
-    session.world = CreateWorld(session.world.arena, session.world.camera.viewSize);
+    session.world = CreateWorld(session.world.arena, session.world.camera.viewSize, NextU32(session.seeds));
     EnterState(session, SessionState::Playing);
     return true;
 }

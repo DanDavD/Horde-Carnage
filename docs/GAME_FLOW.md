@@ -34,6 +34,7 @@ The game executable connects it to the screen and the buttons:
 - **Dead and Victory:** the world is not stepped any more. It stays frozen on the moment the fight ended, so the player can see what got them, or the boss lying on the floor. The fight's clock (`World::elapsedSeconds`) stops with it.
 - **Restart:** `TryRestart` works in `Dead` and `Victory`, and only after `kRestartDelaySeconds` (1 s). It replaces the world with a brand new one from `CreateWorld` and goes back to `Playing`.
 - **Attempts:** `Session::attempt` starts at 1. A retry after a death adds 1. A new fight after a victory starts again from 1. It lives in the `Session`, not in the `World`, so the fresh world of a restart does not reset it.
+- **Seeds:** every fresh world gets the next seed from `Session::seeds`, so each attempt plays out differently, and the session's one seed decides them all (see [Random numbers](RANDOM.md)).
 
 Every state change goes through one helper, `EnterState`, which also resets the clock of the state (`stateSeconds`). That clock is what the restart delay and the fade of the end screens read.
 
@@ -84,13 +85,13 @@ Everything fades in over the restart delay, and the prompt to try again (or to f
   - restart is refused while playing, and inside the delay after a death or a victory;
   - after the delay a retry gives a fresh world (full health, time 0, the player and the boss back at the start);
   - every retry after a death is the next attempt;
+  - every attempt gets its own seed, and the session's seed decides them all;
   - a new fight after a victory starts the attempts over, while the victory screen still shows the attempt that won;
   - standing still in front of the boss ends in death.
 - `tests/core/WorldTests.cpp`: a bullet that hits counts toward accuracy, and a miss does not.
 
 The end screens and the restart buttons are not unit tested, because they need a window. I checked the screens in Release and Debug builds with window captures: standing still until "YOU DIED" (it read "Attempt 1. You lasted 0:07." and "The Matriarch kept 100% of her health.")
 , both screens halfway through the fade, and "VICTORY" after an `F4` key message sent straight to the window. Retrying from each screen, and winning with real bullets, I check by playing.
-
 
 ## Limitations
 

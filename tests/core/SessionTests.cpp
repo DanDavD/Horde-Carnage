@@ -1,3 +1,5 @@
+#include <cstdint>
+
 #include <doctest/doctest.h>
 
 #include "core/Session.h"
@@ -195,6 +197,22 @@ TEST_CASE("a new fight after a victory starts the attempts over") {
     CHECK(session.attempt == 1);
     CHECK(session.state == SessionState::Playing);
     CHECK(session.world.boss.health.current == session.world.boss.health.max);
+}
+
+TEST_CASE("every attempt gets its own seed, and the session's seed decides them all") {
+    Session a = horde::StartSession(kArena, kView, 5);
+    Session b = horde::StartSession(kArena, kView, 5);
+    CHECK(a.world.seed == b.world.seed);
+    CHECK(horde::StartSession(kArena, kView, 6).world.seed != a.world.seed);
+
+    const std::uint64_t first = a.world.seed;
+    DieAndRetry(a);
+    DieAndRetry(b);
+    CHECK(a.world.seed != first);
+    CHECK(a.world.seed == b.world.seed);
+    // The world's generator starts from its seed.
+    horde::Random fresh = horde::SeedRandom(a.world.seed);
+    CHECK(horde::NextU32(a.world.random) == horde::NextU32(fresh));
 }
 
 TEST_CASE("standing still in front of the boss ends in death") {
