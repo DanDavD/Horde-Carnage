@@ -51,7 +51,7 @@ The game executable reads the hardware and draws:
   - Rejected: queueing every press. Ten frantic clicks would turn into a burst of shots the player no longer wants.
 - **Fire rates are whole numbers of steps.** At 60 Hz the pistol (6 per second) waits 10 steps and the SMG (10 per second) waits 6, so both are exact. A small tolerance stops float rounding from adding one extra step. I first let the cooldown carry its leftover below zero, so that any rate would average out exactly. Tracing it showed that a gun that had been idle fired its second shot one step early. Whole-step rates are simpler and right for every gun I plan.
 - **Switching is instant, and each gun keeps its own cooldown.** A swap delay is a balancing tool; I would rather add it later, if switching to dodge the pistol's cooldown turns out to be a problem.
-- **The guns are constant data for now.** `kPistol` and `kSmg` are `constexpr` values. Day 6 loads the same fields from JSON.
+- **The guns are constant data for now.** `kPistol` and `kSmg` are `constexpr` values. Day 9 loads the same fields from JSON.
 - **A drawn crosshair instead of the system cursor.** It is easier to find in a crowd, and it matches the art of the game.
 - **Either direction of the mouse wheel means "the other gun".** With two guns there is nothing else it could mean.
 

@@ -18,7 +18,7 @@ struct Player {
     /// cannot pin the player, but a crowd slows them down.
     float weight = 4.0f;
     /// Direction the player looks and aims, length 1. It follows the mouse, not the movement, so the
-    /// player can run one way and shoot another. Starts facing down, toward the camera.
+    /// player can run one way and shoot another. Faces down by default; `CreateWorld` turns it toward the boss.
     Vec2 facing{0.0f, 1.0f};
     Health health;
     Loadout loadout;

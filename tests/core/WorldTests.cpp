@@ -1,5 +1,7 @@
 #include <algorithm>
+#include <cmath>
 #include <cstddef>
+#include <numbers>
 #include <vector>
 
 #include <doctest/doctest.h>
@@ -16,7 +18,7 @@ using horde::World;
 namespace {
 
 // The same arena and view as the game, so these tests describe what the player actually sees.
-constexpr Arena kArena{{0.0f, 0.0f}, {2400.0f, 1600.0f}};
+constexpr Arena kArena = horde::kBossArena;
 constexpr Vec2 kView{1280.0f, 720.0f};
 constexpr float kDt = 1.0f / 60.0f;
 
@@ -31,7 +33,28 @@ void Step(World& world, Vec2 move, int steps) {
     Step(world, PlayerCommands{.move = move}, steps);
 }
 
-// Replaces the ring with one hairball at `position`, for tests about a single enemy.
+// The player alone in the arena. A dead boss takes no part in the simulation (it does not chase, block,
+// take bullets or hurt), so the tests about the player and the hairballs start from a world where it is
+// dead, and nothing but what the test adds can interfere.
+World PlayerAlone() {
+    World world = horde::CreateWorld(kArena, kView);
+    world.boss.health.current = 0;
+    return world;
+}
+
+// Six hairballs evenly spaced on a ring of 520 units around the player, the crowd the crowd tests need.
+World SurroundedByHairballs() {
+    World world = PlayerAlone();
+    const Vec2 center = world.player.motion.position;
+    for (int i = 0; i < 6; ++i) {
+        const float angle = 2.0f * std::numbers::pi_v<float> * static_cast<float>(i) / 6.0f;
+        const Vec2 offset{std::cos(angle) * 520.0f, std::sin(angle) * 520.0f};
+        world.enemies.Spawn(Enemy{.motion = horde::MotionAt(center + offset)});
+    }
+    return world;
+}
+
+// A single hairball at `position`, for tests about one enemy.
 Enemy& OnlyEnemyAt(World& world, Vec2 position) {
     world.enemies.Clear();
     return *world.enemies.Spawn(Enemy{.motion = horde::MotionAt(position)});
@@ -66,25 +89,19 @@ bool InsideArena(Vec2 position, float radius) {
 
 } // namespace
 
-TEST_CASE("a new world puts the player in the middle and the hairballs on a ring around it") {
+TEST_CASE("a new world puts the boss in the middle and the player south of it, facing it") {
     const World world = horde::CreateWorld(kArena, kView);
-    CHECK(world.player.motion.position == Vec2{1200.0f, 800.0f});
+    CHECK(world.boss.motion.position == horde::Center(kArena));
+    CHECK(world.player.motion.position == horde::Center(kArena) + Vec2{0.0f, horde::kStartingDistance});
     CHECK(world.player.motion.previousPosition == world.player.motion.position);
+    CHECK(world.boss.motion.previousPosition == world.boss.motion.position);
+    CHECK(world.player.facing == Vec2{0.0f, -1.0f});
 
-    REQUIRE(world.enemies.Size() == static_cast<std::size_t>(horde::kStartingHairballs));
+    CHECK(world.boss.health.current == world.boss.health.max);
+    CHECK(world.enemies.Empty());
     CHECK(world.bullets.Empty());
-    for (const Enemy& enemy : world.enemies) {
-        CHECK(DistanceToPlayer(world, enemy) == doctest::Approx(horde::kHairballSpawnDistance));
-        CHECK(enemy.motion.previousPosition == enemy.motion.position);
-        CHECK(enemy.motion.velocity == Vec2{});
-        CHECK(InsideArena(enemy.motion.position, enemy.radius));
-    }
-}
-
-TEST_CASE("the camera of a new world is already on the player") {
-    const World world = horde::CreateWorld(kArena, kView);
-    CHECK(world.camera.center == world.player.motion.position);
-    CHECK(world.camera.previousCenter == world.camera.center);
+    CHECK(InsideArena(world.player.motion.position, world.player.radius));
+    CHECK(InsideArena(world.boss.motion.position, world.boss.radius));
 }
 
 TEST_CASE("a step moves and turns the player by the movement rules") {
@@ -107,7 +124,7 @@ TEST_CASE("a step moves the camera after the player") {
 }
 
 TEST_CASE("hairballs walk toward the player") {
-    World world = horde::CreateWorld(kArena, kView);
+    World world = SurroundedByHairballs();
     std::vector<float> before;
     for (const Enemy& enemy : world.enemies) {
         before.push_back(DistanceToPlayer(world, enemy));
@@ -120,7 +137,7 @@ TEST_CASE("hairballs walk toward the player") {
 }
 
 TEST_CASE("hairballs come to rest touching the player, without sinking into it") {
-    World world = horde::CreateWorld(kArena, kView);
+    World world = SurroundedByHairballs();
     Step(world, Vec2{}, 600);
 
     for (const Enemy& enemy : world.enemies) {
@@ -133,7 +150,7 @@ TEST_CASE("hairballs come to rest touching the player, without sinking into it")
 }
 
 TEST_CASE("hairballs that follow a running player spread out instead of piling up") {
-    World world = horde::CreateWorld(kArena, kView);
+    World world = SurroundedByHairballs();
     Step(world, Vec2{}, 300);
     Step(world, Vec2{1.0f, 0.0f}, 120);
     Step(world, Vec2{}, 240);
@@ -143,7 +160,7 @@ TEST_CASE("hairballs that follow a running player spread out instead of piling u
 TEST_CASE("a crowd leans on a standing player, but far too slowly to notice") {
     // The hairballs in the second row cannot touch the player, so they keep walking into the first row,
     // and a little of that push reaches the player. It must stay under 2% of the player's top speed.
-    World world = horde::CreateWorld(kArena, kView);
+    World world = SurroundedByHairballs();
     Step(world, Vec2{}, 300);
     Step(world, Vec2{1.0f, 0.0f}, 120);
 
@@ -154,9 +171,8 @@ TEST_CASE("a crowd leans on a standing player, but far too slowly to notice") {
 }
 
 TEST_CASE("the player can shove through a hairball, but slower than running free") {
-    World free = horde::CreateWorld(kArena, kView);
-    free.enemies.Clear();
-    World blocked = horde::CreateWorld(kArena, kView);
+    World free = PlayerAlone();
+    World blocked = PlayerAlone();
     OnlyEnemyAt(blocked, blocked.player.motion.position + Vec2{60.0f, 0.0f});
 
     const float start = free.player.motion.position.x;
@@ -171,54 +187,65 @@ TEST_CASE("the player can shove through a hairball, but slower than running free
 }
 
 TEST_CASE("nobody leaves the arena when the player runs into a corner") {
-    World world = horde::CreateWorld(kArena, kView);
+    World world = SurroundedByHairballs();
+    world.boss.health.current = world.boss.health.max;
     Step(world, Vec2{1.0f, 1.0f}, 600);
 
     CHECK(InsideArena(world.player.motion.position, world.player.radius));
+    CHECK(InsideArena(world.boss.motion.position, world.boss.radius));
     for (const Enemy& enemy : world.enemies) {
         CHECK(InsideArena(enemy.motion.position, enemy.radius));
     }
 }
 
 TEST_CASE("the same inputs always give the same world") {
-    World a = horde::CreateWorld(kArena, kView);
-    World b = horde::CreateWorld(kArena, kView);
+    World a = SurroundedByHairballs();
+    a.boss.health.current = a.boss.health.max;
+    World b = a;
     const Vec2 moves[] = {{1.0f, 0.0f}, {0.0f, -1.0f}, {-0.5f, 0.5f}, {}};
     for (int i = 0; i < 400; ++i) {
         const PlayerCommands commands{.move = moves[(i / 50) % 4],
                                       .aimAt = Vec2{100.0f * static_cast<float>(i % 7), 900.0f},
                                       .fireHeld = i % 3 == 0,
                                       .firePressed = i % 10 == 0,
-                                      .cycleWeapon = i % 120 == 0};
+                                      .cycleWeapon = i % 120 == 0,
+                                      .dashPressed = i % 90 == 0};
         horde::StepWorld(a, commands, kDt);
         horde::StepWorld(b, commands, kDt);
     }
 
     CHECK(a.player.motion.position == b.player.motion.position);
     CHECK(a.player.facing == b.player.facing);
+    CHECK(a.player.health.current == b.player.health.current);
+    CHECK(a.boss.motion.position == b.boss.motion.position);
+    CHECK(a.boss.health.current == b.boss.health.current);
     CHECK(a.shotsFired == b.shotsFired);
-    CHECK(a.kills == b.kills);
     REQUIRE(a.bullets.Size() == b.bullets.Size());
+    REQUIRE(a.hostileProjectiles.Size() == b.hostileProjectiles.Size());
+    for (std::size_t i = 0; i < a.hostileProjectiles.Size(); ++i) {
+        CHECK(a.hostileProjectiles[i].motion.position == b.hostileProjectiles[i].motion.position);
+    }
     REQUIRE(a.enemies.Size() == b.enemies.Size());
+
     for (std::size_t i = 0; i < a.enemies.Size(); ++i) {
         CHECK(a.enemies[i].motion.position == b.enemies[i].motion.position);
     }
 }
 
-TEST_CASE("survival time counts simulated seconds") {
+TEST_CASE("the fight's clock counts simulated seconds") {
     World world = horde::CreateWorld(kArena, kView);
     Step(world, Vec2{}, 120);
     CHECK(world.elapsedSeconds == doctest::Approx(2.0f));
 }
 
-TEST_CASE("hairballs that are not touching the player do not hurt it") {
+TEST_CASE("nothing hurts the player in the first second of the fight") {
     World world = horde::CreateWorld(kArena, kView);
     Step(world, Vec2{}, 60);
     CHECK(world.player.health.current == world.player.health.max);
 }
 
 TEST_CASE("a touching hairball hurts the player once per invulnerability window") {
-    World world = horde::CreateWorld(kArena, kView);
+    World world = PlayerAlone();
     horde::Player& player = world.player;
     OnlyEnemyAt(world, player.motion.position + Vec2{player.radius + 18.0f, 0.0f});
     const int damage = world.enemies[0].contactDamage;
@@ -236,7 +263,7 @@ TEST_CASE("a touching hairball hurts the player once per invulnerability window"
 }
 
 TEST_CASE("a whole crowd arriving at once still lands only one hit") {
-    World world = horde::CreateWorld(kArena, kView);
+    World world = SurroundedByHairballs();
     const int damage = world.enemies[0].contactDamage;
     int steps = 0;
     while (world.player.health.current == world.player.health.max && steps < 600) {
@@ -249,11 +276,11 @@ TEST_CASE("a whole crowd arriving at once still lands only one hit") {
 
 TEST_CASE("the player faces the aim point, not the way it walks") {
     World world = horde::CreateWorld(kArena, kView);
-    const Vec2 above = world.player.motion.position + Vec2{0.0f, -300.0f};
-    Step(world, PlayerCommands{.move = {1.0f, 0.0f}, .aimAt = above}, 30);
+    const Vec2 below = world.player.motion.position + Vec2{0.0f, 300.0f};
+    Step(world, PlayerCommands{.move = {1.0f, 0.0f}, .aimAt = below}, 30);
 
     CHECK(world.player.motion.velocity.x > 0.0f);
-    CHECK(world.player.facing.y == doctest::Approx(-1.0f).epsilon(0.05));
+    CHECK(world.player.facing.y == doctest::Approx(1.0f).epsilon(0.05));
 }
 
 TEST_CASE("the fire button fires the gun in hand") {
@@ -262,6 +289,25 @@ TEST_CASE("the fire button fires the gun in hand") {
     CHECK(world.shotsFired == 1);
     CHECK(world.bullets.Size() == 1);
     CHECK(horde::Equipped(world.player.loadout).muzzleFlashSeconds > 0.0f);
+}
+
+TEST_CASE("a bullet that hits counts toward accuracy, and a miss does not") {
+    World world = horde::CreateWorld(kArena, kView);
+    CHECK(horde::Accuracy(world) == 0.0f);
+
+    // The player starts aiming at the boss, so the first shot hits.
+    Step(world, PlayerCommands{.firePressed = true}, 1);
+    Step(world, PlayerCommands{}, 30);
+    REQUIRE(world.shotsHit == 1);
+
+    // The second goes the other way, into the south wall.
+    const Vec2 away = world.player.motion.position + Vec2{0.0f, 300.0f};
+    Step(world, PlayerCommands{.aimAt = away, .firePressed = true}, 1);
+    Step(world, PlayerCommands{.aimAt = away}, 60);
+    CHECK(world.bullets.Empty());
+    CHECK(world.shotsFired == 2);
+    CHECK(world.shotsHit == 1);
+    CHECK(horde::Accuracy(world) == doctest::Approx(0.5f));
 }
 
 TEST_CASE("holding the button fires the SMG steadily but the pistol only once") {
@@ -297,8 +343,7 @@ PlayerCommands AimRight(const World& world, bool firePressed) {
 } // namespace
 
 TEST_CASE("a shot leaves the muzzle and flies where the player aims") {
-    World world = horde::CreateWorld(kArena, kView);
-    world.enemies.Clear();
+    World world = PlayerAlone();
     const horde::Player& player = world.player;
     const Vec2 muzzle = horde::MuzzlePoint(player.motion.position, Vec2{1.0f, 0.0f}, player.radius, horde::kPistol);
 
@@ -312,27 +357,28 @@ TEST_CASE("a shot leaves the muzzle and flies where the player aims") {
 }
 
 TEST_CASE("a bullet that hits nothing is gone once it has flown its range") {
-    World world = horde::CreateWorld(kArena, kView);
-    world.enemies.Clear();
+    World world = PlayerAlone();
+    world.player.motion = horde::MotionAt(Vec2{kArena.min.x + 100.0f, horde::Center(kArena).y});
     Step(world, AimRight(world, true), 1);
     REQUIRE(world.bullets.Size() == 1);
 
     const int lifetimeSteps = static_cast<int>(horde::kPistol.range / horde::kPistol.bulletSpeed / kDt);
-    Step(world, AimRight(world, false), lifetimeSteps + 1);
+    Step(world, AimRight(world, false), lifetimeSteps - 1);
+    CHECK(world.bullets.Size() == 1);
+    Step(world, AimRight(world, false), 2);
     CHECK(world.bullets.Empty());
 }
 
 TEST_CASE("a bullet that reaches a wall is gone at once") {
-    World world = horde::CreateWorld(kArena, kView);
-    world.enemies.Clear();
-    world.player.motion = horde::MotionAt(Vec2{kArena.max.x - 60.0f, 800.0f});
+    World world = PlayerAlone();
+    world.player.motion = horde::MotionAt(Vec2{kArena.max.x - 60.0f, horde::Center(kArena).y});
     Step(world, AimRight(world, true), 1);
     Step(world, AimRight(world, false), 5);
     CHECK(world.bullets.Empty());
 }
 
-TEST_CASE("three pistol bullets kill a hairball, and the kill is counted") {
-    World world = horde::CreateWorld(kArena, kView);
+TEST_CASE("three pistol bullets kill a hairball, and it is removed") {
+    World world = PlayerAlone();
     OnlyEnemyAt(world, world.player.motion.position + Vec2{250.0f, 0.0f});
 
     // Three clicks, each when the pistol is ready again, then time for the last bullet to arrive.
@@ -343,12 +389,11 @@ TEST_CASE("three pistol bullets kill a hairball, and the kill is counted") {
     Step(world, AimRight(world, false), 30);
 
     CHECK(world.enemies.Empty());
-    CHECK(world.kills == 1);
     CHECK(world.shotsFired == 3);
 }
 
 TEST_CASE("a hit flashes the hairball, stuns it and knocks it back along the bullet") {
-    World world = horde::CreateWorld(kArena, kView);
+    World world = PlayerAlone();
     Enemy& hairball = OnlyEnemyAt(world, world.player.motion.position + Vec2{200.0f, 0.0f});
     Step(world, AimRight(world, true), 1);
     for (int i = 0; i < 30 && hairball.health.current == hairball.health.max; ++i) {
@@ -363,9 +408,8 @@ TEST_CASE("a hit flashes the hairball, stuns it and knocks it back along the bul
 }
 
 TEST_CASE("a bullet hits only the nearest hairball in its path") {
-    World world = horde::CreateWorld(kArena, kView);
+    World world = PlayerAlone();
     const Vec2 player = world.player.motion.position;
-    world.enemies.Clear();
     world.enemies.Spawn(Enemy{.motion = horde::MotionAt(player + Vec2{150.0f, 0.0f})});
     world.enemies.Spawn(Enemy{.motion = horde::MotionAt(player + Vec2{200.0f, 0.0f})});
 
@@ -378,32 +422,19 @@ TEST_CASE("a bullet hits only the nearest hairball in its path") {
 }
 
 TEST_CASE("a hairball killed in a step is gone before it can touch the player") {
-    World world = horde::CreateWorld(kArena, kView);
+    World world = PlayerAlone();
     horde::Player& player = world.player;
     Enemy& hairball = OnlyEnemyAt(world, player.motion.position + Vec2{player.radius + 18.0f, 0.0f});
     hairball.health.current = 1;
 
     // Point blank: the muzzle is inside the hairball, so the bullet hits in the step it is fired.
     Step(world, AimRight(world, true), 1);
-    CHECK(world.kills == 1);
+    CHECK(world.enemies.Empty());
     CHECK(player.health.current == player.health.max);
 }
 
-TEST_CASE("a cleared arena gets a new ring of hairballs after the delay") {
-    World world = horde::CreateWorld(kArena, kView);
-    world.enemies.Clear();
-
-    const int delaySteps = static_cast<int>(horde::kRespawnDelaySeconds / kDt);
-    Step(world, Vec2{}, delaySteps - 6);
-    CHECK(world.enemies.Empty());
-
-    Step(world, Vec2{}, 12);
-    CHECK(world.enemies.Size() == static_cast<std::size_t>(horde::kStartingHairballs));
-}
-
 TEST_CASE("a dash carries the player its distance and leaves it at running speed") {
-    World world = horde::CreateWorld(kArena, kView);
-    world.enemies.Clear();
+    World world = PlayerAlone();
     const Vec2 start = world.player.motion.position;
     Step(world, PlayerCommands{.move = {1.0f, 0.0f}, .dashPressed = true}, 1);
     Step(world, PlayerCommands{.move = {1.0f, 0.0f}}, 7);
@@ -416,27 +447,25 @@ TEST_CASE("a dash carries the player its distance and leaves it at running speed
     CHECK(world.player.motion.velocity.x == doctest::Approx(world.player.stats.maxSpeed));
 }
 
-TEST_CASE("a dash with no movement input goes where the player faces") {
-    World world = horde::CreateWorld(kArena, kView);
-    world.enemies.Clear();
+TEST_CASE("a dash with no movement input goes where the player aims") {
+    World world = PlayerAlone();
     const Vec2 start = world.player.motion.position;
-    const Vec2 above = start + Vec2{0.0f, -500.0f};
-    Step(world, PlayerCommands{.aimAt = above, .dashPressed = true}, 1);
-    Step(world, PlayerCommands{.aimAt = above}, 10);
-    CHECK(world.player.motion.position.y < start.y - 150.0f);
-    CHECK(world.player.motion.position.x == doctest::Approx(start.x));
+    const Vec2 left = start + Vec2{-500.0f, 0.0f};
+    Step(world, PlayerCommands{.aimAt = left, .dashPressed = true}, 1);
+    Step(world, PlayerCommands{.aimAt = left}, 10);
+    CHECK(world.player.motion.position.x < start.x - 150.0f);
+    CHECK(world.player.motion.position.y == doctest::Approx(start.y));
 }
 
 TEST_CASE("a dash stops at a wall") {
-    World world = horde::CreateWorld(kArena, kView);
-    world.enemies.Clear();
-    world.player.motion = horde::MotionAt(Vec2{kArena.max.x - 60.0f, 800.0f});
+    World world = PlayerAlone();
+    world.player.motion = horde::MotionAt(Vec2{kArena.max.x - 60.0f, horde::Center(kArena).y});
     Step(world, PlayerCommands{.move = {1.0f, 0.0f}, .dashPressed = true}, 10);
     CHECK(world.player.motion.position.x == doctest::Approx(kArena.max.x - world.player.radius));
 }
 
 TEST_CASE("a dash goes through a hairball instead of shoving it") {
-    World world = horde::CreateWorld(kArena, kView);
+    World world = PlayerAlone();
     const Vec2 start = world.player.motion.position;
     Enemy& hairball = OnlyEnemyAt(world, start + Vec2{80.0f, 0.0f});
     hairball.stunSeconds = 1.0f; // Keep it in place, so only the dash moves anything.
@@ -447,7 +476,7 @@ TEST_CASE("a dash goes through a hairball instead of shoving it") {
 }
 
 TEST_CASE("a dashing player cannot be hurt") {
-    World world = horde::CreateWorld(kArena, kView);
+    World world = PlayerAlone();
     horde::Player& player = world.player;
     OnlyEnemyAt(world, player.motion.position + Vec2{player.radius + 18.0f, 0.0f});
 
@@ -458,8 +487,7 @@ TEST_CASE("a dashing player cannot be hurt") {
 }
 
 TEST_CASE("the gun does not fire during a dash, but a click in it fires right after") {
-    World world = horde::CreateWorld(kArena, kView);
-    world.enemies.Clear();
+    World world = PlayerAlone();
     Step(world, PlayerCommands{.move = {1.0f, 0.0f}, .dashPressed = true}, 1);
     Step(world, PlayerCommands{.move = {1.0f, 0.0f}, .firePressed = true}, 1);
     CHECK(world.shotsFired == 0);
@@ -469,17 +497,15 @@ TEST_CASE("the gun does not fire during a dash, but a click in it fires right af
 }
 
 TEST_CASE("a dash with the cursor right on the player goes where the player faces") {
-    World world = horde::CreateWorld(kArena, kView);
-    world.enemies.Clear();
+    World world = PlayerAlone();
     const Vec2 start = world.player.motion.position;
-    // The player starts facing down, and the cursor gives no direction.
+    // The player starts facing the boss, up the screen, and the cursor gives no direction.
     Step(world, PlayerCommands{.aimAt = start, .dashPressed = true}, 10);
-    CHECK(world.player.motion.position.y > start.y + 150.0f);
+    CHECK(world.player.motion.position.y < start.y - 150.0f);
 }
 
 TEST_CASE("a drink heals the player when it finishes and spends a flask") {
-    World world = horde::CreateWorld(kArena, kView);
-    world.enemies.Clear();
+    World world = PlayerAlone();
     horde::Player& player = world.player;
     player.health.current = 50;
 
@@ -494,16 +520,14 @@ TEST_CASE("a drink heals the player when it finishes and spends a flask") {
 }
 
 TEST_CASE("a drink at full health is refused and keeps the flask") {
-    World world = horde::CreateWorld(kArena, kView);
-    world.enemies.Clear();
+    World world = PlayerAlone();
     Step(world, PlayerCommands{.healPressed = true}, 1);
     CHECK_FALSE(horde::IsDrinking(world.player.flasks));
     CHECK(world.player.flasks.charges == world.player.flasks.stats.maxCharges);
 }
 
 TEST_CASE("while drinking the player is slow and cannot dash or shoot") {
-    World world = horde::CreateWorld(kArena, kView);
-    world.enemies.Clear();
+    World world = PlayerAlone();
     horde::Player& player = world.player;
     player.health.current = 50;
 
@@ -518,7 +542,7 @@ TEST_CASE("while drinking the player is slow and cannot dash or shoot") {
 }
 
 TEST_CASE("a hit while drinking wastes the flask") {
-    World world = horde::CreateWorld(kArena, kView);
+    World world = PlayerAlone();
     horde::Player& player = world.player;
     player.health.current = 50;
     Step(world, PlayerCommands{.healPressed = true}, 1);
@@ -536,8 +560,7 @@ TEST_CASE("a hit while drinking wastes the flask") {
 }
 
 TEST_CASE("the flasks run out after three drinks") {
-    World world = horde::CreateWorld(kArena, kView);
-    world.enemies.Clear();
+    World world = PlayerAlone();
     horde::Player& player = world.player;
     for (int drink = 0; drink < 4; ++drink) {
         player.health.current = 10;

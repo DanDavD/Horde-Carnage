@@ -6,7 +6,7 @@ The rules for how anything in the arena moves: how fast it goes, how quickly it 
 
 The rules live in `horde_core`, so they have no idea where the input comes from or how the result is drawn:
 
-- `src/core/Vec2.h`: a small 2D vector type with the few operations movement needs.
+- `src/core/Vec2.h`: a small 2D vector type with the few operations movement needs, plus `Rotated`, which the boss's Hair Ring uses to place its gap and its strands.
 - `src/core/Movement.h`, `src/core/Movement.cpp`: the `Motion` component, the `MovementStats` tuning values, `MotionAt` to spawn a mover and the `StepMovement` function.
 - `src/core/Arena.h`, `src/core/Arena.cpp`: the `Arena` rectangle and `ConfineToArena`, which keeps a mover inside its walls.
 - `src/core/Facing.h`, `src/core/Facing.cpp`: `UpdateFacing`, which turns a facing direction toward the movement input when nothing aims. Aiming with the mouse (`AimFacing`) is described in [Aiming and weapons](WEAPONS.md).
@@ -69,7 +69,7 @@ The movement numbers are the defaults in `MovementStats` (`src/core/Movement.h`)
 | `acceleration` | 3000 units/s^2 | Time to top speed is `maxSpeed / acceleration` (0.1 s). |
 | `deceleration` | 4000 units/s^2 | Time to stop from top speed is `maxSpeed / deceleration` (0.075 s). Also used while turning back. |
 
-A very high value (for example 100000) gives instant start or stop. These values move to JSON on day 6.
+A very high value (for example 100000) gives instant start or stop. These values may move to JSON with the boss's numbers on day 9.
 
 Other values:
 
@@ -77,12 +77,13 @@ Other values:
 |---|---|---|
 | Player body radius | `Player::radius` (`src/core/Player.h`) | 20 units |
 | Stick deadzone | `kStickDeadzone` (`src/app/PlayerInput.cpp`) | 0.2 |
-| Arena rectangle | `kArena` (`src/app/Game.cpp`) | (0, 0) to (2400, 1600) |
-| Starting facing | `Player::facing` (`src/core/Player.h`) | (0, 1), facing down |
+| Arena rectangle | `kBossArena` (`src/core/World.h`) | (0, 0) to (1640, 1040) |
+| Starting facing | `Player::facing` (`src/core/Player.h`), set by `CreateWorld` (`src/core/World.cpp`) | (0, 1), facing down; a new fight turns the player up, toward the boss |
 
 ## Tests
 
-- `tests/core/Vec2Tests.cpp`: arithmetic, length, `Dot`, `Normalized` (including the zero vector), `ClampLength`, `MoveTowards` (no overshoot, zero distance) and `Lerp`.
+- `tests/core/Vec2Tests.cpp`: arithmetic, length, `Dot`, `Normalized` (including the zero vector), `ClampLength`, `MoveTowards` (no overshoot, zero distance), `Lerp`, and `Rotated` (clockwise on screen, length kept).
+
 - `tests/core/MovementTests.cpp`: `MotionAt` spawns a still mover with both positions set, a mover at rest stays still, acceleration reaches top speed and stays there, a diagonal is not faster than a straight line, half stick input gives half speed, releasing stops without sliding back, turning back brakes at the deceleration rate and then accelerates the other way, a 90 degree turn uses the acceleration rate, and the step saves the previous position.
 - `tests/core/ArenaTests.cpp`: the arena centre, a mover inside is left alone, a side wall cancels only the push into it, velocity away from a wall is kept, the top and bottom walls, a corner, and an arena narrower than the mover.
 - `tests/core/FacingTests.cpp`: a new player faces down, input sets the facing at length 1, no input keeps the last facing, a keyboard diagonal faces diagonally, and a small stick push turns the player fully.

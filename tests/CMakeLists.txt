@@ -3,6 +3,9 @@ add_executable(horde_tests
     TestMain.cpp
     core/AnalogInputTests.cpp
     core/ArenaTests.cpp
+    core/BossChargeTests.cpp
+    core/BossHairRingTests.cpp
+    core/BossTests.cpp
     core/ChaseTests.cpp
     core/CollisionTests.cpp
     core/DashTests.cpp

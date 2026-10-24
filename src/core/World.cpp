@@ -1,8 +1,6 @@
 #include "core/World.h"
 
 #include <algorithm>
-#include <cmath>
-#include <numbers>
 #include <optional>
 
 #include "core/Chase.h"
@@ -22,16 +20,25 @@ namespace {
 // crowd. Each pass ends with the walls, so a body pushed into a wall is put back before the next pass.
 constexpr int kCollisionPasses = 4;
 
-// A hit flashes the hairball white, and stops it chasing for a moment so the hit reads as a stagger.
+// A hit flashes the body white. A hairball also stops chasing for a moment, so the hit reads as a stagger.
 constexpr float kHitFlashSeconds = 0.1f;
 constexpr float kHitStunSeconds = 0.15f;
 
+// The camera looks at a point this far from the player toward the boss, so the boss stays in view. The
+// offset is capped, so a boss across the arena never pushes the player toward the edge of the screen.
+constexpr float kBossFraming = 0.4f;
+constexpr float kMaxBossFramingOffset = 200.0f;
+
 // Every source of damage to the player goes through here, so a dash protects from all of them, and a hit
 // that lands spoils any drink in progress.
-void HurtPlayer(Player& player, int damage) {
+//
+// @return Whether the hit landed, so a hit with extra effects (the charge's knockback) applies them once.
+bool HurtPlayer(Player& player, int damage) {
     if (!IsDashInvulnerable(player.dash) && ApplyDamage(player.health, damage)) {
         InterruptDrinking(player.flasks);
+        return true;
     }
+    return false;
 }
 
 // The dash and the drink exclude each other: drinking is a commitment, and a dash cannot be cancelled into
@@ -127,23 +134,37 @@ void StepEnemies(World& world, float dt) {
 
 void ConfineEveryone(World& world) {
     ConfineToArena(world.player.motion, world.player.radius, world.arena);
+    ConfineToArena(world.boss.motion, world.boss.radius, world.arena);
     for (Enemy& enemy : world.enemies) {
         ConfineToArena(enemy.motion, enemy.radius, world.arena);
     }
 }
 
-// Every pair once: the player against each enemy, then each enemy against the ones after it. With a few
-// dozen bodies that is a few hundred checks per pass, so a spatial grid would cost more than it saves.
-// A dashing player passes through bodies, so a dash can escape a crowd or go through the boss.
+// Every pair once: the player and the boss against each other and against each hairball, then each
+// hairball against the ones after it. With a few dozen bodies that is a few hundred checks per pass, so a
+// spatial grid would cost more than it saves. A dashing player passes through bodies, so a dash can escape
+// a crowd or go through the boss, and a dead boss is not a body any more.
+//
+// A charging boss runs through the player rather than pushing them: at its speed a shove would carry the
+// player across the arena and pin them against the wall. It still bowls hairballs out of its way.
 void SeparateEveryone(World& world) {
     Player& player = world.player;
+    Boss& boss = world.boss;
     const bool playerIsSolid = !IsDashing(player.dash);
+    const bool bossIsSolid = !IsDead(boss.health);
+    if (playerIsSolid && bossIsSolid && !IsCharging(boss)) {
+        SeparateCircles(player.motion, player.radius, boss.motion, boss.radius, PushShare(player.weight, boss.weight));
+    }
+
     auto& enemies = world.enemies;
     for (std::size_t i = 0; i < enemies.Size(); ++i) {
         Enemy& enemy = enemies[i];
         if (playerIsSolid) {
             SeparateCircles(player.motion, player.radius, enemy.motion, enemy.radius,
                             PushShare(player.weight, enemy.weight));
+        }
+        if (bossIsSolid) {
+            SeparateCircles(enemy.motion, enemy.radius, boss.motion, boss.radius, PushShare(enemy.weight, boss.weight));
         }
         for (std::size_t j = i + 1; j < enemies.Size(); ++j) {
             Enemy& other = enemies[j];
@@ -153,10 +174,19 @@ void SeparateEveryone(World& world) {
     }
 }
 
-// The enemy the bullet touches first along this step's flight, if any. Comparing how far along the path
-// each hit happens is what makes the front hairball of a line take the bullet.
-Enemy* FirstEnemyHit(World& world, const Projectile& bullet) {
-    Enemy* first = nullptr;
+// What a bullet touches first along this step's flight: a hairball, the boss, or nothing.
+struct BulletHit {
+    Enemy* enemy = nullptr;
+    bool boss = false;
+};
+
+// Comparing how far along the path each hit happens is what makes the front body of a line take the
+// bullet, whether that is a hairball or the boss.
+BulletHit FirstHit(World& world, const Projectile& bullet) {
+    const auto sweep = [&bullet](Vec2 center, float radius) {
+        return SweepCircle(bullet.motion.previousPosition, bullet.motion.position, bullet.radius, center, radius);
+    };
+    BulletHit hit;
     float firstFraction = 2.0f;
     for (Enemy& enemy : world.enemies) {
         // A hairball killed by an earlier bullet this step is removed only after all bullets have flown.
@@ -164,14 +194,20 @@ Enemy* FirstEnemyHit(World& world, const Projectile& bullet) {
         if (IsDead(enemy.health)) {
             continue;
         }
-        const std::optional<float> fraction = SweepCircle(bullet.motion.previousPosition, bullet.motion.position,
-                                                          bullet.radius, enemy.motion.position, enemy.radius);
+        const std::optional<float> fraction = sweep(enemy.motion.position, enemy.radius);
         if (fraction && *fraction < firstFraction) {
-            first = &enemy;
+            hit = BulletHit{.enemy = &enemy};
             firstFraction = *fraction;
         }
     }
-    return first;
+    const Boss& boss = world.boss;
+    if (!IsDead(boss.health)) {
+        const std::optional<float> fraction = sweep(boss.motion.position, boss.radius);
+        if (fraction && *fraction < firstFraction) {
+            hit = BulletHit{.boss = true};
+        }
+    }
+    return hit;
 }
 
 void HitEnemy(Enemy& enemy, const Projectile& bullet) {
@@ -181,13 +217,37 @@ void HitEnemy(Enemy& enemy, const Projectile& bullet) {
     enemy.motion.velocity += Normalized(bullet.motion.velocity) * bullet.knockback;
 }
 
+// The boss is too heavy to stagger or push: a bullet only takes health and flashes it. Openings to punish
+// it come from its own attacks, not from the gun.
+void HitBoss(Boss& boss, const Projectile& bullet) {
+    ApplyDamage(boss.health, bullet.damage);
+    boss.hitFlashSeconds = kHitFlashSeconds;
+}
+
+// A ring around the gap the boss's attack points to, one strand per slot outside the gap. A full pool drops
+// the strands that find no slot, like a bullet that is not fired.
+void SpitHairRing(World& world) {
+    const Boss& boss = world.boss;
+    const Vec2 gap = boss.attack->direction;
+    for (int i = 0; i < HairRingStrands(boss.hairRing); ++i) {
+        world.hostileProjectiles.Spawn(MakeHairStrand(boss, HairStrandDirection(gap, i, boss.hairRing)));
+    }
+}
+
 // One pass moves every bullet, resolves its hit and removes the ones that are done, so a bullet is never
 // checked in a step it no longer flies in.
 void StepBullets(World& world, float dt) {
     world.bullets.RemoveIf([&world, dt](Projectile& bullet) {
         const bool stillFlying = StepProjectile(bullet, dt);
-        if (Enemy* enemy = FirstEnemyHit(world, bullet)) {
-            HitEnemy(*enemy, bullet);
+        const BulletHit hit = FirstHit(world, bullet);
+        if (hit.enemy) {
+            HitEnemy(*hit.enemy, bullet);
+            ++world.shotsHit;
+            return true;
+        }
+        if (hit.boss) {
+            HitBoss(world.boss, bullet);
+            ++world.shotsHit;
             return true;
         }
         return !stillFlying || !Contains(world.arena, bullet.motion.position);
@@ -195,14 +255,34 @@ void StepBullets(World& world, float dt) {
 }
 
 void RemoveDeadEnemies(World& world) {
-    const std::size_t dead = world.enemies.RemoveIf([](const Enemy& enemy) { return IsDead(enemy.health); });
-    world.kills += static_cast<int>(dead);
+    world.enemies.RemoveIf([](const Enemy& enemy) { return IsDead(enemy.health); });
+}
+
+// Sideways out of the charge's path, on the side the player already is, so the hit throws them clear of
+// the rest of the run instead of along it.
+Vec2 ChargeKnockback(const Boss& boss, Vec2 playerPosition) {
+    const Vec2 direction = boss.attack->direction;
+    Vec2 side{-direction.y, direction.x};
+    if (Dot(playerPosition - boss.motion.position, side) < 0.0f) {
+        side = side * -1.0f;
+    }
+    return side * boss.charge.knockback;
 }
 
 // After collisions, so contact means the bodies really ended the step touching. The invulnerability
-// window lets only the first touch of a crowd land.
+// window lets only the first touch land. The boss is checked first, so when the boss and a hairball reach
+// the player in the same step, the heavier hit is the one that lands.
 void ApplyContactDamage(World& world) {
     Player& player = world.player;
+    const Boss& boss = world.boss;
+    if (!IsDead(boss.health) &&
+        AreTouching(player.motion.position, player.radius, boss.motion.position, boss.radius)) {
+        if (!IsCharging(boss)) {
+            HurtPlayer(player, boss.contactDamage);
+        } else if (HurtPlayer(player, boss.charge.damage)) {
+            player.motion.velocity += ChargeKnockback(boss, player.motion.position);
+        }
+    }
     for (const Enemy& enemy : world.enemies) {
         if (AreTouching(player.motion.position, player.radius, enemy.motion.position, enemy.radius)) {
             HurtPlayer(player, enemy.contactDamage);
@@ -210,37 +290,46 @@ void ApplyContactDamage(World& world) {
     }
 }
 
-// Until the wave director on day 5, a cleared arena gets a new ring after a short breather.
-void RefillEmptyArena(World& world, float dt) {
-    if (!world.enemies.Empty()) {
-        world.clearedSeconds = 0.0f;
-        return;
+// The boss's strands fly like bullets but hit only the player, with the same swept test. A dashing player
+// is not there for them: they fly on, the way an attack passes through a roll in Dark Souls. Otherwise a
+// strand that touches the player is spent, like a bullet that hits a body, even when the window after an
+// earlier hit keeps it from hurting.
+void StepHostileProjectiles(World& world, float dt) {
+    Player& player = world.player;
+    world.hostileProjectiles.RemoveIf([&world, &player, dt](Projectile& strand) {
+        const bool stillFlying = StepProjectile(strand, dt);
+        const bool touches = SweepCircle(strand.motion.previousPosition, strand.motion.position, strand.radius,
+                                         player.motion.position, player.radius)
+                                 .has_value();
+        if (touches && !IsDashInvulnerable(player.dash)) {
+            HurtPlayer(player, strand.damage);
+            return true;
+        }
+        return !stillFlying || !Contains(world.arena, strand.motion.position);
+    });
+}
+
+// What the camera follows: the player, pulled toward a living boss.
+Vec2 CameraFocus(const World& world) {
+    const Vec2 player = world.player.motion.position;
+    if (IsDead(world.boss.health)) {
+        return player;
     }
-    world.clearedSeconds += dt;
-    if (world.clearedSeconds >= kRespawnDelaySeconds) {
-        SpawnHairballRing(world);
-        world.clearedSeconds = 0.0f;
-    }
+    const Vec2 towardBoss = (world.boss.motion.position - player) * kBossFraming;
+    return player + ClampLength(towardBoss, kMaxBossFramingOffset);
 }
 
 } // namespace
 
 World CreateWorld(const Arena& arena, Vec2 viewSize) {
-    World world{.arena = arena, .player = {.motion = MotionAt(Center(arena))}};
-    SpawnHairballRing(world);
-    world.camera = FollowCameraAt(world.player.motion.position, viewSize, arena);
+    const Vec2 bossStart = Center(arena);
+    World world{.arena = arena,
+                .player = {.motion = MotionAt(bossStart + Vec2{0.0f, kStartingDistance})},
+                .boss = {.motion = MotionAt(bossStart)}};
+    // The player starts looking at the boss, so the first shot goes where the threat is.
+    world.player.facing = Vec2{0.0f, -1.0f};
+    world.camera = FollowCameraAt(CameraFocus(world), viewSize, arena);
     return world;
-}
-
-void SpawnHairballRing(World& world) {
-    // Evenly spaced on a ring, so the hairballs come from every side at once and some start off screen.
-    // Near a wall part of the ring falls outside the arena; the walls put those hairballs back inside.
-    const Vec2 center = world.player.motion.position;
-    for (int i = 0; i < kStartingHairballs; ++i) {
-        const float angle = 2.0f * std::numbers::pi_v<float> * static_cast<float>(i) / kStartingHairballs;
-        const Vec2 offset{std::cos(angle) * kHairballSpawnDistance, std::sin(angle) * kHairballSpawnDistance};
-        world.enemies.Spawn(Enemy{.motion = MotionAt(center + offset)});
-    }
 }
 
 void StepWorld(World& world, const PlayerCommands& commands, float dt) {
@@ -261,6 +350,9 @@ void StepWorld(World& world, const PlayerCommands& commands, float dt) {
     }
     HandleWeapons(world, commands, dt);
     StepEnemies(world, dt);
+    if (StepBoss(world.boss, player.motion.position, player.radius, world.arena, dt).spitHairRing) {
+        SpitHairRing(world);
+    }
 
     // Collisions run after everyone has moved, so the order in which bodies moved does not decide who
     // gets pushed.
@@ -274,10 +366,27 @@ void StepWorld(World& world, const PlayerCommands& commands, float dt) {
     StepBullets(world, dt);
     RemoveDeadEnemies(world);
     ApplyContactDamage(world);
-    RefillEmptyArena(world, dt);
+    // After the bodies, so when the boss's body and one of its strands reach the player in the same step,
+    // the heavier hit is the one that lands.
+    StepHostileProjectiles(world, dt);
 
     // Last, so the camera follows where everything ended up in this step.
-    StepFollowCamera(world.camera, player.motion.position, player.motion.velocity, world.arena, dt);
+    StepFollowCamera(world.camera, CameraFocus(world), player.motion.velocity, world.arena, dt);
+}
+
+bool IsBossDefeated(const World& world) {
+    return IsDead(world.boss.health);
+}
+
+float Accuracy(const World& world) {
+    if (world.shotsFired == 0) {
+        return 0.0f;
+    }
+    return static_cast<float>(world.shotsHit) / static_cast<float>(world.shotsFired);
+}
+
+void DefeatBoss(World& world) {
+    world.boss.health.current = 0;
 }
 
 } // namespace horde
