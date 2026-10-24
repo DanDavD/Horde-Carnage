@@ -42,7 +42,8 @@ struct World {
     ObjectPool<Projectile, kMaxBullets> bullets;
     FollowCamera camera;
     float elapsedSeconds = 0.0f; ///< Simulated time since the world was created: how long the fight has lasted.
-    int shotsFired = 0;          ///< Shots fired this run. Later the end screens can show accuracy.
+    int shotsFired = 0;          ///< Shots fired this run.
+    int shotsHit = 0;            ///< Of those, the ones that hit the boss or a hairball.
 };
 
 /// The starting world: the boss in the middle of `arena`, the player `kStartingDistance` south of it and
@@ -56,5 +57,15 @@ struct World {
 ///
 /// @param commands What the player asks for in this step: movement, aim, fire and weapon switching.
 void StepWorld(World& world, const PlayerCommands& commands, float dt);
+
+/// Whether the fight is won. For now that is the boss's health reaching 0; once the boss has a second
+/// phase, it will mean the end of that phase, and only this function will change.
+[[nodiscard]] bool IsBossDefeated(const World& world);
+
+/// The share of shots this run that hit something, from 0 to 1. 0 when nothing was fired.
+[[nodiscard]] float Accuracy(const World& world);
+
+/// Takes all the boss's health at once. For the Debug shortcut that skips to the victory screen.
+void DefeatBoss(World& world);
 
 } // namespace horde

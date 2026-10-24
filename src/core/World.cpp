@@ -238,10 +238,12 @@ void StepBullets(World& world, float dt) {
         const BulletHit hit = FirstHit(world, bullet);
         if (hit.enemy) {
             HitEnemy(*hit.enemy, bullet);
+            ++world.shotsHit;
             return true;
         }
         if (hit.boss) {
             HitBoss(world.boss, bullet);
+            ++world.shotsHit;
             return true;
         }
         return !stillFlying || !Contains(world.arena, bullet.motion.position);
@@ -327,6 +329,21 @@ void StepWorld(World& world, const PlayerCommands& commands, float dt) {
 
     // Last, so the camera follows where everything ended up in this step.
     StepFollowCamera(world.camera, CameraFocus(world), player.motion.velocity, world.arena, dt);
+}
+
+bool IsBossDefeated(const World& world) {
+    return IsDead(world.boss.health);
+}
+
+float Accuracy(const World& world) {
+    if (world.shotsFired == 0) {
+        return 0.0f;
+    }
+    return static_cast<float>(world.shotsHit) / static_cast<float>(world.shotsFired);
+}
+
+void DefeatBoss(World& world) {
+    world.boss.health.current = 0;
 }
 
 } // namespace horde

@@ -1,5 +1,6 @@
 #include "app/Game.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstddef>
 #include <numbers>
@@ -65,6 +66,10 @@ constexpr int kSlotBoxWidth = 150;
 constexpr int kSlotBoxHeight = 48;
 constexpr int kSlotBoxGap = 8;
 constexpr int kHudMargin = 12;
+// The end screens: a dark band across the middle of the screen, with soft top and bottom edges.
+constexpr int kEndBandTop = kScreenHeight / 2 - 120;
+constexpr int kEndBandHeight = 220;
+constexpr int kEndBandFeather = 48;
 
 constexpr Color kBackground{20, 18, 24, 255};
 constexpr Color kFloor{34, 30, 40, 255};
@@ -84,6 +89,7 @@ constexpr Color kBossEye{255, 190, 90, 255};
 constexpr Color kBossBar{170, 32, 40, 255};
 constexpr Color kSoftText{170, 165, 180, 255};
 constexpr Color kBlood{220, 60, 50, 255};
+constexpr Color kVictoryGold{230, 185, 95, 255};
 constexpr Color kBarBack{50, 20, 24, 255};
 constexpr Color kBarHurt{255, 140, 120, 255};
 constexpr Color kBarEdge{120, 100, 110, 255};
@@ -115,7 +121,7 @@ constexpr HairStyle kDeadBossStyle{kPlayerDeadFill, kPlayerDeadEdge, kPlayerDead
 
 #ifndef NDEBUG
 constexpr const char* kControlsHint =
-    "WASD move  Mouse aim  Click fire  Space dash  E heal  Q/1/2/wheel swap gun  Esc quit  F1 debug";
+    "WASD move  Mouse aim  Click fire  Space dash  E heal  Q/1/2/wheel swap gun  Esc quit  F1 debug  F4 win";
 #else
 constexpr const char* kControlsHint =
     "WASD move  Mouse aim  Click fire  Space dash  E heal  Q/1/2/wheel swap gun  Esc quit";
@@ -343,16 +349,60 @@ void DrawDashBar(const Dash& dash) {
                   dash.cooldownSeconds > 0.0f ? kSoftText : kPlayerFill);
 }
 
-void DrawGameOver(const Session& session) {
-    DrawRectangle(0, 0, kScreenWidth, kScreenHeight, Fade(BLACK, 0.55f));
-    DrawCenteredText("GAME OVER", kScreenHeight / 2 - 90, 64, kBlood);
+// Minutes and seconds, the way the length of a fight is read.
+std::string FormatDuration(float seconds) {
+    const int whole = static_cast<int>(seconds);
+    return TextFormat("%d:%02d", whole / 60, whole % 60);
+}
+
+// Rounded up, so a boss with any health left never reads 0%.
+int HealthPercent(const Health& health) {
+    return (health.current * 100 + health.max - 1) / health.max;
+}
+
+// The end of a fight, in the style of the games it borrows from: the world dims and a dark band across
+// the middle carries one big word. It all fades in over the restart delay, so the moment the prompt lights
+// up is the moment a press works.
+void DrawEndScreen(const Session& session) {
+    const float shown = std::min(session.stateSeconds / kRestartDelaySeconds, 1.0f);
+    const bool won = session.state == SessionState::Victory;
     const World& world = session.world;
-    const char* summary = TextFormat("You lasted %.1f seconds. %s had %d of %d health left.", world.elapsedSeconds,
-                                     kBossName, world.boss.health.current, world.boss.health.max);
-    DrawCenteredText(summary, kScreenHeight / 2 - 10, 28, RAYWHITE);
+
+    DrawRectangle(0, 0, kScreenWidth, kScreenHeight, Fade(BLACK, 0.35f * shown));
+    const Color band = Fade(BLACK, 0.75f * shown);
+    const Color clear = Fade(BLACK, 0.0f);
+    DrawRectangleGradientV(0, kEndBandTop - kEndBandFeather, kScreenWidth, kEndBandFeather, clear, band);
+    DrawRectangle(0, kEndBandTop, kScreenWidth, kEndBandHeight, band);
+    DrawRectangleGradientV(0, kEndBandTop + kEndBandHeight, kScreenWidth, kEndBandFeather, band, clear);
+
+    DrawCenteredText(won ? "VICTORY" : "YOU DIED", kEndBandTop + 28, 80, Fade(won ? kVictoryGold : kBlood, shown));
+
+    const std::string duration = FormatDuration(world.elapsedSeconds);
+    std::string summary;
+    std::string detail;
+    if (won) {
+        const int accuracy = static_cast<int>(std::lround(Accuracy(world) * 100.0f));
+        summary = TextFormat("You defeated %s on attempt %d, in %s.", kBossName, session.attempt, duration.c_str());
+        detail = TextFormat("%d of %d shots on target (%d%%)", world.shotsHit, world.shotsFired, accuracy);
+    } else {
+        summary = TextFormat("Attempt %d. You lasted %s.", session.attempt, duration.c_str());
+        detail = TextFormat("%s kept %d%% of her health.", kBossName, HealthPercent(world.boss.health));
+    }
+    DrawCenteredText(summary.c_str(), kEndBandTop + 124, 26, Fade(RAYWHITE, shown));
+    DrawCenteredText(detail.c_str(), kEndBandTop + 154, 22, Fade(kSoftText, shown));
+
     // Dimmed until the restart delay has passed, so it is clear why an early press did nothing.
-    const Color prompt = CanRestart(session) ? RAYWHITE : Fade(kSoftText, 0.4f);
-    DrawCenteredText("Press Enter or R (A or Start on a gamepad) to play again", kScreenHeight / 2 + 40, 22, prompt);
+    const Color prompt = CanRestart(session) ? RAYWHITE : Fade(kSoftText, 0.4f * shown);
+    const char* again = won ? "Press Enter or R (A or Start on a gamepad) to fight her again"
+                            : "Press Enter or R (A or Start on a gamepad) to try again";
+    // Inside the band, so it never lands on top of the player, who stands in the middle of the screen.
+    DrawCenteredText(again, kEndBandTop + 192, 22, prompt);
+}
+
+// Under the version, in the top right corner, so the count of tries is always in sight.
+void DrawAttempt(int attempt) {
+    const char* text = TextFormat("Attempt %d", attempt);
+    DrawText(text, kScreenWidth - kHudMargin - MeasureText(text, 20), 36, 20, kSoftText);
 }
 
 Camera2D ToRaylibCamera(const FollowCamera& camera, float alpha) {
@@ -388,7 +438,7 @@ void DrawDebugHud(const World& world, Vec2 moveInput) {
     constexpr int kX = 10;
     constexpr int kY = 80; // Below the health and dash bars.
     constexpr int kLine = 20;
-    DrawRectangle(kX - 4, kY - 4, 300, 13 * kLine + 8, Fade(BLACK, 0.6f));
+    DrawRectangle(kX - 4, kY - 4, 340, 13 * kLine + 8, Fade(BLACK, 0.6f));
     DrawText(TextFormat("input  %5.2f %5.2f  len %4.2f", moveInput.x, moveInput.y, Length(moveInput)), kX, kY,
              18, RAYWHITE);
     DrawText(TextFormat("speed  %5.0f / %.0f", Length(motion.velocity), player.stats.maxSpeed), kX, kY + kLine, 18,
@@ -409,7 +459,8 @@ void DrawDebugHud(const World& world, Vec2 moveInput) {
     const Weapon& weapon = Equipped(player.loadout);
     DrawText(TextFormat("weapon %s  cd %.2f", std::string(weapon.stats.name).c_str(), weapon.cooldownSeconds), kX,
              kY + 9 * kLine, 18, RAYWHITE);
-    DrawText(TextFormat("shots  %d  boss %d / %d", world.shotsFired, world.boss.health.current, world.boss.health.max),
+    DrawText(TextFormat("shots  %d hit %d  boss %d / %d", world.shotsFired, world.shotsHit, world.boss.health.current,
+                        world.boss.health.max),
              kX, kY + 10 * kLine, 18, RAYWHITE);
     DrawText(TextFormat("dash   cd %.2f  inv %.2f", player.dash.cooldownSeconds, player.dash.invulnerableSeconds), kX,
              kY + 11 * kLine, 18, RAYWHITE);
@@ -439,7 +490,7 @@ void Game::Run() {
         }
         CollectButtonPresses(_pendingPresses);
 
-        // The crosshair replaces the system cursor while playing. On the game over screen the cursor is back.
+        // The crosshair replaces the system cursor while playing. On the end screens the cursor is back.
         const bool playing = _session.state == SessionState::Playing;
         if (playing && !IsCursorHidden()) {
             HideCursor();
@@ -449,6 +500,10 @@ void Game::Run() {
 #ifndef NDEBUG
         if (IsKeyPressed(KEY_F1)) {
             _showDebugOverlay = !_showDebugOverlay;
+        }
+        // Skips to the victory screen without firing 120 bullets. The next step ends the fight.
+        if (IsKeyPressed(KEY_F4) && _session.state == SessionState::Playing) {
+            DefeatBoss(_session.world);
         }
 #endif
         const int steps = _timestep.Advance(GetFrameTime());
@@ -531,11 +586,12 @@ void Game::Draw(float alpha) const {
     DrawBossBar(world.boss);
     DrawFPS(10, 10);
     DrawText("Horde Carnage v" HORDE_VERSION, kScreenWidth - 230, 10, 20, kSoftText);
+    DrawAttempt(_session.attempt);
     if (playing) {
         DrawText(kControlsHint, kHudMargin, kScreenHeight - 30, 18, kSoftText);
         DrawCrosshair(GetMousePosition());
     } else {
-        DrawGameOver(_session);
+        DrawEndScreen(_session);
     }
     EndDrawing();
 }

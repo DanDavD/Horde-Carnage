@@ -23,24 +23,33 @@ void StepSession(Session& session, const PlayerCommands& commands, float dt) {
     switch (session.state) {
     case SessionState::Playing:
         StepWorld(session.world, commands, dt);
-        if (IsDead(session.world.player.health)) {
-            EnterState(session, SessionState::GameOver);
+        // The boss is checked first. A trade, where the last bullet lands in the step the player takes a
+        // killing blow, counts as a win: the player did beat the boss.
+        if (IsBossDefeated(session.world)) {
+            EnterState(session, SessionState::Victory);
+        } else if (IsDead(session.world.player.health)) {
+            EnterState(session, SessionState::Dead);
         }
         break;
-    case SessionState::GameOver:
-        // The world stays frozen on the moment of death, so the player can see what got them.
+    case SessionState::Dead:
+    case SessionState::Victory:
+        // The world stays frozen on the moment the fight ended, so the player can see what got them, or
+        // the boss lying on the floor. It also stops the fight's clock for the end screen.
         break;
     }
 }
 
 bool CanRestart(const Session& session) {
-    return session.state == SessionState::GameOver && session.stateSeconds >= kRestartDelaySeconds;
+    return session.state != SessionState::Playing && session.stateSeconds >= kRestartDelaySeconds;
 }
 
 bool TryRestart(Session& session) {
     if (!CanRestart(session)) {
         return false;
     }
+    // A death is one more try at the same boss. A win closes that run of tries, so the next fight is a new
+    // challenge and starts counting from 1.
+    session.attempt = session.state == SessionState::Victory ? 1 : session.attempt + 1;
     // A brand new World instead of resetting fields one by one, so a field added later cannot be
     // forgotten in the reset and leak from one run into the next.
     session.world = CreateWorld(session.world.arena, session.world.camera.viewSize);

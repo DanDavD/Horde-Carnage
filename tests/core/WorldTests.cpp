@@ -286,6 +286,25 @@ TEST_CASE("the fire button fires the gun in hand") {
     CHECK(horde::Equipped(world.player.loadout).muzzleFlashSeconds > 0.0f);
 }
 
+TEST_CASE("a bullet that hits counts toward accuracy, and a miss does not") {
+    World world = horde::CreateWorld(kArena, kView);
+    CHECK(horde::Accuracy(world) == 0.0f);
+
+    // The player starts aiming at the boss, so the first shot hits.
+    Step(world, PlayerCommands{.firePressed = true}, 1);
+    Step(world, PlayerCommands{}, 30);
+    REQUIRE(world.shotsHit == 1);
+
+    // The second goes the other way, into the south wall.
+    const Vec2 away = world.player.motion.position + Vec2{0.0f, 300.0f};
+    Step(world, PlayerCommands{.aimAt = away, .firePressed = true}, 1);
+    Step(world, PlayerCommands{.aimAt = away}, 60);
+    CHECK(world.bullets.Empty());
+    CHECK(world.shotsFired == 2);
+    CHECK(world.shotsHit == 1);
+    CHECK(horde::Accuracy(world) == doctest::Approx(0.5f));
+}
+
 TEST_CASE("holding the button fires the SMG steadily but the pistol only once") {
     World pistol = horde::CreateWorld(kArena, kView);
     Step(pistol, PlayerCommands{.fireHeld = true, .firePressed = true}, 1);

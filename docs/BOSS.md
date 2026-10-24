@@ -28,7 +28,7 @@ The game executable draws it:
 
 **The camera** follows `CameraFocus`: the player, pulled 40% of the way toward the boss, but never more than 200 units. See [Camera](CAMERA.md).
 
-**Death.** At 0 health the boss is out of the simulation: `StepBoss` brakes it to a stop, it is no longer a body in the collisions, bullets fly through it, it does not hurt, and the camera goes back to the player. It is drawn grey with dark eyes. Nothing else happens yet: the victory screen is the next step.
+**Death.** At 0 health the boss is out of the simulation: `StepBoss` brakes it to a stop, it is no longer a body in the collisions, bullets fly through it, it does not hurt, and the camera goes back to the player. It is drawn grey with dark eyes. `IsBossDefeated` turns true, so the session ends the fight in the same step with the "VICTORY" screen (see [Game flow](GAME_FLOW.md)).
 
 ## Design decisions
 
@@ -61,7 +61,7 @@ The game executable draws it:
 | Camera lean and its cap | `kBossFraming`, `kMaxBossFramingOffset` (`src/core/World.cpp`) | 40%, 200 units |
 | Look | `kBossStyle`, `kBossBar` and the boss bar constants (`src/app/Game.cpp`) | |
 
-In a Debug build, `F1` shows the boss's health next to the shots fired.
+In a Debug build, `F1` shows the boss's health next to the shots fired and hit, and `F4` defeats the boss at once (`DefeatBoss`), to reach the victory screen without shooting.
 
 ## Tests
 
@@ -77,12 +77,14 @@ In a Debug build, `F1` shows the boss's health next to the shots fired.
   - the camera keeps a far boss in mind without pushing the player off screen;
   - once the boss is dead, the camera goes back to the player alone.
 - `tests/core/WorldTests.cpp`: a new world has the boss in the middle and the player south of it, facing it; nobody leaves the arena, the boss included; and two worlds with the boss, hairballs and the same inputs end in exactly the same state.
-- `tests/core/SessionTests.cpp`: standing still in front of the boss ends in a game over, between 5 and 8 seconds in (6.1 in practice: about 2.9 s for the boss to arrive, then five touches 0.8 s apart).
+- `tests/core/SessionTests.cpp`: standing still in front of the boss ends in death, between 5 and 8 seconds in (6.1 in practice: about 2.9 s for the boss to arrive, then five touches 0.8 s apart); and the last bullet into the boss wins the fight in the step it lands.
 
-The drawing is not unit tested, because it needs a window. I checked it in a Release build with captures that send no input: the boss and the player both on screen at the start, the bar under the boss's name, the boss against the player with the health bar at 20, and the game over screen reading "You lasted 6.1 seconds. The Matriarch had 1200 of 1200 health left." The hit flash, the bar going down and the grey dead boss need someone shooting, so I check them by playing.
+The drawing is not unit tested, because it needs a window. I checked it in a Release build with captures that send no input: the boss and the player both on screen at the start, the bar under the boss's name, the boss against the player with the health bar at 20, and the "YOU DIED" screen reading "The Matriarch kept 100% of her health." In a Debug build, `F4` showed the grey dead boss under the "VICTORY" screen. The hit flash and the bar going down need someone shooting, so I check them by playing.
+
 
 ## Limitations
 
 - **It has no attacks yet.** It only walks at the player. The charge and the ring of hair come next, then the leap, the shield and the second phase.
-- **Killing it does not win the fight yet.** The boss turns grey and stops, and the game goes on. The victory screen comes with the next commit.
+- **One bar is the whole fight.** Emptying it wins at once. The transformation and the second phase come on day 8.
+
 - **The bar has no animation.** It jumps to the new value. A trailing chunk that drains behind it is part of the game feel pass.

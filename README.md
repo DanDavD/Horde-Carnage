@@ -29,7 +29,7 @@ This is day 4 of 15, and the boss fight is in progress. Progress is tracked in t
 - The hairball, the boss's small child: it walks straight at you and stops when it touches you. It is no longer in the fight; the boss will summon hairballs in its second phase. See [Enemies](docs/ENEMIES.md).
 - Bodies push each other apart instead of stacking. You can shove a hairball out of your way but not the boss, and a crowd slows you down. See [Collisions](docs/COLLISIONS.md).
 - A health bar. A touch of the boss takes 20 of your 100 hit points (a hairball's takes 10), and after a hit you blink and cannot be hurt for 0.8 seconds. See [Health](docs/HEALTH.md).
-- A game over screen that shows how long you lasted and how much health the boss had left, and a restart into a fresh fight. See [Game flow](docs/GAME_FLOW.md).
+- A fight that ends one of two ways. "YOU DIED" shows your attempt number, how long you lasted and how much health the boss kept; "VICTORY" shows the attempt that won, the length of the fight and your accuracy. Both fade in, then a button starts a fresh fight. The attempt count survives every retry. See [Game flow](docs/GAME_FLOW.md).
 - Aiming with the mouse, independent of where you walk, and two guns: a semi-automatic pistol (one shot per click) and an automatic SMG (hold to fire). A panel shows the gun in hand. See [Aiming and weapons](docs/WEAPONS.md).
 - Bullets that fly and hit the first body in their path. A hairball flashes white and gets knocked back; the boss only flashes, it is too heavy to push. See [Bullets and hits](docs/BULLETS.md).
 - Hairballs and bullets live in fixed object pools, so the game never allocates memory while you play. See [Object pool](docs/OBJECT_POOL.md).
@@ -38,7 +38,7 @@ This is day 4 of 15, and the boss fight is in progress. Progress is tracked in t
 - Unit tests for the pure logic, and a GitHub Actions workflow that builds and tests every push and pull request on Windows.
 - Warnings are errors for the project's own code (`/W4 /WX` on MSVC).
 
-**Still to do:** the "YOU DIED" and "VICTORY" screens, the boss's attacks (the Charge, the Hair Ring and the Leap), its alternating shield and its second phase, then the numbers in JSON, game feel and menus. See the [roadmap](docs/ROADMAP.md) for the order.
+**Still to do:** the boss's attacks (the Charge, the Hair Ring and the Leap), its alternating shield and its second phase, then the numbers in JSON, game feel and menus. See the [roadmap](docs/ROADMAP.md) for the order.
 
 ## Tech stack
 
@@ -77,9 +77,11 @@ You can also open the folder in Visual Studio (*File > Open > Folder*). It reads
 | Switch gun | `Q`, `1`, `2` or the mouse wheel | Not yet |
 | Dash | `Space` or left `Shift` | Not yet |
 | Drink a flask | `E` | Not yet |
-| Play again after a game over | `Enter` or `R` | `A` or `Start` |
+| Try again after "YOU DIED" or "VICTORY" | `Enter` or `R` | `A` or `Start` |
 | Quit | `Esc` | |
 | Debug overlay (Debug builds only) | `F1` | |
+| Defeat the boss at once (Debug builds only) | `F4` | |
+
 
 ## Building and testing
 

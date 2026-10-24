@@ -52,7 +52,9 @@ On screen:
 | Hairball contact damage | `Enemy::contactDamage` (`src/core/Enemy.h`) | 10 |
 | Blink period and fade | `kBlinkPeriod`, `kBlinkFade` (`src/app/Game.cpp`) | 0.1 s, 35% |
 
-With the defaults the player survives 4 touches of the boss and dies on the 5th, or survives 9 hairball touches and dies on the 10th. Standing still from the start, the boss needs about 2.9 seconds to arrive and then lands a touch every 0.8 s, so a player who does nothing dies after about 6 seconds. In a Release build the game over screen read "You lasted 6.1 seconds" for that case.
+With the defaults the player survives 4 touches of the boss and dies on the 5th, or survives 9 hairball touches and dies on the 10th. Standing still from the start, the boss needs about 2.9 seconds to arrive and then lands a touch every 0.8 s, so a player who does nothing dies after about 6 seconds. In a Release build the "YOU DIED" screen read "You lasted 0:06" for that case.
+
+
 
 In a Debug build, `F1` shows the health and the time left in the window.
 
