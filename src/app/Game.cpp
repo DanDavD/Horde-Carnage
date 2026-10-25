@@ -73,6 +73,16 @@ constexpr float kLeapHeight = 220.0f;
 constexpr float kLeapGrow = 0.3f;
 constexpr float kLeapLandingSquash = 0.12f;
 constexpr float kLeapShadowStart = 0.3f;
+// The Aimed Volley. The boss leans back through the warning (shrinks by this fraction), with a line on the
+// floor toward the player, and swells for a moment with each burst.
+constexpr float kVolleyLean = 0.08f;
+constexpr float kVolleyBurstSwell = 0.08f;
+constexpr float kVolleyBurstFlash = 0.08f;
+constexpr float kVolleyLineLength = 600.0f;
+// The transformation: the body swells and trembles harder as it goes, and the eyes flicker from amber to
+// red, faster toward the end.
+constexpr float kTransformSwell = 0.2f;
+constexpr float kTransformTremble = 4.0f;
 // While invulnerable the player blinks: faded for one period, solid for the next.
 constexpr float kBlinkPeriod = 0.1f;
 constexpr float kBlinkFade = 0.35f;
@@ -136,6 +146,8 @@ constexpr Color kExposed{235, 235, 240, 255};
 constexpr Color kRingLane{205, 205, 220, 255};
 // The shockwave is dust thrown up by the landing, red where it still hurts.
 constexpr Color kShockwave{230, 120, 95, 255};
+constexpr Color kBossEyeEnraged{255, 60, 50, 255};
+constexpr Color kFrenzyFill{135, 42, 50, 255};
 constexpr Color kBarBack{50, 20, 24, 255};
 constexpr Color kBarHurt{255, 140, 120, 255};
 constexpr Color kBarEdge{120, 100, 110, 255};
@@ -162,12 +174,17 @@ struct HairStyle {
 
 constexpr HairStyle kHairballStyle{kHairballFill, kHairballEdge, kHairballEye, 12, 3.0f, 3.0f, 1.0f};
 constexpr HairStyle kBossStyle{kBossFill, kBossEdge, kBossEye, 28, 6.0f, 5.0f, 0.45f};
+// In the second phase the eyes turn red, so the change reads at a glance.
+constexpr HairStyle kEnragedBossStyle{kBossFill, kBossEdge, kBossEyeEnraged, 28, 6.0f, 5.0f, 0.45f};
+// In a frenzy it bristles (more tufts) and reddens, over a pulsing glow on the floor.
+constexpr HairStyle kFrenziedBossStyle{kFrenzyFill, kBossEdge, kBossEyeEnraged, 40, 6.0f, 5.0f, 0.45f};
+constexpr float kFrenzyGlow = 0.7f;
 // A dead boss turns grey like a dead player, and its eyes go dark.
 constexpr HairStyle kDeadBossStyle{kPlayerDeadFill, kPlayerDeadEdge, kPlayerDeadEdge, 28, 6.0f, 5.0f, 0.0f};
 
 #ifndef NDEBUG
 constexpr const char* kControlsHint =
-    "WASD move  Mouse aim  Click fire  Space dash  E heal  Q/1/2 swap gun  Esc quit  F1 debug  F2 shield  F4 win";
+    "WASD move  Mouse aim  Click fire  Space dash  E heal  Q/1/2 swap gun  Esc quit  Debug: F1 F2 F3 F4";
 #else
 constexpr const char* kControlsHint =
     "WASD move  Mouse aim  Click fire  Space dash  E heal  Q/1/2/wheel swap gun  Esc quit";
@@ -381,6 +398,19 @@ void DrawHairRingTelegraph(const Boss& boss) {
              gapMiddle + 360.0f - gapHalf, 64, Fade(kBlood, 0.3f + 0.6f * progress));
 }
 
+// The Volley's aim on the floor: a thin line from the body toward the player, brighter as the first burst
+// comes closer. It follows the player, as the bursts do.
+void DrawVolleyTelegraph(const Boss& boss) {
+    if (IsDead(boss.health) || !InAttack(boss, AttackKind::Volley, AttackStage::Warning)) {
+        return;
+    }
+    const BossAttack& volley = *boss.attack;
+    const float progress = std::min(volley.stageSeconds / WarningSeconds(boss, volley), 1.0f);
+    const Vec2 start = boss.motion.position + volley.direction * boss.radius;
+    const Vec2 end = start + volley.direction * kVolleyLineLength;
+    DrawLineEx(ToRaylib(start), ToRaylib(end), 2.0f + 2.0f * progress, Fade(kBlood, 0.2f + 0.6f * progress));
+}
+
 void DrawStunStars(Vec2 position, float radius, float seconds) {
     for (int i = 0; i < kStunStars; ++i) {
         const float angle = seconds * 5.0f + 2.0f * std::numbers::pi_v<float> * static_cast<float>(i) / kStunStars;
@@ -413,7 +443,15 @@ void DrawBossShield(const Shield& shield, Vec2 position, float radius, float sec
 // Every pose of the boss ends here: the body, its shield around it, and stars while its broken shield
 // staggers it.
 void DrawBossBody(const Boss& boss, Vec2 position, float radius, Vec2 lookAt) {
-    DrawHairBody(position, radius, lookAt, kBossStyle, boss.hitFlashSeconds > 0.0f);
+    const HairStyle* style = &kBossStyle;
+    if (boss.frenzied) {
+        style = &kFrenziedBossStyle;
+        const float pulse = 0.5f + 0.5f * std::sin(static_cast<float>(GetTime()) * 8.0f);
+        DrawCircleV(ToRaylib(position), radius * (1.0f + kFrenzyGlow), Fade(kBlood, 0.08f + 0.1f * pulse));
+    } else if (boss.phase == BossPhase::Two) {
+        style = &kEnragedBossStyle;
+    }
+    DrawHairBody(position, radius, lookAt, *style, boss.hitFlashSeconds > 0.0f);
     DrawBossShield(boss.shield, position, radius, static_cast<float>(GetTime()));
     if (IsStaggered(boss)) {
         DrawStunStars(position, radius, boss.staggerSeconds);
@@ -493,10 +531,41 @@ void DrawLeapingBoss(const Boss& boss, Vec2 position, Vec2 playerPosition) {
     DrawBossBody(boss, position, radius, playerPosition);
 }
 
+// Leans back through the warning, and swells for a moment with every burst. It watches the player.
+void DrawVolleyingBoss(const Boss& boss, Vec2 position, Vec2 playerPosition) {
+    const BossAttack& volley = *boss.attack;
+    float radius = boss.radius;
+    if (volley.stage == AttackStage::Warning) {
+        radius *= 1.0f - kVolleyLean * std::min(volley.stageSeconds / WarningSeconds(boss, volley), 1.0f);
+    } else if (volley.stage == AttackStage::Active) {
+        const float sinceBurst = std::fmod(volley.stageSeconds, boss.volley.burstIntervalSeconds);
+        if (sinceBurst < kVolleyBurstFlash) {
+            radius *= 1.0f + kVolleyBurstSwell;
+        }
+    }
+    DrawBossBody(boss, position, radius, playerPosition);
+}
+
+// Swells and trembles harder as the transformation goes on, with its eyes flickering to red, faster toward
+// the end. No shield is drawn: nothing can hurt it.
+void DrawTransformingBoss(const Boss& boss, Vec2 position, Vec2 playerPosition) {
+    const float total = boss.phaseTwo.transformSeconds;
+    const float progress = std::clamp(1.0f - boss.transformSecondsLeft / total, 0.0f, 1.0f);
+    const float seconds = total - boss.transformSecondsLeft;
+    position.x += kTransformTremble * progress * std::sin(seconds * 70.0f);
+    const float radius = boss.radius * (1.0f + kTransformSwell * progress);
+    const bool red = std::sin(seconds * (6.0f + 30.0f * progress)) > 0.0f;
+    DrawHairBody(position, radius, playerPosition, red ? kEnragedBossStyle : kBossStyle, false);
+}
+
 void DrawBoss(const Boss& boss, Vec2 playerPosition, float alpha) {
     const Vec2 position = Lerp(boss.motion.previousPosition, boss.motion.position, alpha);
     if (IsDead(boss.health)) {
         DrawHairBody(position, boss.radius, playerPosition, kDeadBossStyle, false);
+        return;
+    }
+    if (IsTransforming(boss)) {
+        DrawTransformingBoss(boss, position, playerPosition);
         return;
     }
     if (!boss.attack) {
@@ -512,6 +581,9 @@ void DrawBoss(const Boss& boss, Vec2 playerPosition, float alpha) {
         break;
     case AttackKind::Leap:
         DrawLeapingBoss(boss, position, playerPosition);
+        break;
+    case AttackKind::Volley:
+        DrawVolleyingBoss(boss, position, playerPosition);
         break;
     }
 }
@@ -579,12 +651,16 @@ void DrawShieldBar(const Shield& shield, int x) {
 // matters and stays out of the way of the arena.
 void DrawBossBar(const Boss& boss) {
     constexpr int kX = (kScreenWidth - kBossBarWidth) / 2;
-    const float fraction = static_cast<float>(boss.health.current) / static_cast<float>(boss.health.max);
+    float fraction = static_cast<float>(boss.health.current) / static_cast<float>(boss.health.max);
+    // While it transforms, the bar fills back up over the transformation.
+    if (IsTransforming(boss)) {
+        fraction = 1.0f - boss.transformSecondsLeft / boss.phaseTwo.transformSeconds;
+    }
     DrawText(kBossName, kX, kBossBarY - 24, 20, RAYWHITE);
     DrawRectangle(kX, kBossBarY, kBossBarWidth, kBossBarHeight, kBarBack);
     DrawRectangle(kX, kBossBarY, static_cast<int>(kBossBarWidth * fraction), kBossBarHeight, kBossBar);
     DrawRectangleLines(kX, kBossBarY, kBossBarWidth, kBossBarHeight, kBarEdge);
-    if (!IsDead(boss.health)) {
+    if (!IsDead(boss.health) && !IsTransforming(boss)) {
         DrawShieldBar(boss.shield, kX);
     }
 }
@@ -657,10 +733,14 @@ const char* DeathCause(std::optional<DamageSource> source) {
         return "Slain by her Charge";
     case DamageSource::HairRing:
         return "Slain by her Hair Ring";
+    case DamageSource::Volley:
+        return "Slain by her Volley";
     case DamageSource::LeapImpact:
         return "Slain by her Leap";
     case DamageSource::Shockwave:
-        return "Slain by the shockwave of her Leap";
+        return "Slain by her shockwave";
+    case DamageSource::Frenzy:
+        return "Slain by her frenzy";
     case DamageSource::Hairball:
         return "Slain by a hairball";
     }
@@ -756,6 +836,8 @@ const char* AttackKindLabel(AttackKind kind) {
         return "ring";
     case AttackKind::Leap:
         return "leap";
+    case AttackKind::Volley:
+        return "volley";
     }
     return "";
 }
@@ -777,12 +859,16 @@ const char* BossStateLabel(const Boss& boss) {
     if (IsDead(boss.health)) {
         return "dead";
     }
+    if (IsTransforming(boss)) {
+        return TextFormat("transforming %.2f", boss.transformSecondsLeft);
+    }
+    const char* phase = boss.phase == BossPhase::One ? "p1" : (boss.frenzied ? "p2 frenzy" : "p2");
     if (!boss.attack) {
-        return TextFormat("stalk, attack in %.2f", boss.secondsUntilAttack);
+        return TextFormat("%s stalk, attack in %.2f", phase, boss.secondsUntilAttack);
     }
     const BossAttack& attack = *boss.attack;
     const char* combo = attack.followUp ? " combo 1/2" : (attack.endsCombo ? " combo 2/2" : "");
-    return TextFormat("%s %s %.2f/%.2f%s%s%s", AttackKindLabel(attack.kind), AttackStageLabel(attack.stage),
+    return TextFormat("%s %s %s %.2f/%.2f%s%s%s", phase, AttackKindLabel(attack.kind), AttackStageLabel(attack.stage),
                       attack.stageSeconds, WarningSeconds(boss, attack), attack.stunned ? " stunned" : "",
                       IsAirborne(boss) ? " airborne" : "", combo);
 }
@@ -895,6 +981,14 @@ void Game::Run() {
         if (IsKeyPressed(KEY_F2) && _session.state == SessionState::Playing) {
             BreakBossShield(_session.world);
         }
+        // Skips ahead: the transformation in the first phase, the frenzy in the second.
+        if (IsKeyPressed(KEY_F3) && _session.state == SessionState::Playing) {
+            if (_session.world.boss.phase == BossPhase::One) {
+                TransformBoss(_session.world);
+            } else {
+                FrenzyBoss(_session.world);
+            }
+        }
         if (IsKeyPressed(KEY_F4) && _session.state == SessionState::Playing) {
             DefeatBoss(_session.world);
         }
@@ -952,6 +1046,7 @@ void Game::Draw(float alpha) const {
     DrawChargeTelegraph(world.boss, world.arena);
     DrawHairRingTelegraph(world.boss);
     DrawLeapTelegraph(world.boss);
+    DrawVolleyTelegraph(world.boss);
     for (const Shockwave& wave : world.shockwaves) {
         DrawShockwave(wave);
     }

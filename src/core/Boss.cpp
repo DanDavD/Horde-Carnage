@@ -65,6 +65,8 @@ void StartAttack(Boss& boss, AttackKind kind, bool endsCombo, Vec2 playerPositio
         attack.takeoff = boss.motion.position;
         attack.target = InsideArena(playerPosition, boss.radius, arena);
         break;
+    case AttackKind::Volley:
+        break;
     }
     boss.lastAttack = kind;
     boss.attack = attack;
@@ -92,10 +94,12 @@ void Stalk(Boss& boss, Vec2 playerPosition, float playerRadius, const Arena& are
     }
 }
 
-void StepCharge(Boss& boss, BossAttack& charge, Vec2 playerPosition, const Arena& arena, Random& random, float dt) {
+BossActions StepCharge(Boss& boss, BossAttack& charge, Vec2 playerPosition, const Arena& arena, Random& random,
+                       float dt) {
     const ChargeStats& stats = boss.charge;
     Motion& motion = boss.motion;
     charge.stageSeconds += dt;
+    BossActions actions;
 
     switch (charge.stage) {
     case AttackStage::Warning: {
@@ -114,6 +118,12 @@ void StepCharge(Boss& boss, BossAttack& charge, Vec2 playerPosition, const Arena
     }
 
     case AttackStage::Active: {
+        // In a frenzy it throws strands as it runs, on a beat counted from the start of the run.
+        const float nextBolt = static_cast<float>(charge.wavesSpat) * stats.boltIntervalSeconds;
+        if (stats.boltIntervalSeconds > 0.0f && charge.stageSeconds >= nextBolt) {
+            ++charge.wavesSpat;
+            actions.throwBolts = true;
+        }
         // The run replaces normal movement, like the player's dash: a fixed speed in a fixed direction,
         // with no acceleration to read.
         motion.previousPosition = motion.position;
@@ -144,6 +154,7 @@ void StepCharge(Boss& boss, BossAttack& charge, Vec2 playerPosition, const Arena
         break;
     }
     }
+    return actions;
 }
 
 // The boss holds its ground through the whole attack: it swells, spits and gets its breath back.
@@ -239,24 +250,86 @@ BossActions StepLeap(Boss& boss, BossAttack& leap, Vec2 playerPosition, const Ar
     return actions;
 }
 
-BossActions StepAttack(Boss& boss, Vec2 playerPosition, const Arena& arena, Random& random, float dt) {
+// The boss holds its ground and keeps turning to the player. Even bursts (the first and the third) leave
+// toward where the player is; odd ones toward where they will be.
+BossActions StepVolley(Boss& boss, BossAttack& volley, const Motion& player, const Arena& arena, Random& random,
+                       float dt) {
+    const VolleyStats& stats = boss.volley;
+    StepMovement(boss.motion, Vec2{}, boss.stats, dt);
+    volley.direction = AimAt(boss.motion.position, player.position, volley.direction);
+    volley.stageSeconds += dt;
+    BossActions actions;
+
+    switch (volley.stage) {
+    case AttackStage::Warning:
+        if (volley.stageSeconds >= WarningSeconds(boss, volley)) {
+            EnterStage(volley, AttackStage::Active);
+        }
+        break;
+
+    case AttackStage::Active: {
+        // Each burst on its own beat, counted from the start of the stage, like the waves of a ring.
+        const float nextBurst = static_cast<float>(volley.wavesSpat) * stats.burstIntervalSeconds;
+        if (volley.wavesSpat < stats.bursts && volley.stageSeconds >= nextBurst) {
+            if (volley.wavesSpat % 2 == 1) {
+                volley.direction = AimAt(boss.motion.position, LeadPoint(boss, player, arena), volley.direction);
+            }
+            ++volley.wavesSpat;
+            actions.spitVolley = true;
+        }
+        const float lastBurst = static_cast<float>(stats.bursts - 1) * stats.burstIntervalSeconds;
+        if (volley.wavesSpat >= stats.bursts && volley.stageSeconds >= lastBurst + stats.activeSeconds) {
+            EnterStage(volley, AttackStage::Recovery);
+        }
+        break;
+    }
+
+    case AttackStage::Recovery:
+        if (volley.stageSeconds >= RecoverySeconds(boss, volley, stats.recoverySeconds)) {
+            FinishAttack(boss, random);
+        }
+        break;
+    }
+    return actions;
+}
+
+// The roar ends the transformation: the second phase's numbers replace the first's, a fresh Shell comes up
+// with the shorter opening, and the first attack of the new phase is the new one, so the player sees what
+// changed at once.
+BossActions EnterPhaseTwo(Boss& boss) {
+    const PhaseTwoStats& two = boss.phaseTwo;
+    boss.phase = BossPhase::Two;
+    boss.transformSecondsLeft = 0.0f;
+    boss.choice = two.choice;
+    boss.combo = two.combo;
+    boss.shield = Shield{};
+    boss.shield.stats.exposedSeconds = two.exposedSeconds;
+    boss.nextAttack = AttackKind::Volley;
+    boss.secondsUntilAttack = two.choice.minStalkSeconds;
+    return BossActions{.roared = true};
+}
+
+BossActions StepAttack(Boss& boss, const Motion& player, const Arena& arena, Random& random, float dt) {
+    const Vec2 playerPosition = player.position;
     BossAttack& attack = *boss.attack;
     switch (attack.kind) {
     case AttackKind::Charge:
-        StepCharge(boss, attack, playerPosition, arena, random, dt);
-        return {};
+        return StepCharge(boss, attack, playerPosition, arena, random, dt);
     case AttackKind::HairRing:
         return StepHairRing(boss, attack, random, dt);
     case AttackKind::Leap:
         return StepLeap(boss, attack, playerPosition, arena, random, dt);
+    case AttackKind::Volley:
+        return StepVolley(boss, attack, player, arena, random, dt);
     }
     return {};
 }
 
 } // namespace
 
-BossActions StepBoss(Boss& boss, Vec2 playerPosition, float playerRadius, const Arena& arena, Random& random,
+BossActions StepBoss(Boss& boss, const Motion& player, float playerRadius, const Arena& arena, Random& random,
                      float dt) {
+    const Vec2 playerPosition = player.position;
     boss.hitFlashSeconds = std::max(boss.hitFlashSeconds - dt, 0.0f);
 
     // A dead boss drops whatever it was doing and only brakes to a stop.
@@ -264,6 +337,12 @@ BossActions StepBoss(Boss& boss, Vec2 playerPosition, float playerRadius, const 
         boss.attack.reset();
         StepMovement(boss.motion, Vec2{}, boss.stats, dt);
         return {};
+    }
+    // Still and out of reach while it transforms; the attacks wait for the second phase.
+    if (IsTransforming(boss)) {
+        StepMovement(boss.motion, Vec2{}, boss.stats, dt);
+        boss.transformSecondsLeft -= dt;
+        return boss.transformSecondsLeft <= 0.0f ? EnterPhaseTwo(boss) : BossActions{};
     }
     StepShield(boss.shield, dt);
     if (IsStaggered(boss)) {
@@ -275,13 +354,48 @@ BossActions StepBoss(Boss& boss, Vec2 playerPosition, float playerRadius, const 
         Stalk(boss, playerPosition, playerRadius, arena, random, dt);
         return {};
     }
-    const BossActions actions = StepAttack(boss, playerPosition, arena, random, dt);
+    const BossActions actions = StepAttack(boss, player, arena, random, dt);
     // A combo skips its opener's recovery: the follow-up starts in the step the opener would begin to rest,
     // so there is no opening between the two. A Charge stunned by a wall shakes it off for the follow-up.
     if (boss.attack && boss.attack->stage == AttackStage::Recovery && boss.attack->followUp) {
         StartAttack(boss, *boss.attack->followUp, true, playerPosition, arena, random);
     }
     return actions;
+}
+
+bool IsTransforming(const Boss& boss) {
+    return boss.phase == BossPhase::Transforming;
+}
+
+void StartTransformation(Boss& boss) {
+    if (boss.phase != BossPhase::One) {
+        return;
+    }
+    boss.phase = BossPhase::Transforming;
+    boss.transformSecondsLeft = boss.phaseTwo.transformSeconds;
+    boss.attack.reset();
+    boss.staggerSeconds = 0.0f;
+    boss.health.current = boss.health.max;
+}
+
+bool ShouldFrenzy(const Boss& boss) {
+    const float threshold = boss.frenzy.healthFraction * static_cast<float>(boss.health.max);
+    return boss.phase == BossPhase::Two && !boss.frenzied && !IsDead(boss.health) &&
+           static_cast<float>(boss.health.current) <= threshold;
+}
+
+void EnterFrenzy(Boss& boss) {
+    const FrenzyStats& frenzy = boss.frenzy;
+    boss.frenzied = true;
+    boss.choice = frenzy.choice;
+    boss.combo = frenzy.combo;
+    boss.charge.boltIntervalSeconds = frenzy.chargeBoltIntervalSeconds;
+    boss.hairRing.waves = frenzy.ringWaves;
+    boss.hairRing.gapTurnDegrees = frenzy.ringGapTurnDegrees;
+    boss.leap.shadowSpeed = frenzy.leapShadowSpeed;
+    boss.leap.landingStrands = frenzy.leapLandingStrands;
+    boss.volley.bursts = frenzy.volleyBursts;
+    boss.volley.burstIntervalSeconds = frenzy.volleyBurstIntervalSeconds;
 }
 
 bool IsStaggered(const Boss& boss) {
@@ -312,6 +426,8 @@ float WarningSeconds(const Boss& boss, const BossAttack& attack) {
         return boss.hairRing.warningSeconds * attack.warningScale;
     case AttackKind::Leap:
         return LeapCrouchSeconds(boss, attack) + LeapAirSeconds(boss, attack);
+    case AttackKind::Volley:
+        return boss.volley.warningSeconds * attack.warningScale;
     }
     return 0.0f;
 }
@@ -365,6 +481,32 @@ Projectile MakeHairStrand(const Boss& boss, Vec2 direction) {
     Projectile strand = LaunchProjectile(origin, direction, stats.speed, stats.range);
     strand.radius = stats.strandRadius;
     strand.damage = stats.damage;
+    return strand;
+}
+
+// Where a strand leaving now meets a player who keeps their velocity. The time of flight is guessed from the
+// distance today, then again from the distance to the last guess. The strands are faster than the player, so
+// each guess is closer than the one before, and a few are enough for a burst three strands wide. Strands
+// leave the edge of the body, so that part of the distance is not flown. The lead is capped, and kept inside
+// the walls the player cannot leave.
+Vec2 LeadPoint(const Boss& boss, const Motion& player, const Arena& arena) {
+    constexpr int kGuesses = 4;
+    const VolleyStats& stats = boss.volley;
+    Vec2 ahead = player.position;
+    for (int i = 0; i < kGuesses; ++i) {
+        const float distance = std::max(Length(ahead - boss.motion.position) - boss.radius, 0.0f);
+        ahead = player.position + player.velocity * std::min(distance / stats.speed, stats.maxLeadSeconds);
+    }
+    return InsideArena(ahead, 0.0f, arena);
+}
+
+Projectile MakeVolleyStrand(const Boss& boss, Vec2 direction) {
+    const VolleyStats& stats = boss.volley;
+    const Vec2 origin = boss.motion.position + direction * boss.radius;
+    Projectile strand = LaunchProjectile(origin, direction, stats.speed, stats.range);
+    strand.radius = stats.strandRadius;
+    strand.damage = stats.damage;
+    strand.source = DamageSource::Volley;
     return strand;
 }
 

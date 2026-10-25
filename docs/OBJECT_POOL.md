@@ -2,7 +2,7 @@
 
 ## What it is
 
-`ObjectPool<T, Capacity>` (`src/core/ObjectPool.h`) holds objects that are created and destroyed all the time, without allocating memory while the game runs. The world keeps four: up to 64 hairballs, up to 128 of the player's bullets, up to 128 of the boss's projectiles (the strands of its Hair Ring), and up to 8 shockwaves from its Leap. The SMG fires 10 bullets a second, each one lives less than a second, and one ring is 42 strands at once, so without pools the game would allocate and free memory dozens of times a second, in the middle of a fight.
+`ObjectPool<T, Capacity>` (`src/core/ObjectPool.h`) holds objects that are created and destroyed all the time, without allocating memory while the game runs. The world keeps four: up to 64 hairballs, up to 128 of the player's bullets, up to 128 of the boss's projectiles (the strands of its Hair Ring and its Volley), and up to 8 shockwaves from its Leap and its roar. The SMG fires 10 bullets a second, each one lives less than a second, and one ring is 42 strands at once, so without pools the game would allocate and free memory dozens of times a second, in the middle of a fight.
 
 ## How it works
 

@@ -32,7 +32,7 @@ Boss AboutToChargeFrom(Vec2 position) {
 
 void Step(Boss& boss, Vec2 player, int steps) {
     for (int i = 0; i < steps; ++i) {
-        horde::StepBoss(boss, player, kPlayerRadius, kArena, chance, kDt);
+        horde::StepBoss(boss, horde::MotionAt(player), kPlayerRadius, kArena, chance, kDt);
     }
 }
 

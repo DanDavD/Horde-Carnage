@@ -39,7 +39,7 @@ Boss StartingWith(BossAttack attack) {
 horde::BossActions Step(Boss& boss, Vec2 player, Random& random, int steps) {
     horde::BossActions actions;
     for (int i = 0; i < steps; ++i) {
-        actions = horde::StepBoss(boss, player, kPlayerRadius, kArena, random, kDt);
+        actions = horde::StepBoss(boss, horde::MotionAt(player), kPlayerRadius, kArena, random, kDt);
     }
     return actions;
 }

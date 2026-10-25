@@ -4,7 +4,7 @@
 
 The Matriarch, the one boss the game is about: a giant hairball, mother of the small ones, in the middle of the arena. The whole game is one fight against it, in the spirit of Gun Bros and Dark Souls 1: a boss that is hard on purpose, whose patterns you learn by dying. See the [roadmap](ROADMAP.md#changes-to-the-plan) for why.
 
-This document describes what exists today. The boss stalks the player, shoves them, hurts on touch, soaks up bullets behind an alternating shield (see [The boss's shield](SHIELD.md)), and has the three attacks of its first phase: the Charge, the Hair Ring and the Leap. It picks the next one at random, weighted by the distance to the player and never the same one twice in a row, and sometimes it chains two into a combo. The second phase comes next.
+This document describes what exists today. The boss stalks the player, shoves them, hurts on touch, soaks up bullets behind an alternating shield (see [The boss's shield](SHIELD.md)), and has the three attacks of its first phase: the Charge, the Hair Ring and the Leap. It picks the next one at random, weighted by the distance to the player and never the same one twice in a row, and sometimes it chains two into a combo. When its health first runs out it transforms, and a second phase starts with a full bar, faster, and with a fourth attack, the Aimed Volley. At half of that bar it falls into a frenzy, and every attack gains something. The Summon, the second phase's last attack, comes next.
 
 The rules live in `horde_core`:
 
@@ -16,7 +16,7 @@ The rules live in `horde_core`:
 
 The game executable draws it:
 
-- `src/app/Game.cpp`: `DrawBoss` draws the same hairy body as a hairball (`DrawHairBody`), three times bigger, darker, with glowing eyes, plus the crouch, the ghosts and the stun stars of the Charge (`DrawChargingBoss`), the swell of the Hair Ring (`DrawSpittingBoss`), and the jump of the Leap (`DrawLeapingBoss`). `DrawChargeTelegraph`, `DrawHairRingTelegraph` and `DrawLeapTelegraph` draw the warnings on the floor, `DrawHairStrand` draws the strands, and `DrawShockwave` the shockwaves. `DrawBossBar` draws its health along the bottom of the screen, under its name.
+- `src/app/Game.cpp`: `DrawBoss` draws the same hairy body as a hairball (`DrawHairBody`), three times bigger, darker, with glowing eyes, plus the crouch, the ghosts and the stun stars of the Charge (`DrawChargingBoss`), the lean of the Volley (`DrawVolleyingBoss`) and its line on the floor (`DrawVolleyTelegraph`), the transformation (`DrawTransformingBoss`), the red eyes of the second phase, the swell of the Hair Ring (`DrawSpittingBoss`), and the jump of the Leap (`DrawLeapingBoss`). `DrawChargeTelegraph`, `DrawHairRingTelegraph` and `DrawLeapTelegraph` draw the warnings on the floor, `DrawHairStrand` draws the strands, and `DrawShockwave` the shockwaves. `DrawBossBar` draws its health along the bottom of the screen, under its name.
 
 ## How it works
 
@@ -85,7 +85,7 @@ The opener plays as usual until its recovery would start. In that step the follo
 
 **Every fixed step,** after the player and the hairballs have moved:
 
-1. **Think and move.** `StepBoss` stalks, picks the next attack, or advances the attack's stage, and tells the world when to spit a ring or when it lands.
+1. **Think and move.** `StepBoss` stalks, picks the next attack, or advances the attack's stage, and tells the world when to spit a ring or a burst, when it lands and when it roars.
 2. **Collide.** The collision passes treat the boss as one more body (see [Collisions](COLLISIONS.md)). At weight 40 against the player's 4, the player takes 91% of any overlap, so the boss shoves the player and the player cannot shove it. A dashing player passes through it, and a charging boss passes through the player.
 3. **Take bullets.** For each bullet, `FirstHit` sweeps it against every hairball and the boss, and the body it touches first takes it. `HitBoss` hands the bullet to the shield first (see [The boss's shield](SHIELD.md)): while it is up, the bullet bounces off or wears it down, and the bullet that breaks it staggers the boss for 1 s. Only while it is down does the bullet take the boss's health and start a 0.1 s flash. No knockback.
 4. **Hurt on touch.** `ApplyContactDamage` checks the boss before the hairballs. A touch takes 20, or 30 plus the knockback while it charges, through `HurtPlayer`, the single door for damage (see [Health](HEALTH.md)). A dash protects from both.
@@ -93,7 +93,38 @@ The opener plays as usual until its recovery would start. In that step the follo
 
 **The camera** follows `CameraFocus`: the player, pulled 40% of the way toward the boss, but never more than 200 units. See [Camera](CAMERA.md).
 
-**Death.** At 0 health the boss is out of the simulation: `StepBoss` drops its attack and brakes it to a stop, it is no longer a body in the collisions, bullets fly through it, it does not hurt, and the camera goes back to the player. It is drawn grey with dark eyes. `IsBossDefeated` turns true, so the session ends the fight in the same step with the "VICTORY" screen (see [Game flow](GAME_FLOW.md)).
+**The Aimed Volley,** second phase only, stage by stage:
+
+1. **Warning, 0.55 s.** The boss holds its ground and leans back, with a thin red line on the floor from its body toward the player. The line, like the boss's aim, follows the player the whole time.
+2. **Active.** Three bursts, 0.3 s apart, the first as the warning ends. Each burst is five strands 8 degrees apart, a fan 32 degrees wide (`StepBoss` returns `spitVolley`, and `SpitVolley` spawns them into the strands' pool). The bursts take turns: the first and the third go where the player is; the second goes where the player will be if they keep their velocity (`LeadPoint`: the time of flight is guessed from the distance, then four times again from the distance to the last guess, which settles because the strands are faster than the player; at most 1.5 s ahead, and never past a wall). They fly at 520 units/s, more than twice the Hair Ring's, with a radius of 7, and take 12. The invulnerability window lets a burst land only once.
+3. **Recovery, 0.8 s,** once 0.15 s have passed since the last burst.
+
+Running in a straight line, the second burst meets the player; stopping, the first and the third do. Only a change of rhythm between bursts, or a dash, gets through all three. `StepBoss` takes the player's `Motion`, not only a position, for the lead. The strands are the same component and pool as the Hair Ring's, and carry `DamageSource::Volley`, so the death screen can tell the two apart.
+
+**The transformation and the second phase.** The boss has three phases of life (`BossPhase`):
+
+```
+  One  -- the bar runs out -->  Transforming, 2 s  -- roar -->  Two  -- the bar runs out -->  defeated
+```
+
+- **One.** Everything above. The bullet that empties the bar does not kill the boss: `HitBoss` calls `StartTransformation`, which drops its attack and its stagger and refills its health at once.
+- **Transforming, 2 s.** The boss stands still, swelling and trembling harder as it goes, its eyes flickering from amber to red. Bullets still hit it, and are spent, but take nothing, and the shield is not drawn. The bar fills back up over the two seconds. Its touch still hurts.
+- **The roar.** When the time is up, `StepBoss` returns `roared`, and the world sends a shockwave from the body that reaches 300 units, less than the 420 of a landing, so it catches a player who waited next to the boss. Then `EnterPhaseTwo` swaps the first phase's numbers for `PhaseTwoStats`: a fresh Shell with a shorter opening, and the second phase's choice and combo numbers. Its first attack is always the Volley, so the player sees at once what changed.
+- **Two.** The eyes stay red. Stalks last 0.6 to 1.2 s instead of 0.8 to 1.6, warnings are stretched by 0.75 to 1.0 instead of 0.85 to 1.15, half of the Charges and Leaps open a combo instead of 35%, with 1 s of rest after it instead of 1.2, and each broken shield leaves the boss exposed for 4 s instead of 5. The Volley joins the picks, with weights 1, 3 and 3 near, in the middle and far away. Emptying this bar wins the fight: `IsBossDefeated` is true only in the second phase.
+
+**The frenzy.** In the second phase, the bullet that takes the boss to half its health (`ShouldFrenzy`) throws it into a frenzy (`EnterFrenzy`), once: it roars a second 300 unit shockwave, bristles (more tufts) and reddens over a glow on the floor that pulses, and `FrenzyStats` replace its numbers:
+
+| Attack | In the frenzy |
+|---|---|
+| Charge | While it runs it throws a pair of strands every 0.15 s (`throwBolts`): one at the player, one where the player is going (`LeadPoint`). A run across the arena is about six pairs. |
+| Hair Ring | Two rings, 0.4 s apart, the gap turning 30 degrees between them. |
+| Leap | The shadow follows at 240 units/s instead of 200, still slower than the player. The landing also spits a ring of 12 strands with no gap, one of them at the player, at the Hair Ring's speed. |
+| Aimed Volley | Five bursts 0.25 s apart: aimed, led, aimed, led, aimed. |
+| The rhythm | Stalks of 0.4 to 0.9 s, combos on 65% of the Charges and Leaps, 0.9 s of rest after one. |
+
+The frenzy's strands carry `DamageSource::Frenzy`, so the death screen reads "Slain by her frenzy". In a Debug build, `F3` in the second phase drops the boss to half and starts the frenzy (`FrenzyBoss`).
+
+**Death.** At 0 health in the second phase the boss is out of the simulation: `StepBoss` drops its attack and brakes it to a stop, it is no longer a body in the collisions, bullets fly through it, it does not hurt, and the camera goes back to the player. It is drawn grey with dark eyes. `IsBossDefeated` turns true, so the session ends the fight in the same step with the "VICTORY" screen (see [Game flow](GAME_FLOW.md)).
 
 ## Design decisions
 
@@ -101,6 +132,21 @@ The opener plays as usual until its recovery would start. In that step the follo
   - Rejected: a boss flag in `Enemy`. Every system would ask "is this the boss?", and the hairball tests would carry the boss's rules.
   - Rejected: a base class with virtual behaviour. As with the hairballs, the difference is in what the body decides to do, not in how it moves, so it belongs in data and systems.
 - **Exactly one boss, as a plain member of `World`.** The game is one fight. A pool or a list for one object would only add loops and empty checks.
+- **The second phase is new numbers, not new code.** `EnterPhaseTwo` copies `PhaseTwoStats` over the boss's choice, combo and shield numbers; the attacks themselves do not know which phase it is. Making the second phase harder or easier is a change of data, which suits the JSON on day 9.
+  - Rejected: an `if (phase == Two)` in each attack. The rules would spread over every attack, and the tests of each attack would need to cover both phases.
+- **The bar refills at the start of the transformation.** The health is full from the first step of it, and the drawing fills the bar over the two seconds. No system needs a "health that is coming back".
+- **Invulnerable while it transforms, but still a body.** Bullets hit it and are spent, so shooting it reads as a wall, not as a ghost, and the player learns to stop shooting and get ready.
+- **The roar reaches 300 units, not the landing's 420.** At 420 it hit the player at the distance the fight starts at, so it punished doing nothing wrong. At 300 it punishes waiting next to the boss for the second phase.
+- **The Volley's bursts take turns: aimed, led, aimed.** At first every burst was aimed where the player was. From far away, at 400 units/s, a player who simply kept running sideways was never hit, and fighting from the far side of the arena became the safe answer to the whole second phase. Leading every burst would have the opposite problem: stopping would beat it. Alternating means neither habit works, and the answer is to watch the rhythm, as with a boss in Dark Souls. The speed went from 400 to 520 units/s for the same reason.
+  - Rejected: leading every burst. Against a player who keeps running it never misses, and against one who stops it always does, so the answer would be a habit again.
+  - Rejected: one guess at the flight from today's distance, capped at 1 s. A player running away on a diagonal outran it by 50 to 80 units, a miss for a burst 27 units from a hit. Four guesses and a 1.5 s cap brought it within 9 units in the four runs I measured (across, away, on a diagonal, close by).
+  - Rejected: random spread. It makes the hits feel like luck, which is the opposite of a fight learned by dying.
+- **The lead is capped at 1.5 s and kept inside the walls.** Far away the flight is long; leading by all of it would aim at empty floor or into a wall, which teaches nothing.
+- **A frenzy at half of the second bar, with something new in every attack.** Played by hand, the second phase was safe from far away, and the last half of the fight felt like the first. The frenzy gives the end of the fight its own shape without new attacks to learn: each extra is a twist on an attack the player already reads, and each one punishes a habit. The Charge's strands punish running from it in a straight line, the Leap's ring punishes dashing the wave and stopping, the double ring punishes running to where the first gap was, and the longer Volley punishes a rhythm that works for three bursts.
+  - Rejected: a third phase with its own bar. A third transformation and a third bar would make the fight longer, not harder, and the player would wait through another roar.
+  - Rejected: only faster numbers. Shorter warnings past a point stop being readable; new twists keep the warnings honest and make the player think again.
+- **The frenzy is numbers too, plus two small rules.** `EnterFrenzy` copies `FrenzyStats` over the attacks' stats. Only the strands of the Charge (`boltIntervalSeconds`) and of the landing (`landingStrands`) needed code, and both are off at 0, which is their value until the frenzy.
+- **The Volley starts the second phase.** It is the one attack the player has not seen, so showing it first says "this is new" more clearly than any text.
 - **A dead boss is inert, not removed.** The `World` always has its boss, so no system needs to ask whether there is one. The tests about the player and the hairballs use a world with a dead boss for the same reason: it is the boss "not being there" by the game's own rules.
 - **Every attack has the same three stages.** The player learns one rhythm for the whole fight: watch the warning, survive the attack, punish the recovery. In code, the stages are an `enum` and one clock, and each attack only decides what happens inside them. The Hair Ring reused them as they were, and the Leap will too.
   - Rejected: a state per attack and stage (`ChargeWarning`, `Charging`, `ChargeRecovery`, `RingWarning`...). Five attacks would make fifteen states that repeat the same timing code, and nothing would force them to keep the same rhythm.
@@ -166,6 +212,16 @@ The opener plays as usual until its recovery would start. In that step the follo
 | Combo chance | `ComboStats::chance` | 35% |
 | Follow-up warning, and the recovery after it | `ComboStats::warningScale`, `finalRecoverySeconds` | 0.7, at least 1.2 s |
 | The combos | `kCombos` (`src/core/AttackChoice.h`) | Rebound, Pursuit, Crash |
+| Volley warning, bursts, time between them, active and recovery | `VolleyStats::warningSeconds`, `bursts`, `burstIntervalSeconds`, `activeSeconds`, `recoverySeconds` (`src/core/Boss.h`) | 0.55 s, 3, 0.3 s, 0.15 s, 0.8 s |
+| Volley strands: per burst, spread, speed, range, radius, damage | `VolleyStats::strandsPerBurst`, `spreadDegrees`, `speed`, `range`, `strandRadius`, `damage` | 5, 8 degrees, 520 units/s, 900 units, 7 units, 12 |
+| How far ahead the led burst looks, at most | `VolleyStats::maxLeadSeconds` | 1.5 s |
+| Transformation | `PhaseTwoStats::transformSeconds` | 2 s |
+| Second phase: weights, stalks and warnings | `PhaseTwoChoice` (`src/core/Boss.h`) | Volley 1, 3, 3; stalks 0.6 to 1.2 s; warnings 0.75 to 1.0 |
+| Second phase: combos and exposed time | `PhaseTwoStats::combo`, `exposedSeconds` | 50%, 1 s of rest after; 4 s |
+| The roar's shockwave | `PhaseTwoStats::roar` | 380 units/s, 300 units, 20 units, 20 |
+| When the frenzy starts | `FrenzyStats::healthFraction` | Half of the second bar |
+| The frenzy's extras | `FrenzyStats` (`chargeBoltIntervalSeconds`, `ringWaves`, `ringGapTurnDegrees`, `leapShadowSpeed`, `leapLandingStrands`, `volleyBursts`, `volleyBurstIntervalSeconds`) | 0.15 s, 2, 30 degrees, 240 units/s, 12, 5, 0.25 s |
+| The frenzy's rhythm and roar | `FrenzyChoice`, `FrenzyStats::combo`, `roar` | Stalks 0.4 to 0.9 s; 65%, 0.9 s of rest; the same roar as the second phase's |
 | Charge warning, and its locked part | `ChargeStats::warningSeconds`, `aimLockSeconds` | 0.8 s, the last 0.3 s |
 | Charge speed and distance | `ChargeStats::speed`, `distance` | 1000 units/s, 800 units |
 | Charge damage and knockback | `ChargeStats::damage`, `knockback` | 30, 700 units/s |
@@ -187,11 +243,37 @@ The opener plays as usual until its recovery would start. In that step the follo
 | Camera lean and its cap | `kBossFraming`, `kMaxBossFramingOffset` (`src/core/World.cpp`) | 40%, 200 units |
 | Look | `kBossStyle`, `kBossBar`, the boss bar constants and the `kCharge...`, `kStun...`, `kRing...`, `kStrand...`, `kLeap...` and `kShockwave` constants (`src/app/Game.cpp`) | |
 
-In a Debug build, `F1` shows the boss's health next to the shots fired and hit, the strands in flight (`hair`), the shockwaves (`waves`), and what the boss is doing: stalking and the time to its next attack, or the attack, its stage, its clock against the warning's length this time, whether it is in the air, and `combo 1/2` or `combo 2/2` inside a combo. The `pick` line shows the distance to the player, the weight of each attack at that distance, and the attack the next pick skips. `F4` defeats the boss at once (`DefeatBoss`), to reach the victory screen without shooting.
+In a Debug build, `F1` shows the boss's health next to the shots fired and hit, the strands in flight (`hair`), the shockwaves (`waves`), and what the boss is doing: stalking and the time to its next attack, or the attack, its stage, its clock against the warning's length this time, whether it is in the air, and `combo 1/2` or `combo 2/2` inside a combo. The `pick` line shows the distance to the player, the weight of each attack at that distance, and the attack the next pick skips. Its first word is the phase (`p1` or `p2`), or `transforming` with the time left. `F3` starts the transformation at once (`TransformBoss`), to skip the first phase. `F4` defeats the boss at once (`DefeatBoss`), to reach the victory screen without shooting.
 
 ## Tests
 
 The tests about one attack's timings use a boss without its chance (`tests/core/PredictableBoss.h`): every warning at its stats' exact length and no combos.
+
+- `tests/core/BossVolleyTests.cpp`:
+  - during the Volley's warning the boss holds still and its aim follows the player;
+  - a Volley fires three bursts a beat apart, each aimed where a standing player is when it leaves;
+  - the second burst leads a running player, and its middle strand meets them; the first and the third aim at them;
+  - a led burst looks ahead at most its cap, and never past the walls;
+  - a player who runs in a straight line through a whole Volley is hit, running across its aim, away from the boss, on a diagonal or close by;
+  - after the last burst the boss recovers, then stalks again;
+  - a burst is five strands fanned 8 degrees apart around the aim, leaving the edge of the body at the Volley's speed;
+  - a Volley strand that hits the player counts as the Volley's.
+- `tests/core/FrenzyTests.cpp`:
+  - the bullet that takes the second phase's bar to half throws the boss into a frenzy, with a roar, and only once;
+  - the first phase never falls into a frenzy;
+  - a frenzied Charge throws a pair of strands on a beat while it runs (six pairs over a 760 unit run);
+  - a frenzied Hair Ring spits two rings;
+  - a frenzied Leap lands with a ring of 12 strands with no gap, one of them at the player;
+  - a frenzied Volley fires five bursts, led every other one;
+  - the Debug shortcut throws the second phase into its frenzy, and does nothing in the first.
+- `tests/core/PhaseTwoTests.cpp`:
+  - emptying the first phase's bar starts the transformation, not the victory;
+  - while it transforms the boss cannot be hurt, holds still and does not attack;
+  - the transformation ends with a roar, a fresh shield and the second phase's numbers, and the Volley comes first;
+  - the roar's shockwave catches a player who waits next to the boss, and dies out before the distance the fight starts at;
+  - only an empty bar in the second phase wins the fight;
+  - the Debug shortcuts skip to the transformation (only once) and to the victory;
+  - the Volley joins the picks in the second phase (three in ten far away), and never shows in the first.
 
 - `tests/core/AttackChoiceTests.cpp`, on the choice alone:
   - each attack weighs most at its own distance, and the weights blend in between;
@@ -260,13 +342,14 @@ The tests about one attack's timings use a boss without its chance (`tests/core/
 - `tests/core/WorldTests.cpp`: a new world has the boss in the middle and the player south of it, facing it; nobody leaves the arena, the boss included; and two worlds with the boss, hairballs and the same inputs end in exactly the same state, strands included.
 - `tests/core/SessionTests.cpp`: standing still in front of the boss ends in death for each of 20 seeds, before 20 s (between 6.3 and 18.8 s, most often to the boss's touch once a charge has left it next to the player); a dead player's world remembers what killed them; and the last bullet into the boss wins the fight in the step it lands.
 
-The drawing is not unit tested, because it needs a window. I checked it in a Release build with captures that never touch the real keyboard or mouse. For the Charge, standing still from the start: the path following the player, the brighter locked path with the boss crouched, the ghosts behind the running boss, the stun stars with the player's health at 70, and the "YOU DIED" screen at 0:07. For the Hair Ring, standing still dies before the first ring, so I drove the player with key presses posted to the game's window: a sidestep out of the Charge, a walk north, then a run into the gap. The captures show the swollen boss with the red ring and the pale lane, the ring leaving the boss, and the ring passing the player in the gap at full health. A first run that stopped at the edge of the gap took 15. For the Leap, the same run went on: the shadow under the player, the boss in the air with the shadow lagging behind the running player, the landing next to the player at 60 health, and a dash through the shockwave that left the player at 60 and the wave unspent. Runs that started running too late took the impact (60 to 25), and a dash pressed too late took the wave (60 to 40). In a Debug build, `F1` read "ring warning" during the warning and 42 strands in flight after the spit, and "leap warning 0.90 airborne" with the seed during a Leap. For the random choice and the combos, every launch has a new seed, so I ran the game ten times in Debug and nine in Release with the same sidestep out of the opening Charge, and captured it just after the run. Three of the nineteen chained a combo (the tests measure the 35% over thousands of picks; nineteen runs are too few to show it): in Debug, `F1` read "charge warning 0.52/0.54 combo 2/2" with the Rebound's path drawn from the south wall back at the player; in Release, the Pursuit had the boss in the air over the player's shadow at 3.75 s, where a lone Charge would still be stunned. The Debug runs without a combo read "charge recovery" and "stunned", with warnings between 0.71 and 0.91 s, all inside the 0.68 to 0.92 s range. Dodging with the dash, punishing the recovery and how the timing feels need someone playing, so I check them by playing.
+The drawing is not unit tested, because it needs a window. I checked it in a Release build with captures that never touch the real keyboard or mouse. For the Charge, standing still from the start: the path following the player, the brighter locked path with the boss crouched, the ghosts behind the running boss, the stun stars with the player's health at 70, and the "YOU DIED" screen at 0:07. For the Hair Ring, standing still dies before the first ring, so I drove the player with key presses posted to the game's window: a sidestep out of the Charge, a walk north, then a run into the gap. The captures show the swollen boss with the red ring and the pale lane, the ring leaving the boss, and the ring passing the player in the gap at full health. A first run that stopped at the edge of the gap took 15. For the Leap, the same run went on: the shadow under the player, the boss in the air with the shadow lagging behind the running player, the landing next to the player at 60 health, and a dash through the shockwave that left the player at 60 and the wave unspent. Runs that started running too late took the impact (60 to 25), and a dash pressed too late took the wave (60 to 40). In a Debug build, `F1` read "ring warning" during the warning and 42 strands in flight after the spit, and "leap warning 0.90 airborne" with the seed during a Leap. For the random choice and the combos, every launch has a new seed, so I ran the game ten times in Debug and nine in Release with the same sidestep out of the opening Charge, and captured it just after the run. Three of the nineteen chained a combo (the tests measure the 35% over thousands of picks; nineteen runs are too few to show it): in Debug, `F1` read "charge warning 0.52/0.54 combo 2/2" with the Rebound's path drawn from the south wall back at the player; in Release, the Pursuit had the boss in the air over the player's shadow at 3.75 s, where a lone Charge would still be stunned. The Debug runs without a combo read "charge recovery" and "stunned", with warnings between 0.71 and 0.91 s, all inside the 0.68 to 0.92 s range. For the second phase, in a Debug build, `F3` at 1 s: at 1.5 s the swollen boss with red eyes and "transforming 1.45" over a bar a quarter full; at 3.2 s the roar's shockwave around the boss, the red eyes and a fresh Shell; at 3.9 s "p2 volley warning" with the line on the floor to the player; then the three strands of each burst, and the player, standing still, at 68 after a burst's 12. In that run the boss had walked to about 330 units during its first stalk, and the roar's last steps reached the player for 20; a first version with the landing's 420 unit reach hit the player even at the starting 400, which is why the roar is shorter. For the frenzy, `F3` twice (the transformation, then the frenzy at 3.3 s): the second roar around the bristling, reddened boss with its glow; a frenzied Volley of five bursts of five strands; then a Rebound ("p2 frenzy charge active 0.65/0.46 combo 2/2") with pairs of strands left along its run, one at the player and one ahead. For the led burst, the same start with the player running west, away from the boss, through the whole Volley: the first burst passed behind the player and the second, led, hit at 5.3 s (80 to 68). Before the lead, at 400 units/s, the same run ended at 80. Dodging with the dash, punishing the recovery and how the timing feels need someone playing, so I check them by playing.
 
 ## Limitations
 
 - **The pick looks only at the distance.** It does not know whether the player is drinking, out of dash, or standing in a corner. A boss that punishes a drink is a good idea for the second phase, and it would be one more weight, not a new system.
 - **The numbers are a first guess.** The weights, the combo chance and the stalks are set from the captures and the tests, not from people playing. Day 9 moves them to a data file that reloads with `F5`, to tune them while playing.
-- **One bar is the whole fight.** Emptying it wins at once. The transformation and the second phase come on day 8.
+- **The second phase has no Summon yet.** It is the next commit: spawn markers near the walls, then hairballs.
+- **The transformation and the second phase are only checked in Debug.** Reaching the second phase in a Release build takes emptying the first bar through its shields, which the captures cannot do. I used `F3` in a Debug build.
 - **The Leap's arc is drawn, not simulated.** The body's position moves straight from the takeoff to the shadow, and the height is only an offset in the drawing. Nothing in the fight needs a third dimension.
 - **The crouch and the swell change the size, not the shape.** The body is drawn with circles, so it gets smaller or bigger instead of flatter or rounder. Squash and stretch come with the art pass.
 - **A strand is a dot with a short tail.** Real hair, and strands that fall to the floor at the end of their range, come with the art pass.

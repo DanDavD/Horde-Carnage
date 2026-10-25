@@ -78,18 +78,27 @@ struct World {
 /// @param commands What the player asks for in this step: movement, aim, fire and weapon switching.
 void StepWorld(World& world, const PlayerCommands& commands, float dt);
 
-/// Whether the fight is won. For now that is the boss's health reaching 0; once the boss has a second
-/// phase, it will mean the end of that phase, and only this function will change.
+/// Whether the fight is won: the boss's health reaching 0 in its second phase. In the first phase an empty
+/// bar starts the transformation instead.
 [[nodiscard]] bool IsBossDefeated(const World& world);
 
 /// The share of shots this run that hit something, from 0 to 1. 0 when nothing was fired.
 [[nodiscard]] float Accuracy(const World& world);
 
-/// Takes all the boss's health at once. For the Debug shortcut that skips to the victory screen.
+/// Takes all the boss's health at once, in its second phase. For the Debug shortcut that skips to the
+/// victory screen.
 void DefeatBoss(World& world);
 
 /// Breaks the boss's shield at once, staggering it as a real break would. For the Debug shortcut that skips
 /// to the exposed window without the right gun.
 void BreakBossShield(World& world);
+
+/// Starts the boss's transformation into its second phase at once. For the Debug shortcut that skips the
+/// first phase.
+void TransformBoss(World& world);
+
+/// In the second phase, drops the boss to half its health and throws it into its frenzy at once. For the
+/// Debug shortcut that skips to the end of the fight.
+void FrenzyBoss(World& world);
 
 } // namespace horde

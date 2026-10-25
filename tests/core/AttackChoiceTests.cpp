@@ -14,11 +14,12 @@ namespace {
 
 constexpr int kPicks = 1000;
 
-// How many of `kPicks` picks went to each attack, in the order Charge, Hair Ring, Leap.
-std::array<int, 3> CountPicks(float distance, std::optional<AttackKind> last, Random& random) {
-    std::array<int, 3> counts{};
+// How many of `kPicks` picks went to each attack, in the order Charge, Hair Ring, Leap, Volley.
+std::array<int, 4> CountPicks(float distance, std::optional<AttackKind> last, Random& random,
+                              const AttackChoiceStats& stats = AttackChoiceStats{}) {
+    std::array<int, 4> counts{};
     for (int i = 0; i < kPicks; ++i) {
-        ++counts[static_cast<std::size_t>(horde::ChooseAttack(AttackChoiceStats{}, distance, last, random))];
+        ++counts[static_cast<std::size_t>(horde::ChooseAttack(stats, distance, last, random))];
     }
     return counts;
 }
@@ -47,7 +48,7 @@ TEST_CASE("the attack that just ended is never picked again") {
     Random random = horde::SeedRandom(11);
     for (const AttackKind last : {AttackKind::Charge, AttackKind::HairRing, AttackKind::Leap}) {
         for (const float distance : {100.0f, 400.0f, 900.0f}) {
-            const std::array<int, 3> counts = CountPicks(distance, last, random);
+            const std::array<int, 4> counts = CountPicks(distance, last, random);
             CHECK(counts[static_cast<std::size_t>(last)] == 0);
         }
     }
@@ -56,16 +57,16 @@ TEST_CASE("the attack that just ended is never picked again") {
 TEST_CASE("the distance shifts the picks toward the attack that suits it") {
     Random random = horde::SeedRandom(12);
     // Up close the weights are 1, 4 and 1: two picks in three are a Hair Ring.
-    const std::array<int, 3> closeUp = CountPicks(100.0f, std::nullopt, random);
+    const std::array<int, 4> closeUp = CountPicks(100.0f, std::nullopt, random);
     CHECK(closeUp[1] > 600);
     CHECK(closeUp[1] < 733);
     // Far away they are 4, 1 and 2: four in seven are a Charge.
-    const std::array<int, 3> farAway = CountPicks(900.0f, std::nullopt, random);
+    const std::array<int, 4> farAway = CountPicks(900.0f, std::nullopt, random);
     CHECK(farAway[0] > 500);
     CHECK(farAway[0] < 643);
     CHECK(farAway[2] > farAway[1]);
     // With the Charge just ended, far away the Leap takes two in three.
-    const std::array<int, 3> afterCharge = CountPicks(900.0f, AttackKind::Charge, random);
+    const std::array<int, 4> afterCharge = CountPicks(900.0f, AttackKind::Charge, random);
     CHECK(afterCharge[2] > 600);
     CHECK(afterCharge[2] < 733);
 }

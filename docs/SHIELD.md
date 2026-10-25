@@ -89,4 +89,4 @@ The drawing is not unit tested, because it needs a window. I checked it with cap
 
 - **A bounce has no sparks and no sound.** Only the band's flash shows it. Both come with the game feel pass.
 - **The shield ignores the hairballs.** It only stands between the player's bullets and the boss. Nothing else hurts the boss today.
-- **The cycle never speeds up.** The second phase, next on the roadmap, is where it gets faster.
+- **Only the opening changes in the second phase.** It drops from 5 s to 4 s (`PhaseTwoStats::exposedSeconds`), and the second phase starts with a fresh Shell. The strengths stay the same.
