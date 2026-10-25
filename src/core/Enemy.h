@@ -25,6 +25,10 @@ struct Enemy {
     float hitFlashSeconds = 0.0f; ///< Time left on the white flash of the last hit.
     /// Time left in which it does not chase, so a hit staggers it before it comes back.
     float stunSeconds = 0.0f;
+    /// Whether it spits a strand at the player now and then. The boss's summons do; a hairball made any
+    /// other way does not.
+    bool spits = false;
+    float secondsUntilSpit = 0.0f; ///< Until its next strand. It swells for the last moment before.
 };
 
 } // namespace horde

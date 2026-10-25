@@ -15,6 +15,7 @@
 #include "core/Projectile.h"
 #include "core/Random.h"
 #include "core/Shockwave.h"
+#include "core/SpawnMarker.h"
 #include "core/Vec2.h"
 
 namespace horde {
@@ -34,6 +35,8 @@ inline constexpr std::size_t kMaxEnemies = 64;
 inline constexpr std::size_t kMaxBullets = 128;
 inline constexpr std::size_t kMaxHostileProjectiles = 128;
 inline constexpr std::size_t kMaxShockwaves = 8;
+/// A summon puts down 6 marks at most, and they last under a second, so 16 is room for two at once.
+inline constexpr std::size_t kMaxSpawnMarkers = 16;
 
 /// Everything the simulation needs, as plain data: the arena, the player, the boss, the hairballs, the
 /// bullets, the boss's projectiles and shockwaves, the camera, and the random generator.
@@ -46,13 +49,14 @@ struct World {
     Arena arena;
     Player player;
     Boss boss;
-    /// Hairballs. The fight starts without any; the pool is there for the ones the boss summons.
+    /// Hairballs. The fight starts without any; the boss summons them in its second phase.
     ObjectPool<Enemy, kMaxEnemies> enemies;
     ObjectPool<Projectile, kMaxBullets> bullets; ///< The player's. They hit hairballs and the boss.
     /// The boss's: the strands of its Hair Ring. They hit only the player. A pool of their own keeps the two
     /// sides apart without a flag on every projectile.
     ObjectPool<Projectile, kMaxHostileProjectiles> hostileProjectiles;
     ObjectPool<Shockwave, kMaxShockwaves> shockwaves; ///< From the boss's landings. They hit only the player.
+    ObjectPool<SpawnMarker, kMaxSpawnMarkers> spawnMarkers; ///< Where summoned hairballs are about to appear.
     FollowCamera camera;
     std::uint64_t seed = 0; ///< What `random` was seeded with, so a fight can be told apart and replayed.
     Random random;
@@ -78,14 +82,27 @@ struct World {
 /// @param commands What the player asks for in this step: movement, aim, fire and weapon switching.
 void StepWorld(World& world, const PlayerCommands& commands, float dt);
 
-/// Whether the fight is won. For now that is the boss's health reaching 0; once the boss has a second
-/// phase, it will mean the end of that phase, and only this function will change.
+/// Whether the fight is won: the boss's health reaching 0 in its second phase. In the first phase an empty
+/// bar starts the transformation instead.
 [[nodiscard]] bool IsBossDefeated(const World& world);
 
 /// The share of shots this run that hit something, from 0 to 1. 0 when nothing was fired.
 [[nodiscard]] float Accuracy(const World& world);
 
-/// Takes all the boss's health at once. For the Debug shortcut that skips to the victory screen.
+/// Takes all the boss's health at once, in its second phase. For the Debug shortcut that skips to the
+/// victory screen.
 void DefeatBoss(World& world);
+
+/// Breaks the boss's shield at once, staggering it as a real break would. For the Debug shortcut that skips
+/// to the exposed window without the right gun.
+void BreakBossShield(World& world);
+
+/// Starts the boss's transformation into its second phase at once. For the Debug shortcut that skips the
+/// first phase.
+void TransformBoss(World& world);
+
+/// In the second phase, drops the boss to half its health and throws it into its frenzy at once. For the
+/// Debug shortcut that skips to the end of the fight.
+void FrenzyBoss(World& world);
 
 } // namespace horde

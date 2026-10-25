@@ -179,9 +179,10 @@ TEST_CASE("when the boss and a hairball touch the player in the same step, the b
     CHECK(world.player.health.current == world.player.health.max - world.boss.contactDamage);
 }
 
-TEST_CASE("a bullet takes health from the boss and flashes it, but does not push it") {
+TEST_CASE("with its shield down, a bullet takes health from the boss and flashes it, but does not push it") {
     World world = NewFight();
     const Boss& boss = world.boss;
+    horde::BreakShield(world.boss.shield);
     // The player starts aiming at the boss, 400 units north.
     Step(world, PlayerCommands{.firePressed = true}, 1);
     for (int i = 0; i < 30 && boss.health.current == boss.health.max; ++i) {
@@ -193,6 +194,65 @@ TEST_CASE("a bullet takes health from the boss and flashes it, but does not push
     // The bullet flew north. The boss keeps walking south, at the player, as if nothing happened.
     CHECK(boss.motion.velocity.y > 0.0f);
     CHECK(boss.motion.velocity.x == doctest::Approx(0.0f));
+}
+
+TEST_CASE("a shield that is up takes the bullets instead of the boss") {
+    World world = NewFight();
+    const Boss& boss = world.boss;
+    const float full = boss.shield.strength;
+    // The player starts aiming at the boss with the pistol: the shell takes the shot.
+    Step(world, PlayerCommands{.firePressed = true}, 1);
+    for (int i = 0; i < 30 && boss.shield.strength == full; ++i) {
+        Step(world, PlayerCommands{}, 1);
+    }
+    CHECK(boss.shield.strength == doctest::Approx(full - static_cast<float>(horde::kPistol.damage)));
+    CHECK(boss.health.current == boss.health.max);
+    CHECK(boss.hitFlashSeconds == 0.0f);
+    CHECK(world.shotsHit == 1);
+}
+
+TEST_CASE("SMG bullets bounce off the shell without a scratch") {
+    World world = NewFight();
+    const Boss& boss = world.boss;
+    Step(world, PlayerCommands{.selectSlot = 1}, 1);
+    Step(world, PlayerCommands{.fireHeld = true, .firePressed = true}, 40);
+    Step(world, PlayerCommands{}, 30);
+    CHECK(world.shotsHit > 3);
+    CHECK(boss.shield.strength == doctest::Approx(boss.shield.stats.shellStrength));
+    CHECK(boss.health.current == boss.health.max);
+}
+
+TEST_CASE("the bullet that breaks the shield staggers the boss: its attack is cut off and it holds still") {
+    World world = AboutToCharge(250.0f);
+    Boss& boss = world.boss;
+    boss.shield.strength = static_cast<float>(horde::kPistol.damage);
+    StepUntilStage(world, PlayerCommands{}, AttackStage::Warning);
+    Step(world, PlayerCommands{.firePressed = true}, 1);
+    for (int i = 0; i < 30 && horde::IsShieldUp(boss.shield); ++i) {
+        Step(world, PlayerCommands{}, 1);
+    }
+    REQUIRE_FALSE(horde::IsShieldUp(boss.shield));
+    CHECK(horde::IsStaggered(boss));
+    CHECK_FALSE(boss.attack);
+    CHECK(boss.health.current == boss.health.max);
+    const Vec2 where = boss.motion.position;
+
+    // A second of stagger: no attack and no walking, then it stalks again.
+    Step(world, PlayerCommands{}, 55);
+    CHECK(horde::IsStaggered(boss));
+    CHECK_FALSE(boss.attack);
+    CHECK(Distance(boss.motion.position, where) < 1.0f);
+    Step(world, PlayerCommands{}, 10);
+    CHECK_FALSE(horde::IsStaggered(boss));
+    Step(world, PlayerCommands{}, 20);
+    CHECK(Distance(boss.motion.position, where) > 1.0f);
+}
+
+TEST_CASE("the Debug shortcut breaks the shield and staggers the boss like a real break") {
+    World world = NewFight();
+    horde::BreakBossShield(world);
+    CHECK_FALSE(horde::IsShieldUp(world.boss.shield));
+    CHECK(horde::IsStaggered(world.boss));
 }
 
 TEST_CASE("a hairball in front of the boss takes the bullet meant for the boss") {

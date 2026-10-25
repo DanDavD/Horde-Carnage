@@ -2,7 +2,7 @@
 
 ## What it is
 
-`ObjectPool<T, Capacity>` (`src/core/ObjectPool.h`) holds objects that are created and destroyed all the time, without allocating memory while the game runs. The world keeps four: up to 64 hairballs, up to 128 of the player's bullets, up to 128 of the boss's projectiles (the strands of its Hair Ring), and up to 8 shockwaves from its Leap. The SMG fires 10 bullets a second, each one lives less than a second, and one ring is 42 strands at once, so without pools the game would allocate and free memory dozens of times a second, in the middle of a fight.
+`ObjectPool<T, Capacity>` (`src/core/ObjectPool.h`) holds objects that are created and destroyed all the time, without allocating memory while the game runs. The world keeps five: up to 64 hairballs, up to 128 of the player's bullets, up to 128 of the boss's projectiles (the strands of its Hair Ring and its Volley), up to 8 shockwaves from its Leap and its roar, and up to 16 marks of its Summon. The SMG fires 10 bullets a second, each one lives less than a second, and one ring is 42 strands at once, so without pools the game would allocate and free memory dozens of times a second, in the middle of a fight.
 
 ## How it works
 
@@ -29,7 +29,7 @@ slots:  [ A ][ D ][ C ][   ][   ][   ]     Size() == 3
 - **A `std::array` inside the object, not a heap buffer.** The capacity is a template parameter, so the storage is part of the `World`. Copying a world (tests, and `Session` replacing it on restart) copies the pool with its full capacity, and no code path can make it allocate.
   - Rejected: a heap buffer sized at construction. It would need a hand-written copy constructor to keep the capacity, and a mistake there would bring allocations back.
 - **A full pool refuses instead of growing.** The caller decides what "no room" means: a bullet that finds no slot is not fired, and a hairball that finds no slot is not spawned. Both capacities are well above what the game needs, so this is a safety net, not a rule players will meet.
-- **One generic pool for every kind of object.** Hairballs, bullets, the boss's projectiles and its shockwaves use the same class today; the markers of its summons and the particles will too.
+- **One generic pool for every kind of object.** Hairballs, bullets, the boss's projectiles, its shockwaves and the marks of its Summon use the same class today; the particles will too.
 - **A pool per side, not a flag per projectile.** The player's bullets and the boss's strands are both `Projectile`s, but they live in different pools, so the system that flies each pool only tests what that side can hit.
 
 ## How to tune it
@@ -40,6 +40,7 @@ slots:  [ A ][ D ][ C ][   ][   ][   ]     Size() == 3
 | Bullet pool | `kMaxBullets` (`src/core/World.h`) | 128 |
 | The boss's projectiles | `kMaxHostileProjectiles` (`src/core/World.h`) | 128: three Hair Rings at once |
 | Shockwaves | `kMaxShockwaves` (`src/core/World.h`) | 8 |
+| Summon marks | `kMaxSpawnMarkers` (`src/core/World.h`) | 16 |
 
 A pool costs `Capacity` times the size of its object, inside the `World`: about 5 KB each for the enemies and both kinds of projectile.
 

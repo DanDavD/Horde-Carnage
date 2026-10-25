@@ -95,10 +95,12 @@ TEST_CASE("once the player is dead the world is frozen") {
     CHECK(session.world.elapsedSeconds == survived);
 }
 
-TEST_CASE("the fight is won in the step the last bullet lands") {
+TEST_CASE("the fight is won in the step the last bullet of the second phase lands") {
     Session session = horde::StartSession(kArena, kView);
     horde::Boss& boss = session.world.boss;
+    boss.phase = horde::BossPhase::Two;
     boss.health.current = horde::kPistol.damage;
+    horde::BreakShield(boss.shield);
 
     // The player starts aiming at the boss, so one shot is enough.
     Step(session, PlayerCommands{.firePressed = true}, 1);

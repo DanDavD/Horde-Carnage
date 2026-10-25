@@ -75,8 +75,9 @@ Game objects are plain structs (components) that hold data, and free functions (
 - `tests/core/Vec2Tests.cpp`, `MovementTests.cpp`, `FacingTests.cpp`, `ArenaTests.cpp` and `AnalogInputTests.cpp`: see [Movement](MOVEMENT.md#tests).
 - `tests/core/FollowCameraTests.cpp`: see [Camera](CAMERA.md#tests).
 - `tests/core/ChaseTests.cpp` and `WorldTests.cpp`: see [Enemies](ENEMIES.md#tests).
-- `tests/core/AttackChoiceTests.cpp`, `BossTests.cpp`, `BossChargeTests.cpp`, `BossComboTests.cpp`, `BossHairRingTests.cpp`, `BossLeapTests.cpp` and `ShockwaveTests.cpp`: see [The boss](BOSS.md#tests). The boss tests share `PredictableBoss.h`, a boss without its chance.
+- `tests/core/AttackChoiceTests.cpp`, `BossTests.cpp`, `BossChargeTests.cpp`, `BossComboTests.cpp`, `BossHairRingTests.cpp`, `BossLeapTests.cpp`, `BossVolleyTests.cpp`, `FrenzyTests.cpp`, `PhaseTwoTests.cpp`, `ShockwaveTests.cpp` and `SummonTests.cpp`: see [The boss](BOSS.md#tests). The boss tests share `PredictableBoss.h`, a boss without its chance.
 - `tests/core/RandomTests.cpp`: see [Random numbers](RANDOM.md#tests).
+- `tests/core/ShieldTests.cpp`: see [The boss's shield](SHIELD.md#tests).
 - `tests/core/CollisionTests.cpp`
  and the crowd cases in `WorldTests.cpp`: see [Collisions](COLLISIONS.md#tests).
 - `tests/core/HealthTests.cpp` and the contact damage cases in `WorldTests.cpp`: see [Health](HEALTH.md#tests).

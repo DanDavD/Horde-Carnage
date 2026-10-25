@@ -7,11 +7,13 @@
 
 namespace horde {
 
-/// The boss's three attacks of the first phase.
+/// The boss's attacks: three in the first phase, and two more in the second.
 enum class AttackKind {
     Charge,   ///< Crouches, then runs in a straight line across the arena.
     HairRing, ///< Swells, then spits a ring of hair in every direction but one gap.
     Leap,     ///< Jumps, comes down on its shadow and sends a shockwave across the floor.
+    Volley,   ///< Second phase only: a few quick bursts of hair, each one aimed where the player is.
+    Summon,   ///< Second phase only: howls, and hairballs come out of marks on the floor around the player.
 };
 
 /// How likely one attack is to be picked, at three distances from the player. Between two of them the
@@ -27,13 +29,16 @@ struct AttackWeights {
 ///
 /// Each attack is best at its own distance: the Charge crosses the arena, the Leap closes a medium gap, and
 /// the Hair Ring is hardest to dodge up close, where the strands are tight. So no distance is safe to stand
-/// at: running far invites the Charge, and hugging the boss invites the Ring.
+/// at: running far invites the Charge, and hugging the boss invites the Ring. An attack with no weight at
+/// any distance is never picked: that is how the Volley and the Summon stay out of the first phase.
 struct AttackChoiceStats {
     float nearDistance = 250.0f; ///< Between the centres of the boss and the player.
     float farDistance = 550.0f;  ///< The mid weights apply halfway between the two.
     AttackWeights charge{.nearWeight = 1.0f, .midWeight = 2.0f, .farWeight = 4.0f};
     AttackWeights hairRing{.nearWeight = 4.0f, .midWeight = 2.0f, .farWeight = 1.0f};
     AttackWeights leap{.nearWeight = 1.0f, .midWeight = 4.0f, .farWeight = 2.0f};
+    AttackWeights volley{.nearWeight = 0.0f, .midWeight = 0.0f, .farWeight = 0.0f};
+    AttackWeights summon{.nearWeight = 0.0f, .midWeight = 0.0f, .farWeight = 0.0f};
     /// Stalking time between attacks, picked anew each time, so the next attack cannot be counted down to.
     float minStalkSeconds = 0.8f;
     float maxStalkSeconds = 1.6f;

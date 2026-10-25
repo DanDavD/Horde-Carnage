@@ -1,6 +1,7 @@
 #include "core/World.h"
 
 #include <algorithm>
+#include <numbers>
 #include <optional>
 
 #include "core/Chase.h"
@@ -20,9 +21,12 @@ namespace {
 // crowd. Each pass ends with the walls, so a body pushed into a wall is put back before the next pass.
 constexpr int kCollisionPasses = 4;
 
+constexpr float kRadiansPerDegree = std::numbers::pi_v<float> / 180.0f;
+
 // A hit flashes the body white. A hairball also stops chasing for a moment, so the hit reads as a stagger.
 constexpr float kHitFlashSeconds = 0.1f;
 constexpr float kHitStunSeconds = 0.15f;
+constexpr float kSummonShakeSeconds = 0.3f;
 
 // The camera looks at a point this far from the player toward the boss, so the boss stays in view. The
 // offset is capped, so a boss across the arena never pushes the player toward the edge of the screen.
@@ -117,11 +121,35 @@ void HandleWeapons(World& world, const PlayerCommands& commands, float dt) {
     }
 }
 
+// A summoned hairball's strand: aimed where the player is, from the edge of its body.
+void HairballSpit(World& world, const Enemy& hairball) {
+    const SummonStats& stats = world.boss.summon;
+    const Vec2 toPlayer = world.player.motion.position - hairball.motion.position;
+    if (LengthSquared(toPlayer) <= 1.0f) {
+        return;
+    }
+    const Vec2 direction = Normalized(toPlayer);
+    Projectile strand = LaunchProjectile(hairball.motion.position + direction * hairball.radius, direction,
+                                         stats.spitSpeed, stats.spitRange);
+    strand.radius = stats.spitRadius;
+    strand.damage = stats.spitDamage;
+    strand.source = DamageSource::Hairball;
+    world.hostileProjectiles.Spawn(strand);
+}
+
 void StepEnemies(World& world, float dt) {
     const Player& player = world.player;
+    const float spitInterval = world.boss.summon.spitIntervalSeconds;
     for (Enemy& enemy : world.enemies) {
         enemy.hitFlashSeconds = std::max(enemy.hitFlashSeconds - dt, 0.0f);
         enemy.stunSeconds = std::max(enemy.stunSeconds - dt, 0.0f);
+        if (enemy.spits) {
+            enemy.secondsUntilSpit -= dt;
+            if (enemy.secondsUntilSpit <= 0.0f) {
+                HairballSpit(world, enemy);
+                enemy.secondsUntilSpit += spitInterval;
+            }
+        }
 
         // Chase where the player is after this step's move, so a hairball never aims at a stale position.
         // While stunned it has no input: it slides out of the knockback and holds still, instead of turning
@@ -225,11 +253,35 @@ void HitEnemy(Enemy& enemy, const Projectile& bullet) {
     enemy.motion.velocity += Normalized(bullet.motion.velocity) * bullet.knockback;
 }
 
-// The boss is too heavy to stagger or push: a bullet only takes health and flashes it. Openings to punish
-// it come from its own attacks, not from the gun.
-void HitBoss(Boss& boss, const Projectile& bullet) {
-    ApplyDamage(boss.health, bullet.damage);
-    boss.hitFlashSeconds = kHitFlashSeconds;
+// A bullet meets the shield first, and reaches the health only while the shield is down. The boss is too
+// heavy for one bullet to stagger or push: the bullet that breaks the shield staggers it, the others only
+// take health and flash it. While it transforms nothing hurts it: the bullet is spent on it like on a
+// wall. The bullet that empties the first phase's bar starts the transformation instead of killing it, and
+// the one that takes the second phase's bar to half throws the boss into a frenzy, with a roar.
+void HitBoss(World& world, const Projectile& bullet) {
+    Boss& boss = world.boss;
+    if (IsTransforming(boss)) {
+        return;
+    }
+    switch (HitShield(boss.shield, bullet.damage)) {
+    case ShieldHit::Exposed:
+        ApplyDamage(boss.health, bullet.damage);
+        boss.hitFlashSeconds = kHitFlashSeconds;
+        if (IsDead(boss.health) && boss.phase == BossPhase::One) {
+            StartTransformation(boss);
+        }
+        if (ShouldFrenzy(boss)) {
+            EnterFrenzy(boss);
+            world.shockwaves.Spawn(MakeShockwave(boss.motion.position, boss.radius, boss.frenzy.roar));
+        }
+        break;
+    case ShieldHit::Broken:
+        StaggerBoss(boss);
+        break;
+    case ShieldHit::Bounced:
+    case ShieldHit::Absorbed:
+        break;
+    }
 }
 
 // A ring around the gap the boss's attack points to, one strand per slot outside the gap. A full pool drops
@@ -239,6 +291,75 @@ void SpitHairRing(World& world) {
     const Vec2 gap = boss.attack->direction;
     for (int i = 0; i < HairRingStrands(boss.hairRing); ++i) {
         world.hostileProjectiles.Spawn(MakeHairStrand(boss, HairStrandDirection(gap, i, boss.hairRing)));
+    }
+}
+
+// A strand of the boss's hair thrown in a frenzy: as fast as a Volley's, and named for the frenzy on the
+// death screen.
+void ThrowFrenzyStrand(World& world, Vec2 direction) {
+    Projectile strand = MakeVolleyStrand(world.boss, direction);
+    strand.source = DamageSource::Frenzy;
+    world.hostileProjectiles.Spawn(strand);
+}
+
+// While it charges in a frenzy: one strand at the player, one where the player is going. A player who only
+// keeps running from the charge runs into the second.
+void ThrowBolts(World& world) {
+    const Boss& boss = world.boss;
+    const Vec2 from = boss.motion.position;
+    const Vec2 player = world.player.motion.position;
+    if (LengthSquared(player - from) <= 1.0f) {
+        return;
+    }
+    ThrowFrenzyStrand(world, Normalized(player - from));
+    const Vec2 ahead = LeadPoint(boss, world.player.motion, world.arena);
+    if (LengthSquared(ahead - from) > 1.0f) {
+        ThrowFrenzyStrand(world, Normalized(ahead - from));
+    }
+}
+
+// The Summon's marks, around the player, turned by a random angle so no two summons look the same.
+void PlaceSummon(World& world) {
+    const SummonStats& stats = world.boss.summon;
+    const float turn = RandomRange(world.random, 0.0f, 2.0f * std::numbers::pi_v<float>);
+    const SummonPoints plan =
+        PlanSummon(world.player.motion.position, world.boss.motion.position, world.arena, stats.placement, turn);
+    for (std::size_t i = 0; i < plan.count; ++i) {
+        world.spawnMarkers.Spawn(MakeSpawnMarker(plan.points[i], stats.markerSeconds));
+    }
+}
+
+// A mark that runs out lets its hairball out, unless the arena already holds as many as the boss allows.
+// The hairball comes out shaking itself for a moment before it chases, like one that was just hit.
+void StepSpawnMarkers(World& world, float dt) {
+    const int maxAlive = world.boss.summon.maxAlive;
+    world.spawnMarkers.RemoveIf([&world, maxAlive, dt](SpawnMarker& marker) {
+        if (StepSpawnMarker(marker, dt)) {
+            return false;
+        }
+        if (static_cast<int>(world.enemies.Size()) < maxAlive) {
+            const SummonStats& stats = world.boss.summon;
+            Enemy hairball;
+            hairball.motion = MotionAt(marker.position);
+            hairball.stunSeconds = kSummonShakeSeconds;
+            hairball.spits = true;
+            hairball.secondsUntilSpit =
+                RandomRange(world.random, stats.firstSpitMinSeconds, stats.firstSpitMaxSeconds);
+            world.enemies.Spawn(hairball);
+        }
+        return true;
+    });
+}
+
+// One burst of a Volley: a few strands fanned around the direction the boss is aiming in.
+void SpitVolley(World& world) {
+    const Boss& boss = world.boss;
+    const VolleyStats& stats = boss.volley;
+    const float middle = 0.5f * static_cast<float>(stats.strandsPerBurst - 1);
+    for (int i = 0; i < stats.strandsPerBurst; ++i) {
+        const float degrees = (static_cast<float>(i) - middle) * stats.spreadDegrees;
+        const Vec2 direction = Rotated(boss.attack->direction, degrees * kRadiansPerDegree);
+        world.hostileProjectiles.Spawn(MakeVolleyStrand(boss, direction));
     }
 }
 
@@ -254,7 +375,7 @@ void StepBullets(World& world, float dt) {
             return true;
         }
         if (hit.boss) {
-            HitBoss(world.boss, bullet);
+            HitBoss(world, bullet);
             ++world.shotsHit;
             return true;
         }
@@ -309,7 +430,7 @@ void StepHostileProjectiles(World& world, float dt) {
                                          player.motion.position, player.radius)
                                  .has_value();
         if (touches && !IsDashInvulnerable(player.dash)) {
-            HurtPlayer(world, strand.damage, DamageSource::HairRing);
+            HurtPlayer(world, strand.damage, strand.source);
             return true;
         }
         return !stillFlying || !Contains(world.arena, strand.motion.position);
@@ -331,6 +452,16 @@ void LandLeap(World& world) {
         player.motion.velocity += out * leap.impactKnockback;
     }
     world.shockwaves.Spawn(MakeShockwave(center, boss.radius, leap.shockwave));
+    // In a frenzy, a ring of strands with no gap leaves with the wave, one of them at the player: the wave
+    // is dashed through, and the strands are slipped between.
+    const Vec2 toPlayer = LengthSquared(away) > 1.0f ? Normalized(away) : Vec2{0.0f, 1.0f};
+    for (int i = 0; i < leap.landingStrands; ++i) {
+        const float turn = 2.0f * std::numbers::pi_v<float> * static_cast<float>(i) /
+                           static_cast<float>(leap.landingStrands);
+        Projectile strand = MakeHairStrand(boss, Rotated(toPlayer, turn));
+        strand.source = DamageSource::Frenzy;
+        world.hostileProjectiles.Spawn(strand);
+    }
 }
 
 // A wave hurts the player once, the first time its band reaches them. Like the strands, it passes a
@@ -392,12 +523,27 @@ void StepWorld(World& world, const PlayerCommands& commands, float dt) {
     HandleWeapons(world, commands, dt);
     StepEnemies(world, dt);
     const BossActions actions =
-        StepBoss(world.boss, player.motion.position, player.radius, world.arena, world.random, dt);
+        StepBoss(world.boss, player.motion, player.radius, world.arena, world.random, dt);
     if (actions.spitHairRing) {
         SpitHairRing(world);
     }
     if (actions.landed) {
         LandLeap(world);
+    }
+    if (actions.spitVolley) {
+        SpitVolley(world);
+    }
+    if (actions.throwBolts) {
+        ThrowBolts(world);
+    }
+    if (actions.summon) {
+        PlaceSummon(world);
+    }
+    // Before the collisions, so a hairball that comes out is pushed apart and held inside the walls at once.
+    StepSpawnMarkers(world, dt);
+    if (actions.roared) {
+        const Boss& boss = world.boss;
+        world.shockwaves.Spawn(MakeShockwave(boss.motion.position, boss.radius, boss.phaseTwo.roar));
     }
 
     // Collisions run after everyone has moved, so the order in which bodies moved does not decide who
@@ -422,7 +568,7 @@ void StepWorld(World& world, const PlayerCommands& commands, float dt) {
 }
 
 bool IsBossDefeated(const World& world) {
-    return IsDead(world.boss.health);
+    return world.boss.phase == BossPhase::Two && IsDead(world.boss.health);
 }
 
 float Accuracy(const World& world) {
@@ -433,7 +579,29 @@ float Accuracy(const World& world) {
 }
 
 void DefeatBoss(World& world) {
+    world.boss.attack.reset();
+    world.boss.phase = BossPhase::Two;
     world.boss.health.current = 0;
+}
+
+void TransformBoss(World& world) {
+    StartTransformation(world.boss);
+}
+
+void FrenzyBoss(World& world) {
+    Boss& boss = world.boss;
+    if (boss.phase != BossPhase::Two || boss.frenzied) {
+        return;
+    }
+    const float half = boss.frenzy.healthFraction * static_cast<float>(boss.health.max);
+    boss.health.current = std::min(boss.health.current, static_cast<int>(half));
+    EnterFrenzy(boss);
+    world.shockwaves.Spawn(MakeShockwave(boss.motion.position, boss.radius, boss.frenzy.roar));
+}
+
+void BreakBossShield(World& world) {
+    BreakShield(world.boss.shield);
+    StaggerBoss(world.boss);
 }
 
 } // namespace horde

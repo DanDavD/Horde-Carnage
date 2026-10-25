@@ -4,7 +4,7 @@
 
 The small enemies of the arena. There is one kind, the hairball: a slow lump of hair that walks straight at the player and stops when it touches them.
 
-The fight no longer starts with hairballs. They are the boss's children, and the boss will summon them in its second phase (see [The boss](BOSS.md)). Their code and tests stay, and the boss reuses all of it: the same components, the same chase input and the same movement.
+The fight no longer starts with hairballs. They are the boss's children, and the boss summons them in its second phase, out of marks on the floor around the player (see [The boss](BOSS.md)). Their code and tests stay, and the boss reuses all of it: the same components, the same chase input and the same movement.
 
 The rules live in `horde_core`:
 
@@ -65,5 +65,5 @@ In a Debug build, `F1` shows how many enemies the world has.
 
 - **Hairballs all aim at the same point, the player.** Collisions keep them from stacking, but they do not plan around each other: the ones behind keep walking into the ones in front. See the limitations in [Collisions](COLLISIONS.md#limitations).
 - **Touching the player is the only way a hairball hurts.** It takes 10 hit points per touch, at most one hit every 0.8 s. See [Health](HEALTH.md).
-- **Nothing spawns them in the game yet.** The boss's Summon attack, in its second phase, will.
+- **Only the boss spawns them.** The Summon, in its second phase, brings four at a time (six in its frenzy), eight alive at most. Those hairballs also spit a strand at the player every 3 s (see [The boss](BOSS.md)); a hairball made any other way does not.
 - **When the player walks slowly away, a hairball at contact switches between walking and stopping from one step to the next.** I have not checked how that looks in motion yet, only in still screenshots.

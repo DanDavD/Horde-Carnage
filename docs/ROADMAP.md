@@ -35,6 +35,8 @@ Every layer ends with a game that runs and can be played, and every layer is one
   - Out of the plan: the waves and the wave director, XP and levels, power-ups, new guns, and the charger and the spitter as separate enemies. Their ideas come back as boss attacks: the charge, the spit as a ring of hair, and the hairballs as the boss's summons.
   - The hairball stays, as the boss's summon in phase 2, so its code and its tests are still used. The boss itself reuses its components, its chase input and its movement.
   - The first release waits until the whole fight works (day 8), instead of shipping the waves on day 5.
+- **Day 8: a frenzy at half of the second bar.** Not in the plan. Playing it, fighting from far away was too safe and the second half of phase 2 felt like the first, so at half health the boss falls into a frenzy and each attack gains a twist: strands thrown during the Charge, two Hair Rings, a ring of strands on landing, five Volley bursts. See [The boss](BOSS.md).
+- **Day 8: the Barrier caps every hit.** The plan said the orange Barrier would only grow back fast enough that the pistol could not keep up. At full rate the pistol does 60 a second, the same as the SMG, so that rule alone would let a fast clicker break it with either gun. Each hit on the Barrier now takes at most 6, which leaves the pistol at 36 a second against the 40 it grows back. See [The boss's shield](SHIELD.md#design-decisions).
 
 ## The difficulty I am aiming for
 

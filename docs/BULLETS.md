@@ -22,7 +22,7 @@ The game executable draws bullets as short yellow streaks and flashes the bodies
 
 1. `StepProjectile` moves it along its velocity and counts its lifetime down.
 2. `FirstHit` sweeps the bullet's circle from where it was to where it is now against every living hairball and the living boss, unless the boss is in the air during its Leap, with `SweepCircle`, and keeps the body it touches first along the way.
-3. If it hit a hairball, `HitEnemy` applies the damage, starts a 0.1 s white flash and a 0.15 s stun, and adds the bullet's knockback to the hairball's velocity, along the bullet's direction. If it hit the boss, `HitBoss` applies the damage and starts the flash. Either way the bullet is removed.
+3. If it hit a hairball, `HitEnemy` applies the damage, starts a 0.1 s white flash and a 0.15 s stun, and adds the bullet's knockback to the hairball's velocity, along the bullet's direction. If it hit the boss, `HitBoss` hands the bullet to the boss's shield first, and only with the shield down applies the damage and starts the flash (see [The boss's shield](SHIELD.md)). Either way the bullet is removed, even when it bounced off the shield.
 4. Otherwise the bullet is removed if its lifetime is over or it is outside the arena.
 
 **Stun and knockback.** The knockback slides the hairball away, braked at its deceleration, and the collisions let it shove the hairballs behind it. While stunned it gets no chase input, so once it stops it stays where it landed for the rest of the stun instead of turning straight back toward the player.
@@ -65,7 +65,7 @@ In a Debug build, `F1` shows the number of live enemies and bullets, the shots f
 - `tests/core/ArenaTests.cpp`: an arena contains the points inside it and on its edge, and nothing outside.
 - `tests/core/WeaponTests.cpp`: the muzzle is at the end of the barrel; the pistol hits harder per bullet and the SMG fires faster.
 - `tests/core/WorldTests.cpp`: a shot leaves the muzzle and flies where the player aims; a bullet that hits nothing is gone after its range; a bullet that reaches a wall is gone at once; three pistol bullets kill a hairball and it is removed; a hit flashes, stuns and knocks a hairball back along the bullet; a bullet hits only the nearest of two hairballs in a line; and a hairball killed in a step is gone before it can touch the player. The determinism test fires too, and compares the bullets and the boss's health.
-- `tests/core/BossTests.cpp`: a bullet takes health from the boss and flashes it without pushing it; a hairball in front of the boss takes the bullet meant for the boss; a bullet and a strand of the boss's ring fly through each other; and bullets fly under the boss while it is in the air.
+- `tests/core/BossTests.cpp`: with the shield down, a bullet takes health from the boss and flashes it without pushing it; with the shield up, the shield takes it instead; a hairball in front of the boss takes the bullet meant for the boss; a bullet and a strand of the boss's ring fly through each other; and bullets fly under the boss while it is in the air.
 
 The drawing is not unit tested, because it needs a window. In a Debug build, holding the SMG toward a hairball killed it, and the overlay counted the enemies, bullets and shots.
 

@@ -34,7 +34,7 @@ Boss AboutToLeapFrom(Vec2 position) {
 int Step(Boss& boss, Vec2 player, int steps) {
     int landings = 0;
     for (int i = 0; i < steps; ++i) {
-        if (horde::StepBoss(boss, player, kPlayerRadius, kArena, chance, kDt).landed) {
+        if (horde::StepBoss(boss, horde::MotionAt(player), kPlayerRadius, kArena, chance, kDt).landed) {
             ++landings;
         }
     }
