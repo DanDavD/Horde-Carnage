@@ -8,6 +8,9 @@ Versions follow [Semantic Versioning](https://semver.org/) while the game is a p
 ### Added
 - **Web build** (`CMakePresets.json`, `src/CMakeLists.txt`, `web/shell.html`, `Game.cpp`): the game compiles to WebAssembly with Emscripten 3.1.74 (`cmake --preset web`), so it can be played in a browser tab on itch.io. `Game::Run` hands each frame to the browser through `Game::Frame` instead of looping, and the page scales the 1280x720 game to fit the window while the mouse keeps aiming where the cursor is. A CI job builds it on every push and pull request. Checked by hand in a local server; explained in `docs/WEB_BUILD.md`.
 
+### Fixed
+- **Aim in the browser** (`web/shell.html`, `PlayerInput.cpp`, `Game.cpp`): on itch.io the crosshair froze once the fight started, because raylib 5.5 stops following the mouse in a browser when the cursor is hidden. The page now tracks the aim point in game pixels and `ReadAimPoint` reads it, and a click locks the pointer to the game, so the mouse no longer leaves it mid-fight (Esc gives it back). Checked in a browser by moving the mouse to three points during a fight; explained in `docs/WEB_BUILD.md`.
+
 ### Changed
 - **Warnings for GCC and Clang** (`cmake/Warnings.cmake`): `-Wno-missing-field-initializers`, because Clang flags every designated initializer that names only some fields, which is how the code sets its numbers. Every other warning is still an error.
 

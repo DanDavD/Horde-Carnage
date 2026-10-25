@@ -1024,12 +1024,7 @@ void Game::Frame() {
     CollectButtonPresses(_pendingPresses);
 
     // The crosshair replaces the system cursor while playing. On the end screens the cursor is back.
-    const bool playing = _session.state == SessionState::Playing;
-    if (playing && !IsCursorHidden()) {
-        HideCursor();
-    } else if (!playing && IsCursorHidden()) {
-        ShowCursor();
-    }
+    SetCursorHidden(_session.state == SessionState::Playing);
 #ifndef NDEBUG
     if (IsKeyPressed(KEY_F1)) {
         _showDebugOverlay = !_showDebugOverlay;
@@ -1066,7 +1061,7 @@ void Game::Update(float dt) {
     // screen is a fraction of a step behind that, which is far below a pixel of aiming error.
     const Camera2D camera = ToRaylibCamera(_session.world.camera, 1.0f);
     const PlayerCommands commands{.move = ReadMoveInput(),
-                                  .aimAt = FromRaylib(GetScreenToWorld2D(GetMousePosition(), camera)),
+                                  .aimAt = FromRaylib(GetScreenToWorld2D(ToRaylib(ReadAimPoint()), camera)),
                                   .fireHeld = ReadFireHeld(),
                                   .firePressed = _pendingPresses.fire,
                                   .selectSlot = _pendingPresses.weaponSlot,
@@ -1155,7 +1150,7 @@ void Game::Draw(float alpha) const {
     DrawAttempt(_session.attempt);
     if (playing) {
         DrawText(kControlsHint, kHudMargin, kScreenHeight - 30, 18, kSoftText);
-        DrawCrosshair(GetMousePosition());
+        DrawCrosshair(ToRaylib(ReadAimPoint()));
     } else {
         DrawEndScreen(_session);
     }

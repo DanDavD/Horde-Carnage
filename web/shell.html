@@ -35,8 +35,37 @@
       event.preventDefault();
     }
   });
-  // A click on the game gives it the keyboard.
-  Module.canvas.addEventListener('mousedown', function () { Module.canvas.focus(); });
+  // Where the player aims, in game pixels, read by the game every frame (ReadAimPoint). raylib 5.5
+  // stops following the mouse in a browser once the game hides the cursor, so the page tracks it.
+  var canvas = Module.canvas;
+  Module.hordeAim = { x: canvas.width / 2, y: canvas.height / 2 };
+  function clamp(value, low, high) { return Math.min(Math.max(value, low), high); }
+  function locked() { return document.pointerLockElement === canvas; }
+  // The canvas is scaled to fit the window, so page pixels are turned into game pixels.
+  function aimAt(event) {
+    var box = canvas.getBoundingClientRect();
+    Module.hordeAim.x = clamp((event.clientX - box.left) * canvas.width / box.width, 0, canvas.width);
+    Module.hordeAim.y = clamp((event.clientY - box.top) * canvas.height / box.height, 0, canvas.height);
+  }
+  document.addEventListener('mousemove', function (event) {
+    if (locked()) {
+      // Locked, the mouse only reports how far it moved: the aim point moves by that, inside the game.
+      var box = canvas.getBoundingClientRect();
+      Module.hordeAim.x = clamp(Module.hordeAim.x + event.movementX * canvas.width / box.width, 0, canvas.width);
+      Module.hordeAim.y = clamp(Module.hordeAim.y + event.movementY * canvas.height / box.height, 0, canvas.height);
+    } else {
+      aimAt(event);
+    }
+  });
+  // A click gives the game the keyboard and locks the pointer to it, so the mouse cannot wander out of
+  // the game mid-fight. Esc gives it back; the next click locks it again.
+  canvas.addEventListener('mousedown', function (event) {
+    canvas.focus();
+    if (!locked()) {
+      aimAt(event);
+      if (canvas.requestPointerLock) { canvas.requestPointerLock(); }
+    }
+  });
 </script>
 {{{ SCRIPT }}}
 </body>

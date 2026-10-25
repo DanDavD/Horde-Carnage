@@ -2,6 +2,10 @@
 
 #include <raylib.h>
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten/emscripten.h>
+#endif
+
 #include "core/AnalogInput.h"
 
 namespace horde {
@@ -51,6 +55,30 @@ Vec2 ReadMoveInput() {
 
     // All devices add up. StepMovement clamps the sum to length 1, so using two at once is never faster.
     return keys + stick + dpad;
+}
+
+Vec2 ReadAimPoint() {
+#ifdef __EMSCRIPTEN__
+    // The page keeps the aim point up to date in Module.hordeAim, already in game pixels.
+    const double x = EM_ASM_DOUBLE({ return Module.hordeAim ? Module.hordeAim.x : 640; });
+    const double y = EM_ASM_DOUBLE({ return Module.hordeAim ? Module.hordeAim.y : 360; });
+    return Vec2{static_cast<float>(x), static_cast<float>(y)};
+#else
+    const Vector2 mouse = GetMousePosition();
+    return Vec2{mouse.x, mouse.y};
+#endif
+}
+
+void SetCursorHidden(bool hidden) {
+#ifdef __EMSCRIPTEN__
+    (void)hidden;
+#else
+    if (hidden && !IsCursorHidden()) {
+        HideCursor();
+    } else if (!hidden && IsCursorHidden()) {
+        ShowCursor();
+    }
+#endif
 }
 
 bool ReadFireHeld() {
