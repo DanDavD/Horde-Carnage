@@ -23,7 +23,7 @@ Every layer ends with a game that runs and can be played, and every layer is one
 | 9 | Wed Oct 28 | `feat/data-driven-boss` | The boss's and the guns' numbers in JSON, reloaded with F5 in Debug builds |
 | 10 | Thu Oct 29 | `feat/game-feel` | Hit stop, screen shake, particles, sounds, clearer warnings |
 | 11 | Fri Oct 30 | `feat/menus-and-polish` | Title screen, pause, the end screens, an art pass with clean shapes, balancing |
-| 12 | Sat Oct 31 | `chore/release-v0.2.0` | Bug bash, README GIF, docs. Release `v0.2.0`, the version I present |
+| 12 | Sat Oct 31 | `chore/release-v1.0.0` | Bug bash, README GIF, docs. Release `v1.0.0`, the version I present |
 | 13-15 | Nov 1-3 | | Buffer |
 
 ## Changes to the plan
@@ -53,8 +53,8 @@ Someone reviewing the game may only play it for a few minutes and never reach ph
 
 ## Releases
 
-- `v0.1.0` The fight: the boss with its five attacks, its shield and its second phase; the dash and the flasks; "YOU DIED" and "VICTORY".
-- `v0.2.0` Vertical slice: numbers in JSON, game feel, menus, balancing. This is the version I present.
+- `v0.1.0` The fight: the boss with its five attacks, its shield, its second phase and its frenzy; the dash and the flasks; "YOU DIED" and "VICTORY". Released on October 25.
+- `v1.0.0` Vertical slice: art, game feel, sound, menus, balancing. This is the version I present, and the first one that is not a pre-release.
 
 ## If I fall behind
 

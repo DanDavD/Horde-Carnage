@@ -5,6 +5,10 @@ Versions follow [Semantic Versioning](https://semver.org/) while the game is a p
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-10-25
+
+The whole boss fight, playable from the first attack to "YOU DIED" or "VICTORY".
+
 ### Added
 - **Build setup** (`CMakeLists.txt`, `CMakePresets.json`, `cmake/Dependencies.cmake`): a CMake project in C++20 that downloads raylib 5.5 and doctest 2.4.11 at configure time, pinned to those releases, so a fresh clone builds with one command. Presets for Debug and Release.
 - **Strict warnings** (`cmake/Warnings.cmake`): `/W4 /WX /permissive-` on MSVC (and `-Wall -Wextra -Wpedantic -Werror` elsewhere) for the project's own targets only, so third-party code does not break the build.
@@ -53,6 +57,7 @@ Versions follow [Semantic Versioning](https://semver.org/) while the game is a p
 - **The Summon** (`SpawnMarker.cpp`, `Boss.cpp`, `World.cpp`, `Game.cpp`): the second phase's last attack. The boss howls for 0.75 s while four marks appear on the floor 250 units around the player, turned at random and kept inside the walls, never on the player or the boss; 0.75 s later a hairball comes out of each, shakes itself for 0.3 s and chases, and spits a strand at the player every 3 s (for 8), out of step with the others, swelling red just before. Eight hairballs alive at most; six marks in a frenzy. It is picked most when the player is far away, so distance is no longer a safe answer. The marks are a component and a pool of their own (16). Covered by `SummonTests` and `PhaseTwoTests`, explained in `docs/BOSS.md`.
 
 ### Changed
+- **Static C++ runtime** (`CMakeLists.txt`): the executable links the C++ runtime in, so the release zip runs on a Windows PC that does not have the Visual C++ Redistributable installed. The game no longer needs `VCRUNTIME140.dll` or `MSVCP140.dll`.
 - **Stalking between attacks** (`Boss.h`, `Boss.cpp`): the fixed 2 s between attacks becomes a random 0.8 to 1.6 s, with only the first stalk of a fight still 2 s, so there is less free time to shoot and no countdown to learn. `Boss::attackInterval` is gone. Covered by `BossChargeTests`, `BossHairRingTests`, `BossLeapTests` and `BossComboTests`.
 - **Arena and camera** (`World.h`, `World.cpp`): the arena shrinks from 2400x1600 to 1640x1040, so the boss is never far, and the camera follows a point between the player and the boss (40% of the way, at most 200 units from the player), so the boss stays in view without pushing the player off screen. The player starts 400 units south of the boss, facing it. Covered by `BossTests` and `WorldTests`, explained in `docs/CAMERA.md`.
 - **Plan** (`README.md`, `docs/ROADMAP.md`): the game turns from a horde shooter into one hard boss fight in the style of Gun Bros and Dark Souls 1. Waves, XP, levels, power-ups and new guns leave the plan; the first release waits until the whole fight works.
