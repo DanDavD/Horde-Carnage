@@ -6,6 +6,7 @@
 
 #include <doctest/doctest.h>
 
+#include "PredictableBoss.h"
 #include "core/Boss.h"
 #include "core/World.h"
 
@@ -26,9 +27,12 @@ constexpr float kPlayerRadius = 20.0f;
 // The player south of the boss, where the fight starts.
 constexpr Vec2 kSouth = kCenter + Vec2{0.0f, 300.0f};
 
+// What the bosses below draw from. With their chance taken out, it only decides the stalks between attacks.
+horde::Random chance = horde::SeedRandom(2);
+
 // A boss standing at `position` that starts a Hair Ring on the next step.
 Boss AboutToSpitFrom(Vec2 position) {
-    Boss boss;
+    Boss boss = horde::test::Predictable(Boss{});
     boss.motion = horde::MotionAt(position);
     boss.nextAttack = AttackKind::HairRing;
     boss.secondsUntilAttack = 0.0f;
@@ -39,7 +43,7 @@ Boss AboutToSpitFrom(Vec2 position) {
 int Step(Boss& boss, Vec2 player, int steps) {
     int rings = 0;
     for (int i = 0; i < steps; ++i) {
-        if (horde::StepBoss(boss, player, kPlayerRadius, kArena, kDt).spitHairRing) {
+        if (horde::StepBoss(boss, player, kPlayerRadius, kArena, chance, kDt).spitHairRing) {
             ++rings;
         }
     }
@@ -67,25 +71,6 @@ float DegreesBetween(Vec2 a, Vec2 b) {
 }
 
 } // namespace
-
-TEST_CASE("the attacks take turns: a charge, then a hair ring, then a charge again") {
-    Boss boss;
-    boss.motion = horde::MotionAt(kCenter);
-    std::vector<AttackKind> started;
-    bool attacking = false;
-    for (int i = 0; i < 60 * 30 && started.size() < 4; ++i) {
-        Step(boss, kSouth, 1);
-        if (boss.attack && !attacking) {
-            started.push_back(boss.attack->kind);
-        }
-        attacking = boss.attack.has_value();
-    }
-    REQUIRE(started.size() == 4);
-    CHECK(started[0] == AttackKind::Charge);
-    CHECK(started[1] == AttackKind::HairRing);
-    CHECK(started[2] == AttackKind::Charge);
-    CHECK(started[3] == AttackKind::HairRing);
-}
 
 TEST_CASE("during the warning the boss holds its ground, and the gap opens 90 degrees from the player") {
     Boss boss = AboutToSpitFrom(kCenter);
@@ -138,8 +123,9 @@ TEST_CASE("the ring is spat once, as the warning ends, and the boss stalks again
     }
     CHECK(rings == 0);
     CHECK(steps == doctest::Approx(57).epsilon(0.05));
-    CHECK(boss.secondsUntilAttack == boss.attackInterval);
-    CHECK(boss.nextAttack == AttackKind::Charge);
+    CHECK(boss.secondsUntilAttack >= boss.choice.minStalkSeconds);
+    CHECK(boss.secondsUntilAttack <= boss.choice.maxStalkSeconds);
+    CHECK(boss.lastAttack == AttackKind::HairRing);
 }
 
 TEST_CASE("a ring has a strand in every slot but the gap, evenly spaced, and none inside the gap") {

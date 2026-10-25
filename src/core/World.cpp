@@ -29,13 +29,15 @@ constexpr float kHitStunSeconds = 0.15f;
 constexpr float kBossFraming = 0.4f;
 constexpr float kMaxBossFramingOffset = 200.0f;
 
-// Every source of damage to the player goes through here, so a dash protects from all of them, and a hit
-// that lands spoils any drink in progress.
+// Every source of damage to the player goes through here, so a dash protects from all of them, a hit that
+// lands spoils any drink in progress, and the world remembers what landed it.
 //
 // @return Whether the hit landed, so a hit with extra effects (the charge's knockback) applies them once.
-bool HurtPlayer(Player& player, int damage) {
+bool HurtPlayer(World& world, int damage, DamageSource source) {
+    Player& player = world.player;
     if (!IsDashInvulnerable(player.dash) && ApplyDamage(player.health, damage)) {
         InterruptDrinking(player.flasks);
+        world.lastHitBy = source;
         return true;
     }
     return false;
@@ -132,6 +134,12 @@ void StepEnemies(World& world, float dt) {
     }
 }
 
+// A dead boss lies on the floor and an airborne one is out of reach: neither collides, takes bullets or
+// hurts on touch.
+bool IsBossABody(const Boss& boss) {
+    return !IsDead(boss.health) && !IsAirborne(boss);
+}
+
 void ConfineEveryone(World& world) {
     ConfineToArena(world.player.motion, world.player.radius, world.arena);
     ConfineToArena(world.boss.motion, world.boss.radius, world.arena);
@@ -143,7 +151,7 @@ void ConfineEveryone(World& world) {
 // Every pair once: the player and the boss against each other and against each hairball, then each
 // hairball against the ones after it. With a few dozen bodies that is a few hundred checks per pass, so a
 // spatial grid would cost more than it saves. A dashing player passes through bodies, so a dash can escape
-// a crowd or go through the boss, and a dead boss is not a body any more.
+// a crowd or go through the boss, and a dead or airborne boss is not a body.
 //
 // A charging boss runs through the player rather than pushing them: at its speed a shove would carry the
 // player across the arena and pin them against the wall. It still bowls hairballs out of its way.
@@ -151,7 +159,7 @@ void SeparateEveryone(World& world) {
     Player& player = world.player;
     Boss& boss = world.boss;
     const bool playerIsSolid = !IsDashing(player.dash);
-    const bool bossIsSolid = !IsDead(boss.health);
+    const bool bossIsSolid = IsBossABody(boss);
     if (playerIsSolid && bossIsSolid && !IsCharging(boss)) {
         SeparateCircles(player.motion, player.radius, boss.motion, boss.radius, PushShare(player.weight, boss.weight));
     }
@@ -201,7 +209,7 @@ BulletHit FirstHit(World& world, const Projectile& bullet) {
         }
     }
     const Boss& boss = world.boss;
-    if (!IsDead(boss.health)) {
+    if (IsBossABody(boss)) {
         const std::optional<float> fraction = sweep(boss.motion.position, boss.radius);
         if (fraction && *fraction < firstFraction) {
             hit = BulletHit{.boss = true};
@@ -275,17 +283,16 @@ Vec2 ChargeKnockback(const Boss& boss, Vec2 playerPosition) {
 void ApplyContactDamage(World& world) {
     Player& player = world.player;
     const Boss& boss = world.boss;
-    if (!IsDead(boss.health) &&
-        AreTouching(player.motion.position, player.radius, boss.motion.position, boss.radius)) {
+    if (IsBossABody(boss) && AreTouching(player.motion.position, player.radius, boss.motion.position, boss.radius)) {
         if (!IsCharging(boss)) {
-            HurtPlayer(player, boss.contactDamage);
-        } else if (HurtPlayer(player, boss.charge.damage)) {
+            HurtPlayer(world, boss.contactDamage, DamageSource::BossTouch);
+        } else if (HurtPlayer(world, boss.charge.damage, DamageSource::Charge)) {
             player.motion.velocity += ChargeKnockback(boss, player.motion.position);
         }
     }
     for (const Enemy& enemy : world.enemies) {
         if (AreTouching(player.motion.position, player.radius, enemy.motion.position, enemy.radius)) {
-            HurtPlayer(player, enemy.contactDamage);
+            HurtPlayer(world, enemy.contactDamage, DamageSource::Hairball);
         }
     }
 }
@@ -302,10 +309,42 @@ void StepHostileProjectiles(World& world, float dt) {
                                          player.motion.position, player.radius)
                                  .has_value();
         if (touches && !IsDashInvulnerable(player.dash)) {
-            HurtPlayer(player, strand.damage);
+            HurtPlayer(world, strand.damage, DamageSource::HairRing);
             return true;
         }
         return !stillFlying || !Contains(world.arena, strand.motion.position);
+    });
+}
+
+// The impact lands on a player under the shadow and throws them out from under the body. The shockwave
+// leaves from the edge of the body. A player caught by the impact is still inside the window when the
+// wave's band passes, so one landing costs one hit, not two.
+void LandLeap(World& world) {
+    Player& player = world.player;
+    const Boss& boss = world.boss;
+    const LeapStats& leap = boss.leap;
+    const Vec2 center = boss.motion.position;
+    const Vec2 away = player.motion.position - center;
+    if (Length(away) <= leap.impactRadius + player.radius &&
+        HurtPlayer(world, leap.impactDamage, DamageSource::LeapImpact)) {
+        const Vec2 out = LengthSquared(away) > 1.0f ? Normalized(away) : Vec2{0.0f, 1.0f};
+        player.motion.velocity += out * leap.impactKnockback;
+    }
+    world.shockwaves.Spawn(MakeShockwave(center, boss.radius, leap.shockwave));
+}
+
+// A wave hurts the player once, the first time its band reaches them. Like the strands, it passes a
+// dashing player by; any other touch spends it, even inside the window after an earlier hit.
+void StepShockwaves(World& world, float dt) {
+    Player& player = world.player;
+    world.shockwaves.RemoveIf([&world, &player, dt](Shockwave& wave) {
+        const bool going = StepShockwave(wave, dt);
+        if (!wave.spent && !IsDashInvulnerable(player.dash) &&
+            ShockwaveTouches(wave, player.motion.position, player.radius)) {
+            HurtPlayer(world, wave.stats.damage, DamageSource::Shockwave);
+            wave.spent = true;
+        }
+        return !going;
     });
 }
 
@@ -321,11 +360,13 @@ Vec2 CameraFocus(const World& world) {
 
 } // namespace
 
-World CreateWorld(const Arena& arena, Vec2 viewSize) {
+World CreateWorld(const Arena& arena, Vec2 viewSize, std::uint64_t seed) {
     const Vec2 bossStart = Center(arena);
     World world{.arena = arena,
                 .player = {.motion = MotionAt(bossStart + Vec2{0.0f, kStartingDistance})},
-                .boss = {.motion = MotionAt(bossStart)}};
+                .boss = {.motion = MotionAt(bossStart)},
+                .seed = seed,
+                .random = SeedRandom(seed)};
     // The player starts looking at the boss, so the first shot goes where the threat is.
     world.player.facing = Vec2{0.0f, -1.0f};
     world.camera = FollowCameraAt(CameraFocus(world), viewSize, arena);
@@ -350,8 +391,13 @@ void StepWorld(World& world, const PlayerCommands& commands, float dt) {
     }
     HandleWeapons(world, commands, dt);
     StepEnemies(world, dt);
-    if (StepBoss(world.boss, player.motion.position, player.radius, world.arena, dt).spitHairRing) {
+    const BossActions actions =
+        StepBoss(world.boss, player.motion.position, player.radius, world.arena, world.random, dt);
+    if (actions.spitHairRing) {
         SpitHairRing(world);
+    }
+    if (actions.landed) {
+        LandLeap(world);
     }
 
     // Collisions run after everyone has moved, so the order in which bodies moved does not decide who
@@ -369,6 +415,7 @@ void StepWorld(World& world, const PlayerCommands& commands, float dt) {
     // After the bodies, so when the boss's body and one of its strands reach the player in the same step,
     // the heavier hit is the one that lands.
     StepHostileProjectiles(world, dt);
+    StepShockwaves(world, dt);
 
     // Last, so the camera follows where everything ended up in this step.
     StepFollowCamera(world.camera, CameraFocus(world), player.motion.velocity, world.arena, dt);

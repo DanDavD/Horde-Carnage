@@ -1,6 +1,7 @@
 # Pure game logic. The tests link this library, so nothing in it may open a window.
 add_library(horde_core STATIC
     core/Arena.cpp
+    core/AttackChoice.cpp
     core/Boss.cpp
     core/Chase.cpp
     core/Collision.cpp
@@ -13,7 +14,9 @@ add_library(horde_core STATIC
     core/Loadout.cpp
     core/Movement.cpp
     core/Projectile.cpp
+    core/Random.cpp
     core/Session.cpp
+    core/Shockwave.cpp
     core/Weapon.cpp
     core/World.cpp)
 target_include_directories(horde_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})

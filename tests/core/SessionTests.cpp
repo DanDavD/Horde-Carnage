@@ -1,3 +1,5 @@
+#include <cstdint>
+
 #include <doctest/doctest.h>
 
 #include "core/Session.h"
@@ -71,6 +73,13 @@ TEST_CASE("the player is dead in the step their health reaches zero") {
     Step(session, Vec2{}, 1);
     CHECK(horde::IsDead(session.world.player.health));
     CHECK(session.state == SessionState::Dead);
+}
+
+TEST_CASE("a dead player's world remembers what killed them") {
+    Session session = OneHitFromDeath();
+    Step(session, Vec2{}, 1);
+    REQUIRE(session.state == SessionState::Dead);
+    CHECK(session.world.lastHitBy == horde::DamageSource::BossTouch);
 }
 
 TEST_CASE("once the player is dead the world is frozen") {
@@ -197,18 +206,35 @@ TEST_CASE("a new fight after a victory starts the attempts over") {
     CHECK(session.world.boss.health.current == session.world.boss.health.max);
 }
 
-TEST_CASE("standing still in front of the boss ends in death") {
-    // The boss stalks for 2 s and charges: the run hits for 30 at about 2.9 s and ends stunned against the
-    // south wall, next to the player. Once the stun is over, four touches 0.8 s apart finish the player off
-    // at about 7.1 s. The Hair Ring that comes next starts its warning at 6.6 s, too late to matter.
-    Session session = horde::StartSession(kArena, kView);
-    int steps = 0;
-    while (session.state == SessionState::Playing && steps < 60 * 60) {
-        Step(session, Vec2{}, 1);
-        ++steps;
-    }
-    CHECK(session.state == SessionState::Dead);
-    CHECK(session.world.elapsedSeconds > 6.5f);
-    CHECK(session.world.elapsedSeconds < 7.5f);
+TEST_CASE("every attempt gets its own seed, and the session's seed decides them all") {
+    Session a = horde::StartSession(kArena, kView, 5);
+    Session b = horde::StartSession(kArena, kView, 5);
+    CHECK(a.world.seed == b.world.seed);
+    CHECK(horde::StartSession(kArena, kView, 6).world.seed != a.world.seed);
+
+    const std::uint64_t first = a.world.seed;
+    DieAndRetry(a);
+    DieAndRetry(b);
+    CHECK(a.world.seed != first);
+    CHECK(a.world.seed == b.world.seed);
+    // The world's generator starts from its seed.
+    horde::Random fresh = horde::SeedRandom(a.world.seed);
+    CHECK(horde::NextU32(a.world.random) == horde::NextU32(fresh));
 }
 
+TEST_CASE("standing still in front of the boss ends in death, whatever the seed") {
+    // The fight opens with a charge after 2 s, and from there the boss's picks depend on the seed. Over these
+    // 20 seeds a player who never moves dies between 6.3 and 18.8 s, most often to the boss's touch once a
+    // charge has left it standing next to them.
+    for (std::uint64_t seed = 1; seed <= 20; ++seed) {
+        Session session = horde::StartSession(kArena, kView, seed);
+        int steps = 0;
+        while (session.state == SessionState::Playing && steps < 60 * 60) {
+            Step(session, Vec2{}, 1);
+            ++steps;
+        }
+        CHECK(session.state == SessionState::Dead);
+        CHECK(session.world.elapsedSeconds < 20.0f);
+        CHECK(session.world.lastHitBy.has_value());
+    }
+}

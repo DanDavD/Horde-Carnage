@@ -3,8 +3,11 @@ add_executable(horde_tests
     TestMain.cpp
     core/AnalogInputTests.cpp
     core/ArenaTests.cpp
+    core/AttackChoiceTests.cpp
     core/BossChargeTests.cpp
+    core/BossComboTests.cpp
     core/BossHairRingTests.cpp
+    core/BossLeapTests.cpp
     core/BossTests.cpp
     core/ChaseTests.cpp
     core/CollisionTests.cpp
@@ -18,7 +21,9 @@ add_executable(horde_tests
     core/MovementTests.cpp
     core/ObjectPoolTests.cpp
     core/ProjectileTests.cpp
+    core/RandomTests.cpp
     core/SessionTests.cpp
+    core/ShockwaveTests.cpp
     core/Vec2Tests.cpp
     core/WeaponTests.cpp
     core/WorldTests.cpp)
