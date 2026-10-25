@@ -8,6 +8,7 @@
 #include "core/Movement.h"
 #include "core/Projectile.h"
 #include "core/Random.h"
+#include "core/Shield.h"
 #include "core/Shockwave.h"
 #include "core/Vec2.h"
 
@@ -144,10 +145,16 @@ struct Boss {
     float weight = 40.0f;
     /// Twice a hairball's touch. Five touches kill a player at full health.
     int contactDamage = 20;
-    /// 120 pistol bullets or 200 SMG bullets. No invulnerability window, like the hairballs, so every
-    /// bullet counts.
+    /// 120 pistol bullets or 200 SMG bullets, but only while its shield is down. No invulnerability window,
+    /// like the hairballs, so every bullet counts.
     Health health{.current = 1200, .max = 1200, .invulnerabilityAfterHit = 0.0f};
     float hitFlashSeconds = 0.0f; ///< Time left on the white flash of the last hit.
+    /// Stands between the bullets and the health. It has to be broken, with the right gun, before the boss
+    /// can be hurt at all.
+    Shield shield;
+    /// Breaking the shield staggers the boss: it drops its attack and stands still for this long.
+    float breakStaggerSeconds = 1.0f;
+    float staggerSeconds = 0.0f; ///< Time left in the current stagger.
 
     std::optional<BossAttack> attack; ///< Empty while it stalks the player between attacks.
     /// Stalking time left before the next attack starts. The first stalk is longer than the ones that
@@ -190,6 +197,13 @@ BossActions StepBoss(Boss& boss, Vec2 playerPosition, float playerRadius, const 
 /// Whether the boss is in the air during a Leap. Up there it is not a body: it does not collide, take
 /// bullets or hurt on touch.
 [[nodiscard]] bool IsAirborne(const Boss& boss);
+
+/// Whether the boss is reeling from its broken shield.
+[[nodiscard]] bool IsStaggered(const Boss& boss);
+
+/// Cuts the boss's attack off and holds it still for `breakStaggerSeconds`, with the shortest stalk after
+/// it. Called when its shield breaks, so the break is felt, not only seen on a bar.
+void StaggerBoss(Boss& boss);
 
 /// The path of a charge from `start` along `direction` (length 1), for a body of `radius`: the full
 /// `distance`, or less if a wall comes first. The simulation runs along it and the warning draws it, so

@@ -4,13 +4,14 @@
 
 The Matriarch, the one boss the game is about: a giant hairball, mother of the small ones, in the middle of the arena. The whole game is one fight against it, in the spirit of Gun Bros and Dark Souls 1: a boss that is hard on purpose, whose patterns you learn by dying. See the [roadmap](ROADMAP.md#changes-to-the-plan) for why.
 
-This document describes what exists today. The boss stalks the player, shoves them, hurts on touch, soaks up bullets, and has the three attacks of its first phase: the Charge, the Hair Ring and the Leap. It picks the next one at random, weighted by the distance to the player and never the same one twice in a row, and sometimes it chains two into a combo. The shield and the second phase come next.
+This document describes what exists today. The boss stalks the player, shoves them, hurts on touch, soaks up bullets behind an alternating shield (see [The boss's shield](SHIELD.md)), and has the three attacks of its first phase: the Charge, the Hair Ring and the Leap. It picks the next one at random, weighted by the distance to the player and never the same one twice in a row, and sometimes it chains two into a combo. The second phase comes next.
 
 The rules live in `horde_core`:
 
 - `src/core/Boss.h`, `src/core/Boss.cpp`: the `Boss` struct, with the same body components as the player and the hairballs (`Motion`, `MovementStats`, a radius and a weight) and the boss's numbers; its attack state (`BossAttack`, `AttackStage`, `ChargeStats`, `HairRingStats`, `LeapStats`); and the systems that run it: `StepBoss`, which returns the `BossActions` the world has to carry out, `IsCharging`, `IsAirborne`, `WarningSeconds`, `LeapCrouchSeconds`, `LeapAirSeconds`, `PlanChargePath`, and the ring's `HairRingStrands`, `HairStrandDirection` and `MakeHairStrand`.
 - `src/core/AttackChoice.h`, `src/core/AttackChoice.cpp`: how the boss picks what comes next. `AttackKind`, the weights by distance (`AttackWeights`, `AttackChoiceStats`, `AttackWeightAt`, `ChooseAttack`), and the combos (`ComboStats`, `Combo`, `kCombos`, `ChooseFollowUp`). They draw from the world's seeded generator (see [Random numbers](RANDOM.md)).
 - `src/core/Shockwave.h`, `src/core/Shockwave.cpp`: the `Shockwave` the Leap sends out, with `MakeShockwave`, `StepShockwave` and `ShockwaveTouches`.
+- `src/core/Shield.h`, `src/core/Shield.cpp`: the boss's `Shield`, described in [The boss's shield](SHIELD.md). `StepBoss` steps it, and `StaggerBoss` and `IsStaggered` handle the stagger when it breaks.
 - `src/core/World.h`, `src/core/World.cpp`: `kBossArena` and `kStartingDistance`; `CreateWorld` places the boss; `StepWorld` calls `StepBoss` with the world's `random`; `HurtPlayer` records which attack landed each hit in `World::lastHitBy`, for the death screen; `SpitHairRing` spawns the ring's strands into `World::hostileProjectiles`, where `StepHostileProjectiles` flies them and hurts the player; `LandLeap` applies the Leap's impact and spawns its shockwave into `World::shockwaves`, where `StepShockwaves` grows it; the collision, bullet and contact damage systems include the boss, unless it is dead or in the air (`IsBossABody`); and `CameraFocus` keeps it in view.
 
 The game executable draws it:
@@ -86,7 +87,7 @@ The opener plays as usual until its recovery would start. In that step the follo
 
 1. **Think and move.** `StepBoss` stalks, picks the next attack, or advances the attack's stage, and tells the world when to spit a ring or when it lands.
 2. **Collide.** The collision passes treat the boss as one more body (see [Collisions](COLLISIONS.md)). At weight 40 against the player's 4, the player takes 91% of any overlap, so the boss shoves the player and the player cannot shove it. A dashing player passes through it, and a charging boss passes through the player.
-3. **Take bullets.** For each bullet, `FirstHit` sweeps it against every hairball and the boss, and the body it touches first takes it. `HitBoss` takes the bullet's damage and starts a 0.1 s flash. No stun and no knockback.
+3. **Take bullets.** For each bullet, `FirstHit` sweeps it against every hairball and the boss, and the body it touches first takes it. `HitBoss` hands the bullet to the shield first (see [The boss's shield](SHIELD.md)): while it is up, the bullet bounces off or wears it down, and the bullet that breaks it staggers the boss for 1 s. Only while it is down does the bullet take the boss's health and start a 0.1 s flash. No knockback.
 4. **Hurt on touch.** `ApplyContactDamage` checks the boss before the hairballs. A touch takes 20, or 30 plus the knockback while it charges, through `HurtPlayer`, the single door for damage (see [Health](HEALTH.md)). A dash protects from both.
 5. **Fly the strands and grow the shockwaves.** After the bodies, so when the boss's body and a strand or a wave reach the player in the same step, the heavier hit is the one that lands. A wave hurts once, the first time its band reaches the player; like a strand, it passes a dashing player by, and any other touch spends it, even inside the invulnerability window. So a player caught by the impact is not hit again by the wave that leaves under them.
 
@@ -136,7 +137,7 @@ The opener plays as usual until its recovery would start. In that step the follo
 - **A shockwave cannot be outrun.** At 380 units/s against the player's 300, the only answers are being far enough away (420 units) or dashing through its band. That makes the Leap the attack that tests the dash timing against something that comes at the player, where the Hair Ring tests it against something to walk through.
 - **Shockwaves are a component and a pool of their own.** They grow instead of flying, and they hit with a band instead of a circle, so they are not `Projectile`s. A pool of 8 keeps the second phase's leaps, and any other attack that needs a wave, free of allocations.
 - **Waves and a turning gap are already numbers.** `waves`, `waveIntervalSeconds` and `gapTurnDegrees` are 1, 0.4 s and 0 degrees today. Rings in quick succession, or a gap that sweeps around the boss, are for the second phase, and they will need new numbers, not new code. The combos chain whole attacks instead.
-- **No stagger and no knockback from bullets.** The SMG hits ten times a second. If each bullet staggered the boss, the SMG would lock it in place, and the fight would be about holding the button. The openings to punish it come from its own attacks (the recovery after each one) and will come from its shield.
+- **No stagger and no knockback from bullets.** The SMG hits ten times a second. If each bullet staggered the boss, the SMG would lock it in place, and the fight would be about holding the button. The openings to punish it come from its own attacks (the recovery after each one) and from its shield. The one bullet that staggers it is the one that breaks the shield, once per shield.
 - **Heavy, but not immovable.** Weight 40 means the boss wins every shove, which is what a giant should feel like. An infinite weight would need a special case in `SeparateCircles`, and nothing in the fight needs it.
 - **Slower than a hairball when it walks.** The walk is only how the boss gets close between attacks. If the walk alone could catch the player, the attacks would not matter.
 - **The camera leans toward the boss, with a cap.** In a fight with one enemy, losing sight of it is the worst thing the camera can do. Leaning 40% of the way keeps both on screen at the start and in most of the fight. The cap of 200 units keeps the player at least 160 units from the edge of the screen when the boss is across the arena.
@@ -149,7 +150,8 @@ The opener plays as usual until its recovery would start. In that step the follo
 
 | Value | Where | Default |
 |---|---|---|
-| Health | `Boss::health` (`src/core/Boss.h`) | 1200: 120 pistol or 200 SMG bullets |
+| Health | `Boss::health` (`src/core/Boss.h`) | 1200: 120 pistol or 200 SMG bullets, while the shield is down |
+| Shield and the stagger of a break | `Boss::shield`, `breakStaggerSeconds` | See [The boss's shield](SHIELD.md#how-to-tune-it) |
 | Contact damage | `Boss::contactDamage` | 20 |
 | Walking speed | `Boss::stats.maxSpeed` | 120 units/s |
 | Acceleration and deceleration | `Boss::stats` | 400 and 1500 units/s^2 |
@@ -233,7 +235,7 @@ The tests about one attack's timings use a boss without its chance (`tests/core/
   - the boss walks toward the player, slower than a hairball;
   - it stops when it touches the player, and pushes the player rather than being pushed;
   - a touch takes its contact damage, and when the boss and a hairball touch the player in the same step, the boss's hit is the one that lands;
-  - a bullet takes health from the boss and flashes it, but does not push it;
+  - with its shield down, a bullet takes health from the boss and flashes it, but does not push it; the shield's own tests are in [The boss's shield](SHIELD.md#tests);
   - a hairball in front of the boss takes the bullet meant for the boss;
   - a dash goes through the boss without a scratch;
   - a dead boss does not chase, block, take bullets or hurt;

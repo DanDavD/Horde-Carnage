@@ -47,6 +47,14 @@ constexpr float kChargeTremble = 2.5f;
 constexpr int kChargeGhosts = 3;
 constexpr int kStunStars = 3;
 constexpr float kStunStarRadius = 5.0f;
+// The shield: a coloured band just outside the tips of the tufts, over a faint bubble. Its brightness
+// follows the strength left; a hit that counts flashes it white, and a bounce flashes it thicker. The
+// Barrier breathes, so it reads as alive and growing back. The shield's own bar runs under the boss's.
+constexpr float kShieldGap = 6.0f;
+constexpr float kShieldWidth = 5.0f;
+constexpr float kShieldBounceWidth = 4.0f;
+constexpr float kBarrierPulse = 6.0f;
+constexpr int kShieldBarHeight = 6;
 // The Hair Ring. During the warning the boss swells by this fraction and the ring is drawn on the floor
 // just outside the tips of its tufts, with the gap as a pale lane running out from it. As it spits, it
 // deflates for a moment. A strand is a short streak behind a round tip.
@@ -122,6 +130,9 @@ constexpr Color kStunStar{255, 225, 130, 255};
 // Paler and redder than the boss's body, so a strand reads against the dark floor and as something that
 // hurts. The gap lane is the one pale, safe thing in the warning.
 constexpr Color kStrand{225, 130, 110, 255};
+constexpr Color kShell{95, 155, 255, 255};
+constexpr Color kBarrier{255, 150, 50, 255};
+constexpr Color kExposed{235, 235, 240, 255};
 constexpr Color kRingLane{205, 205, 220, 255};
 // The shockwave is dust thrown up by the landing, red where it still hurts.
 constexpr Color kShockwave{230, 120, 95, 255};
@@ -156,7 +167,7 @@ constexpr HairStyle kDeadBossStyle{kPlayerDeadFill, kPlayerDeadEdge, kPlayerDead
 
 #ifndef NDEBUG
 constexpr const char* kControlsHint =
-    "WASD move  Mouse aim  Click fire  Space dash  E heal  Q/1/2/wheel swap gun  Esc quit  F1 debug  F4 win";
+    "WASD move  Mouse aim  Click fire  Space dash  E heal  Q/1/2 swap gun  Esc quit  F1 debug  F2 shield  F4 win";
 #else
 constexpr const char* kControlsHint =
     "WASD move  Mouse aim  Click fire  Space dash  E heal  Q/1/2/wheel swap gun  Esc quit";
@@ -379,6 +390,36 @@ void DrawStunStars(Vec2 position, float radius, float seconds) {
     }
 }
 
+Color ShieldColor(ShieldKind kind) {
+    return kind == ShieldKind::Shell ? kShell : kBarrier;
+}
+
+// Around the body as it is drawn, so it follows the crouch, the swell and the jump.
+void DrawBossShield(const Shield& shield, Vec2 position, float radius, float seconds) {
+    if (!IsShieldUp(shield)) {
+        return;
+    }
+    const float left = shield.strength / MaxStrength(shield.stats, shield.kind);
+    float inner = radius * (1.0f + kTuftLength) + kShieldGap;
+    if (shield.kind == ShieldKind::Barrier) {
+        inner += kBarrierPulse * 0.5f * (1.0f + std::sin(seconds * 6.0f));
+    }
+    const float width = kShieldWidth + (shield.bounceFlashSeconds > 0.0f ? kShieldBounceWidth : 0.0f);
+    const Color band = shield.hitFlashSeconds > 0.0f ? kExposed : ShieldColor(shield.kind);
+    DrawCircleV(ToRaylib(position), inner, Fade(ShieldColor(shield.kind), 0.08f + 0.08f * left));
+    DrawRing(ToRaylib(position), inner, inner + width, 0.0f, 360.0f, 64, Fade(band, 0.35f + 0.6f * left));
+}
+
+// Every pose of the boss ends here: the body, its shield around it, and stars while its broken shield
+// staggers it.
+void DrawBossBody(const Boss& boss, Vec2 position, float radius, Vec2 lookAt) {
+    DrawHairBody(position, radius, lookAt, kBossStyle, boss.hitFlashSeconds > 0.0f);
+    DrawBossShield(boss.shield, position, radius, static_cast<float>(GetTime()));
+    if (IsStaggered(boss)) {
+        DrawStunStars(position, radius, boss.staggerSeconds);
+    }
+}
+
 // Crouched and trembling through the warning, with ghosts behind it while it runs and stars over its head
 // while it is stunned. The eyes look down its path instead of at the player.
 void DrawChargingBoss(const Boss& boss, Vec2 position) {
@@ -405,7 +446,7 @@ void DrawChargingBoss(const Boss& boss, Vec2 position) {
     case AttackStage::Recovery:
         break;
     }
-    DrawHairBody(position, radius, position + attack.direction, kBossStyle, boss.hitFlashSeconds > 0.0f);
+    DrawBossBody(boss, position, radius, position + attack.direction);
     if (attack.stage == AttackStage::Recovery && attack.stunned) {
         DrawStunStars(position, radius, attack.stageSeconds);
     }
@@ -421,7 +462,7 @@ void DrawSpittingBoss(const Boss& boss, Vec2 position, Vec2 playerPosition) {
     } else if (ring.stage == AttackStage::Active) {
         radius *= 1.0f - kRingSpitShrink;
     }
-    DrawHairBody(position, radius, playerPosition, kBossStyle, boss.hitFlashSeconds > 0.0f);
+    DrawBossBody(boss, position, radius, playerPosition);
 }
 
 // Crouches, flies up in an arc toward its shadow, growing as it rises, and lands squashed. In the air it is
@@ -449,7 +490,7 @@ void DrawLeapingBoss(const Boss& boss, Vec2 position, Vec2 playerPosition) {
     case AttackStage::Recovery:
         break;
     }
-    DrawHairBody(position, radius, playerPosition, kBossStyle, boss.hitFlashSeconds > 0.0f);
+    DrawBossBody(boss, position, radius, playerPosition);
 }
 
 void DrawBoss(const Boss& boss, Vec2 playerPosition, float alpha) {
@@ -459,7 +500,7 @@ void DrawBoss(const Boss& boss, Vec2 playerPosition, float alpha) {
         return;
     }
     if (!boss.attack) {
-        DrawHairBody(position, boss.radius, playerPosition, kBossStyle, boss.hitFlashSeconds > 0.0f);
+        DrawBossBody(boss, position, boss.radius, playerPosition);
         return;
     }
     switch (boss.attack->kind) {
@@ -516,6 +557,24 @@ void DrawHealthBar(const Health& health) {
     DrawText(TextFormat("%d / %d", health.current, health.max), kX + 8, kY + 2, 18, RAYWHITE);
 }
 
+// Under the boss's bar: what is left of the shield, in its colour, with its name at the right end above the
+// bar. Once it breaks, a white strip drains away with the exposed time, so the player can see how long the
+// opening lasts.
+void DrawShieldBar(const Shield& shield, int x) {
+    const int y = kBossBarY + kBossBarHeight + 3;
+    float fraction = shield.exposedSecondsLeft / shield.stats.exposedSeconds;
+    Color color = kExposed;
+    const char* label = "EXPOSED";
+    if (IsShieldUp(shield)) {
+        fraction = shield.strength / MaxStrength(shield.stats, shield.kind);
+        color = ShieldColor(shield.kind);
+        label = shield.kind == ShieldKind::Shell ? "SHELL" : "BARRIER";
+    }
+    DrawRectangle(x, y, kBossBarWidth, kShieldBarHeight, kBarBack);
+    DrawRectangle(x, y, static_cast<int>(kBossBarWidth * std::clamp(fraction, 0.0f, 1.0f)), kShieldBarHeight, color);
+    DrawText(label, x + kBossBarWidth - MeasureText(label, 20), kBossBarY - 24, 20, color);
+}
+
 // Wide and thin along the bottom of the screen, with the name above it, so it reads as the one fight that
 // matters and stays out of the way of the arena.
 void DrawBossBar(const Boss& boss) {
@@ -525,6 +584,9 @@ void DrawBossBar(const Boss& boss) {
     DrawRectangle(kX, kBossBarY, kBossBarWidth, kBossBarHeight, kBarBack);
     DrawRectangle(kX, kBossBarY, static_cast<int>(kBossBarWidth * fraction), kBossBarHeight, kBossBar);
     DrawRectangleLines(kX, kBossBarY, kBossBarWidth, kBossBarHeight, kBarEdge);
+    if (!IsDead(boss.health)) {
+        DrawShieldBar(boss.shield, kX);
+    }
 }
 
 // One box per slot. The gun in hand is lit, so the player can tell at a glance which one they hold.
@@ -725,6 +787,17 @@ const char* BossStateLabel(const Boss& boss) {
                       IsAirborne(boss) ? " airborne" : "", combo);
 }
 
+// The shield's kind and strength, or how long the boss stays exposed, and the stagger.
+const char* ShieldLabel(const Boss& boss) {
+    const Shield& shield = boss.shield;
+    if (!IsShieldUp(shield)) {
+        return TextFormat("shield exposed %.2f  stagger %.2f", shield.exposedSecondsLeft,
+                          std::max(boss.staggerSeconds, 0.0f));
+    }
+    return TextFormat("shield %s %.0f / %.0f", shield.kind == ShieldKind::Shell ? "shell" : "barrier",
+                      shield.strength, MaxStrength(shield.stats, shield.kind));
+}
+
 // How likely each attack is at the player's distance right now, and the one the next pick skips.
 const char* AttackPickLabel(const World& world) {
     const Boss& boss = world.boss;
@@ -747,7 +820,7 @@ void DrawDebugHud(const World& world, Vec2 moveInput) {
     constexpr int kX = 10;
     constexpr int kY = 80; // Below the health and dash bars.
     constexpr int kLine = 20;
-    DrawRectangle(kX - 4, kY - 4, 380, 16 * kLine + 8, Fade(BLACK, 0.6f));
+    DrawRectangle(kX - 4, kY - 4, 380, 17 * kLine + 8, Fade(BLACK, 0.6f));
     DrawText(TextFormat("input  %5.2f %5.2f  len %4.2f", moveInput.x, moveInput.y, Length(moveInput)), kX, kY,
              18, RAYWHITE);
     DrawText(TextFormat("speed  %5.0f / %.0f", Length(motion.velocity), player.stats.maxSpeed), kX, kY + kLine, 18,
@@ -781,6 +854,7 @@ void DrawDebugHud(const World& world, Vec2 moveInput) {
                         static_cast<int>(world.shockwaves.Size())),
              kX, kY + 14 * kLine, 18, RAYWHITE);
     DrawText(AttackPickLabel(world), kX, kY + 15 * kLine, 18, ORANGE);
+    DrawText(ShieldLabel(world.boss), kX, kY + 16 * kLine, 18, ORANGE);
 }
 #endif
 
@@ -817,6 +891,10 @@ void Game::Run() {
             _showDebugOverlay = !_showDebugOverlay;
         }
         // Skips to the victory screen without firing 120 bullets. The next step ends the fight.
+        // Breaks the shield at once, to reach the exposed window without the right gun.
+        if (IsKeyPressed(KEY_F2) && _session.state == SessionState::Playing) {
+            BreakBossShield(_session.world);
+        }
         if (IsKeyPressed(KEY_F4) && _session.state == SessionState::Playing) {
             DefeatBoss(_session.world);
         }

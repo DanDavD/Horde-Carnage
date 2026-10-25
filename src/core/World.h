@@ -88,4 +88,8 @@ void StepWorld(World& world, const PlayerCommands& commands, float dt);
 /// Takes all the boss's health at once. For the Debug shortcut that skips to the victory screen.
 void DefeatBoss(World& world);
 
+/// Breaks the boss's shield at once, staggering it as a real break would. For the Debug shortcut that skips
+/// to the exposed window without the right gun.
+void BreakBossShield(World& world);
+
 } // namespace horde

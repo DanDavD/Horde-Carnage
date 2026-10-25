@@ -31,6 +31,7 @@ This is day 7 of 15, and the boss fight is in progress. Progress is tracked in t
 - Its third attack, the Leap. It crouches, jumps out of reach and comes down on its shadow, which follows you, slower than you run, then stops a moment before the landing. The landing takes 35, and a shockwave rolls out from it faster than you can run: dash through it. See [The boss](docs/BOSS.md).
 - A boss that picks its next attack at random, weighted by how far you are: up close it favours the Hair Ring, far away the Charge, in between the Leap, and it never repeats the attack it just did. It stalks for 0.8 to 1.6 s between attacks, and every warning runs up to 15% longer or shorter, so you have to watch it instead of counting. The moment its aim or its shadow locks always lasts the same. See [The boss](docs/BOSS.md).
 - Combos. About a third of the Charges and Leaps chain straight into a second attack with a shorter warning and no opening in between: the Rebound (a second Charge back off the wall), the Pursuit (a Leap after you once the Charge is over) and the Crash (a Hair Ring on landing). The opening after a combo is longer. See [The boss](docs/BOSS.md).
+- An alternating shield. The blue Shell shrugs off bullets under 8 damage, so only the pistol breaks it; the orange Barrier takes at most 6 per bullet and grows back, so only the SMG's stream breaks it. A break staggers the boss and leaves it open to both guns for 5 s, then the other shield comes up. Its bar runs under the boss's. See [The boss's shield](docs/SHIELD.md).
 - A seeded random number generator (PCG32) behind all of it, with a new seed for every attempt, so a fight can be replayed exactly from its seed. See [Random numbers](docs/RANDOM.md).
 - The hairball, the boss's small child: it walks straight at you and stops when it touches you. It is no longer in the fight; the boss will summon hairballs in its second phase. See [Enemies](docs/ENEMIES.md).
 - Bodies push each other apart instead of stacking. You can shove a hairball out of your way but not the boss, and a crowd slows you down. See [Collisions](docs/COLLISIONS.md).
@@ -44,7 +45,7 @@ This is day 7 of 15, and the boss fight is in progress. Progress is tracked in t
 - Unit tests for the pure logic, and a GitHub Actions workflow that builds and tests every push and pull request on Windows.
 - Warnings are errors for the project's own code (`/W4 /WX` on MSVC).
 
-**Still to do:** the boss's alternating shield and its second phase, then the numbers in JSON, game feel and menus. See the [roadmap](docs/ROADMAP.md) for the order, and for the difficulty I am aiming for.
+**Still to do:** the boss's second phase, then the numbers in JSON, game feel and menus. See the [roadmap](docs/ROADMAP.md) for the order, and for the difficulty I am aiming for.
 
 ## Tech stack
 

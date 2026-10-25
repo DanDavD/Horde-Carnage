@@ -16,6 +16,7 @@ add_library(horde_core STATIC
     core/Projectile.cpp
     core/Random.cpp
     core/Session.cpp
+    core/Shield.cpp
     core/Shockwave.cpp
     core/Weapon.cpp
     core/World.cpp)

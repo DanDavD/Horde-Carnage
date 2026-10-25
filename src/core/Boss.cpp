@@ -265,6 +265,12 @@ BossActions StepBoss(Boss& boss, Vec2 playerPosition, float playerRadius, const 
         StepMovement(boss.motion, Vec2{}, boss.stats, dt);
         return {};
     }
+    StepShield(boss.shield, dt);
+    if (IsStaggered(boss)) {
+        boss.staggerSeconds -= dt;
+        StepMovement(boss.motion, Vec2{}, boss.stats, dt);
+        return {};
+    }
     if (!boss.attack) {
         Stalk(boss, playerPosition, playerRadius, arena, random, dt);
         return {};
@@ -276,6 +282,16 @@ BossActions StepBoss(Boss& boss, Vec2 playerPosition, float playerRadius, const 
         StartAttack(boss, *boss.attack->followUp, true, playerPosition, arena, random);
     }
     return actions;
+}
+
+bool IsStaggered(const Boss& boss) {
+    return boss.staggerSeconds > 0.0f;
+}
+
+void StaggerBoss(Boss& boss) {
+    boss.attack.reset();
+    boss.staggerSeconds = boss.breakStaggerSeconds;
+    boss.secondsUntilAttack = boss.choice.minStalkSeconds;
 }
 
 bool IsCharging(const Boss& boss) {

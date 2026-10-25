@@ -225,11 +225,22 @@ void HitEnemy(Enemy& enemy, const Projectile& bullet) {
     enemy.motion.velocity += Normalized(bullet.motion.velocity) * bullet.knockback;
 }
 
-// The boss is too heavy to stagger or push: a bullet only takes health and flashes it. Openings to punish
-// it come from its own attacks, not from the gun.
+// A bullet meets the shield first, and reaches the health only while the shield is down. The boss is too
+// heavy for one bullet to stagger or push: the bullet that breaks the shield staggers it, the others only
+// take health and flash it.
 void HitBoss(Boss& boss, const Projectile& bullet) {
-    ApplyDamage(boss.health, bullet.damage);
-    boss.hitFlashSeconds = kHitFlashSeconds;
+    switch (HitShield(boss.shield, bullet.damage)) {
+    case ShieldHit::Exposed:
+        ApplyDamage(boss.health, bullet.damage);
+        boss.hitFlashSeconds = kHitFlashSeconds;
+        break;
+    case ShieldHit::Broken:
+        StaggerBoss(boss);
+        break;
+    case ShieldHit::Bounced:
+    case ShieldHit::Absorbed:
+        break;
+    }
 }
 
 // A ring around the gap the boss's attack points to, one strand per slot outside the gap. A full pool drops
@@ -434,6 +445,11 @@ float Accuracy(const World& world) {
 
 void DefeatBoss(World& world) {
     world.boss.health.current = 0;
+}
+
+void BreakBossShield(World& world) {
+    BreakShield(world.boss.shield);
+    StaggerBoss(world.boss);
 }
 
 } // namespace horde

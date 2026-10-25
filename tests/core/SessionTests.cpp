@@ -99,6 +99,7 @@ TEST_CASE("the fight is won in the step the last bullet lands") {
     Session session = horde::StartSession(kArena, kView);
     horde::Boss& boss = session.world.boss;
     boss.health.current = horde::kPistol.damage;
+    horde::BreakShield(boss.shield);
 
     // The player starts aiming at the boss, so one shot is enough.
     Step(session, PlayerCommands{.firePressed = true}, 1);

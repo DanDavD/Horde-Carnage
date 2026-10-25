@@ -23,6 +23,7 @@ add_executable(horde_tests
     core/ProjectileTests.cpp
     core/RandomTests.cpp
     core/SessionTests.cpp
+    core/ShieldTests.cpp
     core/ShockwaveTests.cpp
     core/Vec2Tests.cpp
     core/WeaponTests.cpp
