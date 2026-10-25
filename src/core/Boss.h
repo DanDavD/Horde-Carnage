@@ -10,6 +10,7 @@
 #include "core/Random.h"
 #include "core/Shield.h"
 #include "core/Shockwave.h"
+#include "core/SpawnMarker.h"
 #include "core/Vec2.h"
 
 namespace horde {
@@ -138,11 +139,40 @@ struct VolleyStats {
     int damage = 12; ///< Per strand. A burst lands at most one hit, through the invulnerability window.
 };
 
-/// The second phase's weights: the Volley joins the three attacks of the first, at its best far away,
-/// where the others leave gaps. Stalks are shorter and warnings a little shorter on average.
+/// The numbers of the Summon, the second phase's answer to a player who keeps far away.
+struct SummonStats {
+    float warningSeconds = 0.75f; ///< Howling, swollen, while the marks appear on the floor.
+    float activeSeconds = 0.2f;
+    float recoverySeconds = 1.0f; ///< Spent: the opening to punish it, if the hairballs allow.
+    /// From the marks appearing to the hairballs coming out: as long as the warning, so the hairballs come
+    /// out as the howl ends.
+    float markerSeconds = 0.75f;
+    /// Hairballs alive at once, at most. A summon brings fewer when the arena is already this full, so
+    /// ignoring the hairballs does not bury the player.
+    int maxAlive = 8;
+    SummonPlacement placement; ///< Four marks 250 units around the player, inside the walls.
+    /// Each summoned hairball spits a strand at the player this often, so the hairballs are something to
+    /// watch, not only to outrun. Its first one comes at a random moment in the first two values, so a
+    /// crowd does not spit in step.
+    float spitIntervalSeconds = 3.0f;
+    float firstSpitMinSeconds = 1.0f;
+    float firstSpitMaxSeconds = 3.0f;
+    float spitWarningSeconds = 0.4f; ///< It swells and its eyes redden for this long before it spits.
+    /// A little faster than the Hair Ring's strands and far slower than the Volley's, and weaker than both,
+    /// since there can be eight hairballs spitting.
+    float spitSpeed = 300.0f;
+    float spitRange = 700.0f;
+    float spitRadius = 6.0f;
+    int spitDamage = 8;
+};
+
+/// The second phase's weights: the Volley and the Summon join the three attacks of the first. Both are at
+/// their best far away, where the others leave gaps, so keeping away is no longer the safe answer. Stalks
+/// are shorter and warnings a little shorter on average.
 inline constexpr AttackChoiceStats PhaseTwoChoice() {
     AttackChoiceStats choice;
     choice.volley = AttackWeights{.nearWeight = 1.0f, .midWeight = 3.0f, .farWeight = 3.0f};
+    choice.summon = AttackWeights{.nearWeight = 0.5f, .midWeight = 1.0f, .farWeight = 2.5f};
     choice.minStalkSeconds = 0.6f;
     choice.maxStalkSeconds = 1.2f;
     choice.minWarningScale = 0.75f;
@@ -186,6 +216,7 @@ struct FrenzyStats {
     int leapLandingStrands = 12;
     int volleyBursts = 5; ///< Aimed, led, aimed, led, aimed.
     float volleyBurstIntervalSeconds = 0.25f;
+    int summonCount = 6; ///< Hairballs per Summon.
     ShockwaveStats roar{.speed = 380.0f, .reach = 300.0f, .thickness = 20.0f, .damage = 20};
 };
 
@@ -204,6 +235,7 @@ struct BossActions {
     bool landed = false;       ///< It just came down from a Leap: the impact, and a shockwave from its body.
     bool spitVolley = false;   ///< Spawn one burst of a Volley now, aimed along `BossAttack::direction`.
     bool throwBolts = false;   ///< In a frenzy, while it charges: a strand at the player and one ahead.
+    bool summon = false;       ///< Put the Summon's marks on the floor around the player.
     bool roared = false;       ///< The transformation is over: a shockwave from its body.
 };
 
@@ -264,6 +296,7 @@ struct Boss {
     HairRingStats hairRing;
     LeapStats leap;
     VolleyStats volley;
+    SummonStats summon;
     AttackChoiceStats choice; ///< The phase in progress: the second phase replaces it.
     ComboStats combo;         ///< The same.
     BossPhase phase = BossPhase::One;

@@ -26,6 +26,7 @@ constexpr float kRadiansPerDegree = std::numbers::pi_v<float> / 180.0f;
 // A hit flashes the body white. A hairball also stops chasing for a moment, so the hit reads as a stagger.
 constexpr float kHitFlashSeconds = 0.1f;
 constexpr float kHitStunSeconds = 0.15f;
+constexpr float kSummonShakeSeconds = 0.3f;
 
 // The camera looks at a point this far from the player toward the boss, so the boss stays in view. The
 // offset is capped, so a boss across the arena never pushes the player toward the edge of the screen.
@@ -120,11 +121,35 @@ void HandleWeapons(World& world, const PlayerCommands& commands, float dt) {
     }
 }
 
+// A summoned hairball's strand: aimed where the player is, from the edge of its body.
+void HairballSpit(World& world, const Enemy& hairball) {
+    const SummonStats& stats = world.boss.summon;
+    const Vec2 toPlayer = world.player.motion.position - hairball.motion.position;
+    if (LengthSquared(toPlayer) <= 1.0f) {
+        return;
+    }
+    const Vec2 direction = Normalized(toPlayer);
+    Projectile strand = LaunchProjectile(hairball.motion.position + direction * hairball.radius, direction,
+                                         stats.spitSpeed, stats.spitRange);
+    strand.radius = stats.spitRadius;
+    strand.damage = stats.spitDamage;
+    strand.source = DamageSource::Hairball;
+    world.hostileProjectiles.Spawn(strand);
+}
+
 void StepEnemies(World& world, float dt) {
     const Player& player = world.player;
+    const float spitInterval = world.boss.summon.spitIntervalSeconds;
     for (Enemy& enemy : world.enemies) {
         enemy.hitFlashSeconds = std::max(enemy.hitFlashSeconds - dt, 0.0f);
         enemy.stunSeconds = std::max(enemy.stunSeconds - dt, 0.0f);
+        if (enemy.spits) {
+            enemy.secondsUntilSpit -= dt;
+            if (enemy.secondsUntilSpit <= 0.0f) {
+                HairballSpit(world, enemy);
+                enemy.secondsUntilSpit += spitInterval;
+            }
+        }
 
         // Chase where the player is after this step's move, so a hairball never aims at a stale position.
         // While stunned it has no input: it slides out of the knockback and holds still, instead of turning
@@ -291,6 +316,39 @@ void ThrowBolts(World& world) {
     if (LengthSquared(ahead - from) > 1.0f) {
         ThrowFrenzyStrand(world, Normalized(ahead - from));
     }
+}
+
+// The Summon's marks, around the player, turned by a random angle so no two summons look the same.
+void PlaceSummon(World& world) {
+    const SummonStats& stats = world.boss.summon;
+    const float turn = RandomRange(world.random, 0.0f, 2.0f * std::numbers::pi_v<float>);
+    const SummonPoints plan =
+        PlanSummon(world.player.motion.position, world.boss.motion.position, world.arena, stats.placement, turn);
+    for (std::size_t i = 0; i < plan.count; ++i) {
+        world.spawnMarkers.Spawn(MakeSpawnMarker(plan.points[i], stats.markerSeconds));
+    }
+}
+
+// A mark that runs out lets its hairball out, unless the arena already holds as many as the boss allows.
+// The hairball comes out shaking itself for a moment before it chases, like one that was just hit.
+void StepSpawnMarkers(World& world, float dt) {
+    const int maxAlive = world.boss.summon.maxAlive;
+    world.spawnMarkers.RemoveIf([&world, maxAlive, dt](SpawnMarker& marker) {
+        if (StepSpawnMarker(marker, dt)) {
+            return false;
+        }
+        if (static_cast<int>(world.enemies.Size()) < maxAlive) {
+            const SummonStats& stats = world.boss.summon;
+            Enemy hairball;
+            hairball.motion = MotionAt(marker.position);
+            hairball.stunSeconds = kSummonShakeSeconds;
+            hairball.spits = true;
+            hairball.secondsUntilSpit =
+                RandomRange(world.random, stats.firstSpitMinSeconds, stats.firstSpitMaxSeconds);
+            world.enemies.Spawn(hairball);
+        }
+        return true;
+    });
 }
 
 // One burst of a Volley: a few strands fanned around the direction the boss is aiming in.
@@ -478,6 +536,11 @@ void StepWorld(World& world, const PlayerCommands& commands, float dt) {
     if (actions.throwBolts) {
         ThrowBolts(world);
     }
+    if (actions.summon) {
+        PlaceSummon(world);
+    }
+    // Before the collisions, so a hairball that comes out is pushed apart and held inside the walls at once.
+    StepSpawnMarkers(world, dt);
     if (actions.roared) {
         const Boss& boss = world.boss;
         world.shockwaves.Spawn(MakeShockwave(boss.motion.position, boss.radius, boss.phaseTwo.roar));

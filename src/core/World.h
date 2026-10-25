@@ -15,6 +15,7 @@
 #include "core/Projectile.h"
 #include "core/Random.h"
 #include "core/Shockwave.h"
+#include "core/SpawnMarker.h"
 #include "core/Vec2.h"
 
 namespace horde {
@@ -34,6 +35,8 @@ inline constexpr std::size_t kMaxEnemies = 64;
 inline constexpr std::size_t kMaxBullets = 128;
 inline constexpr std::size_t kMaxHostileProjectiles = 128;
 inline constexpr std::size_t kMaxShockwaves = 8;
+/// A summon puts down 6 marks at most, and they last under a second, so 16 is room for two at once.
+inline constexpr std::size_t kMaxSpawnMarkers = 16;
 
 /// Everything the simulation needs, as plain data: the arena, the player, the boss, the hairballs, the
 /// bullets, the boss's projectiles and shockwaves, the camera, and the random generator.
@@ -46,13 +49,14 @@ struct World {
     Arena arena;
     Player player;
     Boss boss;
-    /// Hairballs. The fight starts without any; the pool is there for the ones the boss summons.
+    /// Hairballs. The fight starts without any; the boss summons them in its second phase.
     ObjectPool<Enemy, kMaxEnemies> enemies;
     ObjectPool<Projectile, kMaxBullets> bullets; ///< The player's. They hit hairballs and the boss.
     /// The boss's: the strands of its Hair Ring. They hit only the player. A pool of their own keeps the two
     /// sides apart without a flag on every projectile.
     ObjectPool<Projectile, kMaxHostileProjectiles> hostileProjectiles;
     ObjectPool<Shockwave, kMaxShockwaves> shockwaves; ///< From the boss's landings. They hit only the player.
+    ObjectPool<SpawnMarker, kMaxSpawnMarkers> spawnMarkers; ///< Where summoned hairballs are about to appear.
     FollowCamera camera;
     std::uint64_t seed = 0; ///< What `random` was seeded with, so a fight can be told apart and replayed.
     Random random;

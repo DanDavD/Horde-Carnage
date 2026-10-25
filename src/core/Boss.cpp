@@ -66,6 +66,7 @@ void StartAttack(Boss& boss, AttackKind kind, bool endsCombo, Vec2 playerPositio
         attack.target = InsideArena(playerPosition, boss.radius, arena);
         break;
     case AttackKind::Volley:
+    case AttackKind::Summon:
         break;
     }
     boss.lastAttack = kind;
@@ -293,6 +294,38 @@ BossActions StepVolley(Boss& boss, BossAttack& volley, const Motion& player, con
     return actions;
 }
 
+// The boss holds its ground and howls. The marks go down as the howl starts; the world counts them down and
+// lets the hairballs out, so the boss is free to recover while they come.
+BossActions StepSummon(Boss& boss, BossAttack& summon, Random& random, float dt) {
+    const SummonStats& stats = boss.summon;
+    StepMovement(boss.motion, Vec2{}, boss.stats, dt);
+    summon.stageSeconds += dt;
+    BossActions actions;
+
+    switch (summon.stage) {
+    case AttackStage::Warning:
+        if (summon.wavesSpat == 0) {
+            summon.wavesSpat = 1;
+            actions.summon = true;
+        }
+        if (summon.stageSeconds >= WarningSeconds(boss, summon)) {
+            EnterStage(summon, AttackStage::Active);
+        }
+        break;
+    case AttackStage::Active:
+        if (summon.stageSeconds >= stats.activeSeconds) {
+            EnterStage(summon, AttackStage::Recovery);
+        }
+        break;
+    case AttackStage::Recovery:
+        if (summon.stageSeconds >= RecoverySeconds(boss, summon, stats.recoverySeconds)) {
+            FinishAttack(boss, random);
+        }
+        break;
+    }
+    return actions;
+}
+
 // The roar ends the transformation: the second phase's numbers replace the first's, a fresh Shell comes up
 // with the shorter opening, and the first attack of the new phase is the new one, so the player sees what
 // changed at once.
@@ -321,6 +354,8 @@ BossActions StepAttack(Boss& boss, const Motion& player, const Arena& arena, Ran
         return StepLeap(boss, attack, playerPosition, arena, random, dt);
     case AttackKind::Volley:
         return StepVolley(boss, attack, player, arena, random, dt);
+    case AttackKind::Summon:
+        return StepSummon(boss, attack, random, dt);
     }
     return {};
 }
@@ -396,6 +431,7 @@ void EnterFrenzy(Boss& boss) {
     boss.leap.landingStrands = frenzy.leapLandingStrands;
     boss.volley.bursts = frenzy.volleyBursts;
     boss.volley.burstIntervalSeconds = frenzy.volleyBurstIntervalSeconds;
+    boss.summon.placement.count = frenzy.summonCount;
 }
 
 bool IsStaggered(const Boss& boss) {
@@ -428,6 +464,8 @@ float WarningSeconds(const Boss& boss, const BossAttack& attack) {
         return LeapCrouchSeconds(boss, attack) + LeapAirSeconds(boss, attack);
     case AttackKind::Volley:
         return boss.volley.warningSeconds * attack.warningScale;
+    case AttackKind::Summon:
+        return boss.summon.warningSeconds * attack.warningScale;
     }
     return 0.0f;
 }

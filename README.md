@@ -34,19 +34,19 @@ This is day 7 of 15, and the boss fight is in progress. Progress is tracked in t
 - An alternating shield. The blue Shell shrugs off bullets under 8 damage, so only the pistol breaks it; the orange Barrier takes at most 6 per bullet and grows back, so only the SMG's stream breaks it. A break staggers the boss and leaves it open to both guns for 5 s, then the other shield comes up. Its bar runs under the boss's. See [The boss's shield](docs/SHIELD.md).
 - A second phase. Emptying the first bar starts a 2 s transformation: the boss swells and roars, its bar fills back up, and a short shockwave knocks back anyone waiting next to it. Then its eyes turn red, it stalks less, combos more, its shield opens for 4 s instead of 5, and it has a fourth attack, the Aimed Volley: three quick bursts of five strands, the first and last aimed where you are and the middle one where you are running to. At half of its second bar it falls into a frenzy: it throws strands at you while it charges, spits two rings, lands from a Leap with a ring of strands, and fires five bursts. Only the second bar wins. See [The boss](docs/BOSS.md).
 - A seeded random number generator (PCG32) behind all of it, with a new seed for every attempt, so a fight can be replayed exactly from its seed. See [Random numbers](docs/RANDOM.md).
-- The hairball, the boss's small child: it walks straight at you and stops when it touches you. It is no longer in the fight; the boss will summon hairballs in its second phase. See [Enemies](docs/ENEMIES.md).
+- The hairball, the boss's small child: it walks straight at you and stops when it touches you. The boss summons them in its second phase: marks appear on the floor around you, and 0.75 s later a hairball comes out of each, so keeping far from the boss is no longer safe. Summoned hairballs spit a strand at you every 3 s, each on its own beat, and swell red just before. See [Enemies](docs/ENEMIES.md).
 - Bodies push each other apart instead of stacking. You can shove a hairball out of your way but not the boss, and a crowd slows you down. See [Collisions](docs/COLLISIONS.md).
 - A health bar. A touch of the boss takes 20 of your 100 hit points (a hairball's takes 10), and after a hit you blink and cannot be hurt for 0.8 seconds. See [Health](docs/HEALTH.md).
 - A fight that ends one of two ways. "YOU DIED" shows your attempt number, what killed you and when, and how much health the boss kept; "VICTORY" shows the attempt that won, the length of the fight and your accuracy. Both fade in, then a button starts a fresh fight. The attempt count survives every retry. See [Game flow](docs/GAME_FLOW.md).
 - Aiming with the mouse, independent of where you walk, and two guns: a semi-automatic pistol (one shot per click) and an automatic SMG (hold to fire). A panel shows the gun in hand. See [Aiming and weapons](docs/WEAPONS.md).
 - Bullets that fly and hit the first body in their path. A hairball flashes white and gets knocked back; the boss only flashes, it is too heavy to push. See [Bullets and hits](docs/BULLETS.md).
-- Hairballs, bullets, the boss's strands and its shockwaves live in fixed object pools, so the game never allocates memory while you play. See [Object pool](docs/OBJECT_POOL.md).
+- Hairballs, bullets, the boss's strands, its shockwaves and the marks of its Summon live in fixed object pools, so the game never allocates memory while you play. See [Object pool](docs/OBJECT_POOL.md).
 - A dash that covers about four body widths in 0.12 s, passes through enemies and makes you untouchable while it lasts. See [Player abilities](docs/ABILITIES.md).
 - Three healing flasks per attempt, Dark Souls style: drinking takes a second, slows you down, and a hit while drinking wastes the flask. See [Player abilities](docs/ABILITIES.md).
 - Unit tests for the pure logic, and a GitHub Actions workflow that builds and tests every push and pull request on Windows.
 - Warnings are errors for the project's own code (`/W4 /WX` on MSVC).
 
-**Still to do:** the boss's Summon in its second phase, then the numbers in JSON, game feel and menus. See the [roadmap](docs/ROADMAP.md) for the order, and for the difficulty I am aiming for.
+**Still to do:** the numbers in JSON, game feel and menus. See the [roadmap](docs/ROADMAP.md) for the order, and for the difficulty I am aiming for.
 
 ## Tech stack
 

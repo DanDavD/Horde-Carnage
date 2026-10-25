@@ -18,6 +18,7 @@ add_library(horde_core STATIC
     core/Session.cpp
     core/Shield.cpp
     core/Shockwave.cpp
+    core/SpawnMarker.cpp
     core/Weapon.cpp
     core/World.cpp)
 target_include_directories(horde_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})

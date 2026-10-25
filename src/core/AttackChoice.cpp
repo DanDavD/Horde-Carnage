@@ -6,8 +6,8 @@ namespace horde {
 
 namespace {
 
-constexpr std::array<AttackKind, 4> kAttackKinds{AttackKind::Charge, AttackKind::HairRing, AttackKind::Leap,
-                                                 AttackKind::Volley};
+constexpr std::array<AttackKind, 5> kAttackKinds{AttackKind::Charge, AttackKind::HairRing, AttackKind::Leap,
+                                                 AttackKind::Volley, AttackKind::Summon};
 
 const AttackWeights& WeightsOf(const AttackChoiceStats& stats, AttackKind kind) {
     switch (kind) {
@@ -19,6 +19,8 @@ const AttackWeights& WeightsOf(const AttackChoiceStats& stats, AttackKind kind) 
         return stats.leap;
     case AttackKind::Volley:
         return stats.volley;
+    case AttackKind::Summon:
+        return stats.summon;
     }
     return stats.charge;
 }

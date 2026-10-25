@@ -79,6 +79,12 @@ constexpr float kVolleyLean = 0.08f;
 constexpr float kVolleyBurstSwell = 0.08f;
 constexpr float kVolleyBurstFlash = 0.08f;
 constexpr float kVolleyLineLength = 600.0f;
+// The Summon. The boss swells and shudders as it howls. Each mark is a dark pit on the floor with a red
+// rim that closes in on it as the hairball's moment comes.
+constexpr float kSummonSwell = 0.12f;
+constexpr float kSummonShudder = 2.0f;
+constexpr float kMarkerRadius = 18.0f;
+constexpr float kMarkerRimStart = 2.5f;
 // The transformation: the body swells and trembles harder as it goes, and the eyes flicker from amber to
 // red, faster toward the end.
 constexpr float kTransformSwell = 0.2f;
@@ -173,6 +179,8 @@ struct HairStyle {
 };
 
 constexpr HairStyle kHairballStyle{kHairballFill, kHairballEdge, kHairballEye, 12, 3.0f, 3.0f, 1.0f};
+constexpr HairStyle kSpittingHairballStyle{kHairballFill, kHairballEdge, kBlood, 12, 3.0f, 3.0f, 1.0f};
+constexpr float kHairballSpitSwell = 0.2f;
 constexpr HairStyle kBossStyle{kBossFill, kBossEdge, kBossEye, 28, 6.0f, 5.0f, 0.45f};
 // In the second phase the eyes turn red, so the change reads at a glance.
 constexpr HairStyle kEnragedBossStyle{kBossFill, kBossEdge, kBossEyeEnraged, 28, 6.0f, 5.0f, 0.45f};
@@ -310,9 +318,13 @@ void DrawHairBody(Vec2 position, float radius, Vec2 lookAt, const HairStyle& sty
     DrawCircleV(ToRaylib(eyes - side * (radius * kHairballEyeSpread)), radius * kHairballEyeRadius, style.eye);
 }
 
-void DrawHairball(const Enemy& enemy, Vec2 playerPosition, float alpha) {
+// A hairball about to spit swells and reddens its eyes, so the player can see which one is next.
+void DrawHairball(const Enemy& enemy, Vec2 playerPosition, float spitWarningSeconds, float alpha) {
     const Vec2 position = Lerp(enemy.motion.previousPosition, enemy.motion.position, alpha);
-    DrawHairBody(position, enemy.radius, playerPosition, kHairballStyle, enemy.hitFlashSeconds > 0.0f);
+    const bool aboutToSpit = enemy.spits && enemy.secondsUntilSpit <= spitWarningSeconds;
+    const float radius = enemy.radius * (aboutToSpit ? 1.0f + kHairballSpitSwell : 1.0f);
+    DrawHairBody(position, radius, playerPosition, aboutToSpit ? kSpittingHairballStyle : kHairballStyle,
+                 enemy.hitFlashSeconds > 0.0f);
 }
 
 bool InAttack(const Boss& boss, AttackKind kind, AttackStage stage) {
@@ -546,6 +558,17 @@ void DrawVolleyingBoss(const Boss& boss, Vec2 position, Vec2 playerPosition) {
     DrawBossBody(boss, position, radius, playerPosition);
 }
 
+// Swells and shudders while it howls, and settles back as the hairballs come out.
+void DrawSummoningBoss(const Boss& boss, Vec2 position, Vec2 playerPosition) {
+    const BossAttack& summon = *boss.attack;
+    float radius = boss.radius;
+    if (summon.stage == AttackStage::Warning) {
+        radius *= 1.0f + kSummonSwell * std::min(summon.stageSeconds / WarningSeconds(boss, summon), 1.0f);
+        position.x += kSummonShudder * std::sin(summon.stageSeconds * 60.0f);
+    }
+    DrawBossBody(boss, position, radius, playerPosition);
+}
+
 // Swells and trembles harder as the transformation goes on, with its eyes flickering to red, faster toward
 // the end. No shield is drawn: nothing can hurt it.
 void DrawTransformingBoss(const Boss& boss, Vec2 position, Vec2 playerPosition) {
@@ -585,7 +608,20 @@ void DrawBoss(const Boss& boss, Vec2 playerPosition, float alpha) {
     case AttackKind::Volley:
         DrawVolleyingBoss(boss, position, playerPosition);
         break;
+    case AttackKind::Summon:
+        DrawSummoningBoss(boss, position, playerPosition);
+        break;
     }
+}
+
+// A dark pit the size of a hairball, with a red rim that closes in on it: when the rim reaches the pit, the
+// hairball comes out.
+void DrawSpawnMarker(const SpawnMarker& marker) {
+    const float left = std::clamp(marker.secondsLeft / marker.totalSeconds, 0.0f, 1.0f);
+    const Vector2 center = ToRaylib(marker.position);
+    DrawCircleV(center, kMarkerRadius, Fade(BLACK, 0.45f));
+    const float rim = kMarkerRadius * (1.0f + (kMarkerRimStart - 1.0f) * left);
+    DrawRing(center, rim - 2.0f, rim, 0.0f, 360.0f, 32, Fade(kBlood, 0.9f - 0.5f * left));
 }
 
 // The band that hurts, fading as the ring spreads out. A wave that already hit the player is drawn faint,
@@ -838,6 +874,8 @@ const char* AttackKindLabel(AttackKind kind) {
         return "leap";
     case AttackKind::Volley:
         return "volley";
+    case AttackKind::Summon:
+        return "summon";
     }
     return "";
 }
@@ -889,10 +927,12 @@ const char* AttackPickLabel(const World& world) {
     const Boss& boss = world.boss;
     const float distance = Length(world.player.motion.position - boss.motion.position);
     const AttackChoiceStats& choice = boss.choice;
-    return TextFormat("pick   %3.0f  c %.1f r %.1f l %.1f  not %s", distance,
+    return TextFormat("pick %3.0f c%.1f r%.1f l%.1f v%.1f s%.1f not %s", distance,
                       AttackWeightAt(choice, AttackKind::Charge, distance),
                       AttackWeightAt(choice, AttackKind::HairRing, distance),
                       AttackWeightAt(choice, AttackKind::Leap, distance),
+                      AttackWeightAt(choice, AttackKind::Volley, distance),
+                      AttackWeightAt(choice, AttackKind::Summon, distance),
                       boss.lastAttack ? AttackKindLabel(*boss.lastAttack) : "-");
 }
 
@@ -906,7 +946,7 @@ void DrawDebugHud(const World& world, Vec2 moveInput) {
     constexpr int kX = 10;
     constexpr int kY = 80; // Below the health and dash bars.
     constexpr int kLine = 20;
-    DrawRectangle(kX - 4, kY - 4, 380, 17 * kLine + 8, Fade(BLACK, 0.6f));
+    DrawRectangle(kX - 4, kY - 4, 420, 17 * kLine + 8, Fade(BLACK, 0.6f));
     DrawText(TextFormat("input  %5.2f %5.2f  len %4.2f", moveInput.x, moveInput.y, Length(moveInput)), kX, kY,
              18, RAYWHITE);
     DrawText(TextFormat("speed  %5.0f / %.0f", Length(motion.velocity), player.stats.maxSpeed), kX, kY + kLine, 18,
@@ -936,8 +976,8 @@ void DrawDebugHud(const World& world, Vec2 moveInput) {
                         player.flasks.drinkingSeconds),
              kX, kY + 12 * kLine, 18, RAYWHITE);
     DrawText(TextFormat("boss   %s", BossStateLabel(world.boss)), kX, kY + 13 * kLine, 18, ORANGE);
-    DrawText(TextFormat("seed   %08X  waves %d", static_cast<unsigned>(world.seed),
-                        static_cast<int>(world.shockwaves.Size())),
+    DrawText(TextFormat("seed   %08X  waves %d  marks %d", static_cast<unsigned>(world.seed),
+                        static_cast<int>(world.shockwaves.Size()), static_cast<int>(world.spawnMarkers.Size())),
              kX, kY + 14 * kLine, 18, RAYWHITE);
     DrawText(AttackPickLabel(world), kX, kY + 15 * kLine, 18, ORANGE);
     DrawText(ShieldLabel(world.boss), kX, kY + 16 * kLine, 18, ORANGE);
@@ -1050,6 +1090,9 @@ void Game::Draw(float alpha) const {
     for (const Shockwave& wave : world.shockwaves) {
         DrawShockwave(wave);
     }
+    for (const SpawnMarker& marker : world.spawnMarkers) {
+        DrawSpawnMarker(marker);
+    }
 
     // The boss goes under its children, so a dead boss lies on the floor. In the air it goes over
     // everything, the player included.
@@ -1058,7 +1101,7 @@ void Game::Draw(float alpha) const {
         DrawBoss(world.boss, playerPosition, alpha);
     }
     for (const Enemy& enemy : world.enemies) {
-        DrawHairball(enemy, playerPosition, alpha);
+        DrawHairball(enemy, playerPosition, world.boss.summon.spitWarningSeconds, alpha);
     }
     for (const Projectile& bullet : world.bullets) {
         DrawBullet(bullet, alpha);

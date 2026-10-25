@@ -1,3 +1,6 @@
+#include <array>
+#include <cstddef>
+
 #include <doctest/doctest.h>
 
 #include "PredictableBoss.h"
@@ -155,18 +158,22 @@ TEST_CASE("the Debug shortcuts skip to the transformation and to the victory") {
     CHECK(horde::IsBossDefeated(won));
 }
 
-TEST_CASE("the Volley joins the picks in the second phase, and never shows in the first") {
+TEST_CASE("the Volley and the Summon join the picks in the second phase, and never show in the first") {
     horde::Random random = horde::SeedRandom(61);
     const horde::AttackChoiceStats phaseOne;
     const horde::AttackChoiceStats phaseTwo = horde::PhaseTwoChoice();
-    int phaseOneVolleys = 0;
-    int phaseTwoVolleys = 0;
-    for (int i = 0; i < 1000; ++i) {
-        phaseOneVolleys += horde::ChooseAttack(phaseOne, 900.0f, std::nullopt, random) == AttackKind::Volley ? 1 : 0;
-        phaseTwoVolleys += horde::ChooseAttack(phaseTwo, 900.0f, std::nullopt, random) == AttackKind::Volley ? 1 : 0;
+    std::array<int, 5> one{};
+    std::array<int, 5> two{};
+    for (int i = 0; i < 2000; ++i) {
+        ++one[static_cast<std::size_t>(horde::ChooseAttack(phaseOne, 900.0f, std::nullopt, random))];
+        ++two[static_cast<std::size_t>(horde::ChooseAttack(phaseTwo, 900.0f, std::nullopt, random))];
     }
-    CHECK(phaseOneVolleys == 0);
-    // Far away the weights are 4, 1, 2 and 3: three picks in ten are a Volley.
-    CHECK(phaseTwoVolleys > 250);
-    CHECK(phaseTwoVolleys < 350);
+    CHECK(one[static_cast<std::size_t>(AttackKind::Volley)] == 0);
+    CHECK(one[static_cast<std::size_t>(AttackKind::Summon)] == 0);
+    // Far away the weights are 4, 1, 2, 3 and 2.5: about a quarter of the picks are a Volley, and a fifth a
+    // Summon.
+    CHECK(two[static_cast<std::size_t>(AttackKind::Volley)] > 400);
+    CHECK(two[static_cast<std::size_t>(AttackKind::Volley)] < 560);
+    CHECK(two[static_cast<std::size_t>(AttackKind::Summon)] > 320);
+    CHECK(two[static_cast<std::size_t>(AttackKind::Summon)] < 480);
 }
