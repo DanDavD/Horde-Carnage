@@ -4,6 +4,7 @@
 #include <cmath>
 #include <cstddef>
 #include <numbers>
+#include <optional>
 #include <random>
 #include <string>
 
@@ -304,8 +305,9 @@ void DrawChargeTelegraph(const Boss& boss, const Arena& arena) {
     // To the front of the body where the run ends, not to its centre.
     const Vec2 end = path.end + charge.direction * boss.radius;
     const Vec2 side = Vec2{-charge.direction.y, charge.direction.x} * boss.radius;
-    const bool locked = charge.stageSeconds > stats.warningSeconds - stats.aimLockSeconds;
-    const float progress = std::min(charge.stageSeconds / stats.warningSeconds, 1.0f);
+    const float warning = WarningSeconds(boss, charge);
+    const bool locked = charge.stageSeconds > warning - stats.aimLockSeconds;
+    const float progress = std::min(charge.stageSeconds / warning, 1.0f);
 
     DrawLineEx(ToRaylib(start), ToRaylib(end), boss.radius * 2.0f,
                Fade(kBlood, locked ? 0.3f : 0.06f + 0.12f * progress));
@@ -325,9 +327,10 @@ void DrawLeapTelegraph(const Boss& boss) {
     }
     const BossAttack& leap = *boss.attack;
     const LeapStats& stats = boss.leap;
-    const float airborne = std::max(leap.stageSeconds - stats.crouchSeconds, 0.0f);
-    const float progress = std::min(airborne / stats.airSeconds, 1.0f);
-    const bool locked = airborne > stats.airSeconds - stats.lockSeconds;
+    const float airSeconds = LeapAirSeconds(boss, leap);
+    const float airborne = std::max(leap.stageSeconds - LeapCrouchSeconds(boss, leap), 0.0f);
+    const float progress = std::min(airborne / airSeconds, 1.0f);
+    const bool locked = airborne > airSeconds - stats.lockSeconds;
     const Vector2 center = ToRaylib(leap.target);
 
     const float shadow = stats.impactRadius * (kLeapShadowStart + (1.0f - kLeapShadowStart) * progress);
@@ -346,7 +349,7 @@ void DrawHairRingTelegraph(const Boss& boss) {
     }
     const BossAttack& ring = *boss.attack;
     const HairRingStats& stats = boss.hairRing;
-    const float progress = std::min(ring.stageSeconds / stats.warningSeconds, 1.0f);
+    const float progress = std::min(ring.stageSeconds / WarningSeconds(boss, ring), 1.0f);
     const Vector2 center = ToRaylib(boss.motion.position);
     // In degrees, clockwise on screen, the way raylib draws arcs.
     const float gapMiddle = std::atan2(ring.direction.y, ring.direction.x) * kDegreesPerRadian;
@@ -384,8 +387,9 @@ void DrawChargingBoss(const Boss& boss, Vec2 position) {
     float radius = boss.radius;
     switch (attack.stage) {
     case AttackStage::Warning: {
-        radius *= 1.0f - kChargeCrouch * std::min(attack.stageSeconds / stats.warningSeconds, 1.0f);
-        if (attack.stageSeconds > stats.warningSeconds - stats.aimLockSeconds) {
+        const float warning = WarningSeconds(boss, attack);
+        radius *= 1.0f - kChargeCrouch * std::min(attack.stageSeconds / warning, 1.0f);
+        if (attack.stageSeconds > warning - stats.aimLockSeconds) {
             const Vec2 side{-attack.direction.y, attack.direction.x};
             position += side * (kChargeTremble * std::sin(attack.stageSeconds * 90.0f));
         }
@@ -413,7 +417,7 @@ void DrawSpittingBoss(const Boss& boss, Vec2 position, Vec2 playerPosition) {
     const BossAttack& ring = *boss.attack;
     float radius = boss.radius;
     if (ring.stage == AttackStage::Warning) {
-        radius *= 1.0f + kRingSwell * std::min(ring.stageSeconds / boss.hairRing.warningSeconds, 1.0f);
+        radius *= 1.0f + kRingSwell * std::min(ring.stageSeconds / WarningSeconds(boss, ring), 1.0f);
     } else if (ring.stage == AttackStage::Active) {
         radius *= 1.0f - kRingSpitShrink;
     }
@@ -424,16 +428,17 @@ void DrawSpittingBoss(const Boss& boss, Vec2 position, Vec2 playerPosition) {
 // drawn above everything else, since it is over the player's head.
 void DrawLeapingBoss(const Boss& boss, Vec2 position, Vec2 playerPosition) {
     const BossAttack& leap = *boss.attack;
-    const LeapStats& stats = boss.leap;
     float radius = boss.radius;
     switch (leap.stage) {
     case AttackStage::Warning: {
-        const float airborne = leap.stageSeconds - stats.crouchSeconds;
+        const float crouch = LeapCrouchSeconds(boss, leap);
+        const float airborne = leap.stageSeconds - crouch;
         if (airborne <= 0.0f) {
-            radius *= 1.0f - kLeapCrouch * leap.stageSeconds / stats.crouchSeconds;
+            radius *= 1.0f - kLeapCrouch * leap.stageSeconds / crouch;
             break;
         }
-        const float arc = std::sin(std::numbers::pi_v<float> * std::min(airborne / stats.airSeconds, 1.0f));
+        const float air = std::min(airborne / LeapAirSeconds(boss, leap), 1.0f);
+        const float arc = std::sin(std::numbers::pi_v<float> * air);
         position.y -= kLeapHeight * arc;
         radius *= 1.0f + kLeapGrow * arc;
         break;
@@ -578,6 +583,28 @@ void DrawDashBar(const Dash& dash) {
                   dash.cooldownSeconds > 0.0f ? kSoftText : kPlayerFill);
 }
 
+// What killed the player, for the death screen: knowing which attack did it is how the fight is learned.
+const char* DeathCause(std::optional<DamageSource> source) {
+    if (!source) {
+        return "Slain";
+    }
+    switch (*source) {
+    case DamageSource::BossTouch:
+        return "Slain by her touch";
+    case DamageSource::Charge:
+        return "Slain by her Charge";
+    case DamageSource::HairRing:
+        return "Slain by her Hair Ring";
+    case DamageSource::LeapImpact:
+        return "Slain by her Leap";
+    case DamageSource::Shockwave:
+        return "Slain by the shockwave of her Leap";
+    case DamageSource::Hairball:
+        return "Slain by a hairball";
+    }
+    return "Slain";
+}
+
 // Minutes and seconds, the way the length of a fight is read.
 std::string FormatDuration(float seconds) {
     const int whole = static_cast<int>(seconds);
@@ -614,7 +641,8 @@ void DrawEndScreen(const Session& session) {
         summary = TextFormat("You defeated %s on attempt %d, in %s.", kBossName, session.attempt, duration.c_str());
         detail = TextFormat("%d of %d shots on target (%d%%)", world.shotsHit, world.shotsFired, accuracy);
     } else {
-        summary = TextFormat("Attempt %d. You lasted %s.", session.attempt, duration.c_str());
+        summary =
+            TextFormat("Attempt %d. %s after %s.", session.attempt, DeathCause(world.lastHitBy), duration.c_str());
         detail = TextFormat("%s kept %d%% of her health.", kBossName, HealthPercent(world.boss.health));
     }
     DrawCenteredText(summary.c_str(), kEndBandTop + 124, 26, Fade(RAYWHITE, shown));
@@ -691,8 +719,22 @@ const char* BossStateLabel(const Boss& boss) {
         return TextFormat("stalk, attack in %.2f", boss.secondsUntilAttack);
     }
     const BossAttack& attack = *boss.attack;
-    return TextFormat("%s %s %.2f%s%s", AttackKindLabel(attack.kind), AttackStageLabel(attack.stage),
-                      attack.stageSeconds, attack.stunned ? " stunned" : "", IsAirborne(boss) ? " airborne" : "");
+    const char* combo = attack.followUp ? " combo 1/2" : (attack.endsCombo ? " combo 2/2" : "");
+    return TextFormat("%s %s %.2f/%.2f%s%s%s", AttackKindLabel(attack.kind), AttackStageLabel(attack.stage),
+                      attack.stageSeconds, WarningSeconds(boss, attack), attack.stunned ? " stunned" : "",
+                      IsAirborne(boss) ? " airborne" : "", combo);
+}
+
+// How likely each attack is at the player's distance right now, and the one the next pick skips.
+const char* AttackPickLabel(const World& world) {
+    const Boss& boss = world.boss;
+    const float distance = Length(world.player.motion.position - boss.motion.position);
+    const AttackChoiceStats& choice = boss.choice;
+    return TextFormat("pick   %3.0f  c %.1f r %.1f l %.1f  not %s", distance,
+                      AttackWeightAt(choice, AttackKind::Charge, distance),
+                      AttackWeightAt(choice, AttackKind::HairRing, distance),
+                      AttackWeightAt(choice, AttackKind::Leap, distance),
+                      boss.lastAttack ? AttackKindLabel(*boss.lastAttack) : "-");
 }
 
 // Debug builds only, in screen space. The numbers I tune against: what the input asks for, what the
@@ -705,7 +747,7 @@ void DrawDebugHud(const World& world, Vec2 moveInput) {
     constexpr int kX = 10;
     constexpr int kY = 80; // Below the health and dash bars.
     constexpr int kLine = 20;
-    DrawRectangle(kX - 4, kY - 4, 340, 15 * kLine + 8, Fade(BLACK, 0.6f));
+    DrawRectangle(kX - 4, kY - 4, 380, 16 * kLine + 8, Fade(BLACK, 0.6f));
     DrawText(TextFormat("input  %5.2f %5.2f  len %4.2f", moveInput.x, moveInput.y, Length(moveInput)), kX, kY,
              18, RAYWHITE);
     DrawText(TextFormat("speed  %5.0f / %.0f", Length(motion.velocity), player.stats.maxSpeed), kX, kY + kLine, 18,
@@ -738,6 +780,7 @@ void DrawDebugHud(const World& world, Vec2 moveInput) {
     DrawText(TextFormat("seed   %08X  waves %d", static_cast<unsigned>(world.seed),
                         static_cast<int>(world.shockwaves.Size())),
              kX, kY + 14 * kLine, 18, RAYWHITE);
+    DrawText(AttackPickLabel(world), kX, kY + 15 * kLine, 18, ORANGE);
 }
 #endif
 

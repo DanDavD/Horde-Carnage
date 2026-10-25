@@ -4,13 +4,14 @@
 
 The Matriarch, the one boss the game is about: a giant hairball, mother of the small ones, in the middle of the arena. The whole game is one fight against it, in the spirit of Gun Bros and Dark Souls 1: a boss that is hard on purpose, whose patterns you learn by dying. See the [roadmap](ROADMAP.md#changes-to-the-plan) for why.
 
-This document describes what exists today. The boss stalks the player, shoves them, hurts on touch, soaks up bullets, and has the three attacks of its first phase, which take turns: the Charge, the Hair Ring and the Leap. A seeded random choice between them comes next, then the shield and the second phase.
+This document describes what exists today. The boss stalks the player, shoves them, hurts on touch, soaks up bullets, and has the three attacks of its first phase: the Charge, the Hair Ring and the Leap. It picks the next one at random, weighted by the distance to the player and never the same one twice in a row, and sometimes it chains two into a combo. The shield and the second phase come next.
 
 The rules live in `horde_core`:
 
-- `src/core/Boss.h`, `src/core/Boss.cpp`: the `Boss` struct, with the same body components as the player and the hairballs (`Motion`, `MovementStats`, a radius and a weight) and the boss's numbers; its attack state (`BossAttack`, `AttackStage`, `ChargeStats`, `HairRingStats`, `LeapStats`); and the systems that run it: `StepBoss`, which returns the `BossActions` the world has to carry out, `IsCharging`, `IsAirborne`, `PlanChargePath`, and the ring's `HairRingStrands`, `HairStrandDirection` and `MakeHairStrand`.
+- `src/core/Boss.h`, `src/core/Boss.cpp`: the `Boss` struct, with the same body components as the player and the hairballs (`Motion`, `MovementStats`, a radius and a weight) and the boss's numbers; its attack state (`BossAttack`, `AttackStage`, `ChargeStats`, `HairRingStats`, `LeapStats`); and the systems that run it: `StepBoss`, which returns the `BossActions` the world has to carry out, `IsCharging`, `IsAirborne`, `WarningSeconds`, `LeapCrouchSeconds`, `LeapAirSeconds`, `PlanChargePath`, and the ring's `HairRingStrands`, `HairStrandDirection` and `MakeHairStrand`.
+- `src/core/AttackChoice.h`, `src/core/AttackChoice.cpp`: how the boss picks what comes next. `AttackKind`, the weights by distance (`AttackWeights`, `AttackChoiceStats`, `AttackWeightAt`, `ChooseAttack`), and the combos (`ComboStats`, `Combo`, `kCombos`, `ChooseFollowUp`). They draw from the world's seeded generator (see [Random numbers](RANDOM.md)).
 - `src/core/Shockwave.h`, `src/core/Shockwave.cpp`: the `Shockwave` the Leap sends out, with `MakeShockwave`, `StepShockwave` and `ShockwaveTouches`.
-- `src/core/World.h`, `src/core/World.cpp`: `kBossArena` and `kStartingDistance`; `CreateWorld` places the boss; `StepWorld` calls `StepBoss`; `SpitHairRing` spawns the ring's strands into `World::hostileProjectiles`, where `StepHostileProjectiles` flies them and hurts the player; `LandLeap` applies the Leap's impact and spawns its shockwave into `World::shockwaves`, where `StepShockwaves` grows it; the collision, bullet and contact damage systems include the boss, unless it is dead or in the air (`IsBossABody`); and `CameraFocus` keeps it in view.
+- `src/core/World.h`, `src/core/World.cpp`: `kBossArena` and `kStartingDistance`; `CreateWorld` places the boss; `StepWorld` calls `StepBoss` with the world's `random`; `HurtPlayer` records which attack landed each hit in `World::lastHitBy`, for the death screen; `SpitHairRing` spawns the ring's strands into `World::hostileProjectiles`, where `StepHostileProjectiles` flies them and hurts the player; `LandLeap` applies the Leap's impact and spawns its shockwave into `World::shockwaves`, where `StepShockwaves` grows it; the collision, bullet and contact damage systems include the boss, unless it is dead or in the air (`IsBossABody`); and `CameraFocus` keeps it in view.
 
 The game executable draws it:
 
@@ -23,15 +24,19 @@ The game executable draws it:
 **Stalking and attacking.** The boss is always doing one of two things:
 
 ```
-  Stalking  -- 2 s of stalking -->  Attack: Warning --> Active --> Recovery
-      ^                                                                 |
+  Stalking  -- 0.8 to 1.6 s -->  Attack: Warning --> Active --> Recovery
+      ^       (2 s the first time)                       |              |
+      |                                                  | combo        |
+      |                                                  v              |
+      |                       Follow-up: Warning --> Active --> Recovery (1.2 s at least)
+      |                                                                 |
       +---------------------------- recovery over ----------------------+
-
-  The attacks take turns: Charge, Hair Ring, Leap, Charge...
 ```
 
-- **Stalking** (`Boss::attack` is empty): it walks at the player with the same `ChaseInput` as a hairball, stopping at contact, at 120 units/s at most and slow to get going (400 units/s^2). `secondsUntilAttack` counts down from `attackInterval` (2 s). Then it starts `nextAttack`: a Charge first, then a Hair Ring, then a Leap, and round again.
-- **Attacking** (`Boss::attack` holds a `BossAttack`): every attack runs through the same three stages, `Warning`, `Active` and `Recovery`, and `stageSeconds` is the clock of the current one. When the recovery ends, the boss stalks again for another 2 s.
+- **Stalking** (`Boss::attack` is empty): it walks at the player with the same `ChaseInput` as a hairball, stopping at contact, at 120 units/s at most and slow to get going (400 units/s^2). `secondsUntilAttack` counts down. The first stalk lasts 2 s, so the fight opens with a moment to look at her; every later one lasts a random time between 0.8 and 1.6 s. When it runs out the boss starts an attack: `nextAttack` if one is already decided (the fight always opens with a Charge), otherwise one picked by `ChooseAttack` (see "Choosing an attack" below).
+- **Attacking** (`Boss::attack` holds a `BossAttack`): every attack runs through the same three stages, `Warning`, `Active` and `Recovery`, and `stageSeconds` is the clock of the current one. When the recovery ends, the boss stalks again. If the attack opened a combo, its recovery never starts: the second attack takes its place (see "Combos" below).
+
+The timings below are each attack's stats. In the fight every warning is stretched or shortened by a random factor between 0.85 and 1.15 (`BossAttack::warningScale`, read through `WarningSeconds`), and the second attack of a combo shortens it again, to 0.7 of that. The two locks keep their exact length: the Charge's aim always locks for the last 0.3 s, and the Leap's shadow for the last 0.35 s.
 
 **The Charge,** stage by stage:
 
@@ -53,11 +58,33 @@ The game executable draws it:
 
 The landing zone can be escaped on foot only by moving from the start of the jump: the shadow is slower than the player, so it falls behind. A player who only starts running when it locks covers about 100 units before the landing, not enough to leave the 120 unit reach of the zone (its radius plus the player's), so then only the dash helps. The shockwave cannot be outrun at all: it is dashed through, or it reaches the end of its range first.
 
+**Choosing an attack.** When a stalk ends, `ChooseAttack` picks the next attack from the distance between the centres of the boss and the player at that moment. Each attack has a weight at three distances, and between them the weight blends in a straight line:
+
+| Attack | Near (250 or less) | Middle (400) | Far (550 or more) |
+|---|---|---|---|
+| Charge | 1 | 2 | 4 |
+| Hair Ring | 4 | 2 | 1 |
+| Leap | 1 | 4 | 2 |
+
+The attack that ended last (`Boss::lastAttack`) gets a weight of 0, so it never comes twice in a row outside a combo. Up close that makes two picks in three a Hair Ring; far away, four in seven a Charge, or two in three a Leap right after a Charge. So no distance is safe: hugging the boss invites the Ring, running far invites the Charge.
+
+**Combos.** When an attack starts, `ChooseFollowUp` decides whether it opens a combo: with a 35% chance, if `kCombos` has one that starts with it. There are three:
+
+| Combo | Opener, then follow-up | What it asks of the player |
+|---|---|---|
+| The Rebound | Charge, then Charge | The second run comes back from the wall at the player. Dodging the first one is not the end of it. |
+| The Pursuit | Charge, then Leap | The boss leaps after a player who ran far from the charge. |
+| The Crash | Leap, then Hair Ring | A ring on landing: dash through the shockwave, then find the gap. |
+
+The opener plays as usual until its recovery would start. In that step the follow-up starts instead (`BossAttack::followUp`), so there is no opening between the two, and a Charge stunned by a wall shakes the stun off. The follow-up (`BossAttack::endsCombo`) has a warning 0.7 times as long, and a recovery of at least 1.2 s, the reward for getting through the whole chain. A Hair Ring opens no combo, and a follow-up opens none either, so a combo is always two attacks.
+
+**Every random pick** draws from `World::random`, in a fixed order: the attack (when it is not already decided), then the warning's factor, then the combo, and the next stalk when the attack ends. So the seed and the player's inputs decide the whole fight.
+
 **The strands** fly in their own pool, `World::hostileProjectiles`. Every step, after contact damage, `StepHostileProjectiles` moves each one and sweeps it against the player with `SweepCircle`, the test bullets use. A dashing player is not there for them: the strand flies on. Otherwise the strand hurts the player for 15 through `HurtPlayer` and is spent, even when the invulnerability window keeps it from hurting. A strand is also gone at a wall or at the end of its range. Strands ignore hairballs, the boss and the player's bullets.
 
 **Every fixed step,** after the player and the hairballs have moved:
 
-1. **Think and move.** `StepBoss` stalks, or advances the attack's stage, and tells the world when to spit a ring.
+1. **Think and move.** `StepBoss` stalks, picks the next attack, or advances the attack's stage, and tells the world when to spit a ring or when it lands.
 2. **Collide.** The collision passes treat the boss as one more body (see [Collisions](COLLISIONS.md)). At weight 40 against the player's 4, the player takes 91% of any overlap, so the boss shoves the player and the player cannot shove it. A dashing player passes through it, and a charging boss passes through the player.
 3. **Take bullets.** For each bullet, `FirstHit` sweeps it against every hairball and the boss, and the body it touches first takes it. `HitBoss` takes the bullet's damage and starts a 0.1 s flash. No stun and no knockback.
 4. **Hurt on touch.** `ApplyContactDamage` checks the boss before the hairballs. A touch takes 20, or 30 plus the knockback while it charges, through `HurtPlayer`, the single door for damage (see [Health](HEALTH.md)). A dash protects from both.
@@ -77,13 +104,24 @@ The landing zone can be escaped on foot only by moving from the start of the jum
 - **Every attack has the same three stages.** The player learns one rhythm for the whole fight: watch the warning, survive the attack, punish the recovery. In code, the stages are an `enum` and one clock, and each attack only decides what happens inside them. The Hair Ring reused them as they were, and the Leap will too.
   - Rejected: a state per attack and stage (`ChargeWarning`, `Charging`, `ChargeRecovery`, `RingWarning`...). Five attacks would make fifteen states that repeat the same timing code, and nothing would force them to keep the same rhythm.
   - Rejected: a class per attack with virtual `Update`. The attacks share all their data except a direction, a distance and a count, so a hierarchy would be more code than behaviour, and it would put the attacks in the heap instead of in the plain `Boss` struct.
-- **The attacks take turns, for now.** Charge, then Hair Ring. It is the simplest order that shows both, and it is easy to test. On day 7 a weighted, seeded random choice replaces it, so the order cannot be memorised.
+- **A random choice, weighted by distance.** A fixed order is learned in one attempt, and after that the fight is about rhythm, not reading. A random pick makes the player read every warning, and the weights keep the boss from looking random: each attack shows up where it makes sense, the Charge from afar, the Ring up close and the Leap in between.
+  - Rejected: an even pick. The boss would often answer a far player with a Ring that cannot reach them, and the fight would look like dice, not like a creature that hunts.
+  - Rejected: a shuffled bag (every attack once, in a random order). It is fairer to the player, but the last attack of a bag is always known, and the distance could not weigh in.
+- **Never the same attack twice in a row.** Two Rings in a row read like a stutter, not a decision, and a streak of the same attack would turn a hard fight into a lucky one or an unlucky one. The Rebound is the one exception, and it is a combo on purpose.
+- **The pick happens when the stalk ends, not when the last attack ends.** The boss walks for up to 1.6 s between the two, and the distance it was picked for would be stale by then.
+- **The fight opens with a Charge.** It is the plainest attack to read: one line on the floor. The first attack is the only one the player can count on.
+- **A stalk of random length, and a first one of 2 s.** A fixed stalk is a countdown the player can learn, and a short random one keeps the pressure up: at 0.8 to 1.6 s, there is time for a few shots and a step, and a drink (1 s) is a gamble. The first stalk is longer, so a new attempt does not start in the middle of an attack.
+- **Warnings of random length, locks of exact length.** Dark Souls bosses delay their swings so a player who dodges to a rhythm gets caught. A 15% stretch either way does the same, and the moment that decides the dodge (the Charge's aim lock, the Leap's shadow lock) stays the same length, so a player who watches the boss is never cheated.
+  - Rejected: random lock times. The lock is the cue to move. If it moved, the warning would stop being a promise.
+- **A combo replaces the opener's recovery.** That is what makes it a combo: the opening the player expects is not there. The follow-up has a shorter warning, since the player is still busy with the first attack, and a longer recovery, so getting through the chain pays.
+- **Combos are a short, fixed list.** Each one is designed to ask a new question (a run that comes back, a leap that follows a player who ran, a ring that has to be read right after a shockwave), and the warnings still tell the player which one is coming. Chains of any length, or a random follow-up, would surprise the player without teaching them anything.
+  - Rejected: a combo after any attack, with any follow-up. A Hair Ring into a Charge would aim the run while the player is still threading between the strands, with no room to step out of the line.
 - **The aim locks before the run.** If the path followed the player until the last moment, the only answer would be the dash. With 0.3 s of locked path, a quick sidestep also works, and the bright path and the tremble tell the player exactly when to move.
 - **The telegraph draws the real path.** `DrawChargeTelegraph` calls the same `PlanChargePath` that the run follows, so the band on the floor ends exactly where the boss will stop, and the bar across its end appears only when the run will end at a wall.
 - **A fixed distance, not "until a wall".** At 800 units the run overshoots the player by a lot and usually ends at a wall, but a charge from near one wall into the open middle stops short and recovers fast. So where the player stands decides how big the opening is, and leading the boss into a wall is a skill.
 - **The run goes through the player.** At 1000 units/s a shove would carry the player across the arena and pin them against the far wall. Instead the hit lands once (the invulnerability window covers the rest of the overlap) and the knockback throws the player sideways, out of the path.
 - **The ring's gap opens to the side, never toward the player.** If it opened toward the player, standing still would be the answer. At 90 degrees, a player 400 units away has to cover about 370 units in about 2 s (the warning plus the ring's flight), which takes a little over a second on foot. Alternating sides keeps the player from settling into one habit.
-  - Rejected: a random gap. It needs the seeded random generator, which comes on day 7 with the choice of attack. It could also land behind the boss, where only the dash would work.
+  - Rejected: a random gap. It could land behind the boss, where only the dash would work, and the alternation already keeps the player from settling into one habit.
 - **The gap is fixed from the start of the warning.** The Charge follows the player and then locks, because a straight line is easy to sidestep. The ring is the opposite: the player needs to know at once where to run, so the lane appears with the warning and stays.
 - **The boss decides, the world spawns.** `StepBoss` returns `BossActions` instead of writing into a pool, so `Boss.cpp` knows nothing about the world, and the boss tests check the spit without one.
 - **The strands have a pool of their own.** Bullets and strands are the same `Projectile` component and fly the same way. In two pools, `StepBullets` never tests a strand and `StepHostileProjectiles` never tests a hairball, and no hit test checks which side fired.
@@ -97,7 +135,7 @@ The landing zone can be escaped on foot only by moving from the start of the jum
 - **The landing is two hits, but costs one.** The impact punishes standing under the shadow, and the shockwave punishes standing anywhere near. A player caught by the impact is still blinking when the wave passes, and the wave is spent, so one mistake costs one hit.
 - **A shockwave cannot be outrun.** At 380 units/s against the player's 300, the only answers are being far enough away (420 units) or dashing through its band. That makes the Leap the attack that tests the dash timing against something that comes at the player, where the Hair Ring tests it against something to walk through.
 - **Shockwaves are a component and a pool of their own.** They grow instead of flying, and they hit with a band instead of a circle, so they are not `Projectile`s. A pool of 8 keeps the second phase's leaps, and any other attack that needs a wave, free of allocations.
-- **Waves and a turning gap are already numbers.** `waves`, `waveIntervalSeconds` and `gapTurnDegrees` are 1, 0.4 s and 0 degrees today. Rings in quick succession, or a gap that sweeps around the boss, are for the combos on day 7 and the second phase, and they will need new numbers, not new code.
+- **Waves and a turning gap are already numbers.** `waves`, `waveIntervalSeconds` and `gapTurnDegrees` are 1, 0.4 s and 0 degrees today. Rings in quick succession, or a gap that sweeps around the boss, are for the second phase, and they will need new numbers, not new code. The combos chain whole attacks instead.
 - **No stagger and no knockback from bullets.** The SMG hits ten times a second. If each bullet staggered the boss, the SMG would lock it in place, and the fight would be about holding the button. The openings to punish it come from its own attacks (the recovery after each one) and will come from its shield.
 - **Heavy, but not immovable.** Weight 40 means the boss wins every shove, which is what a giant should feel like. An infinite weight would need a special case in `SeparateCircles`, and nothing in the fight needs it.
 - **Slower than a hairball when it walks.** The walk is only how the boss gets close between attacks. If the walk alone could catch the player, the attacks would not matter.
@@ -117,8 +155,15 @@ The landing zone can be escaped on foot only by moving from the start of the jum
 | Acceleration and deceleration | `Boss::stats` | 400 and 1500 units/s^2 |
 | Body radius | `Boss::radius` | 60 units |
 | Weight | `Boss::weight` | 40 (player 4, hairball 1) |
-| Stalking time between attacks | `Boss::attackInterval` | 2 s |
+| First stalk | `Boss::secondsUntilAttack` | 2 s |
+| Stalks after that | `AttackChoiceStats::minStalkSeconds`, `maxStalkSeconds` (`src/core/AttackChoice.h`) | 0.8 to 1.6 s |
 | First attack | `Boss::nextAttack` | The Charge |
+| Weights by distance | `AttackChoiceStats::charge`, `hairRing`, `leap` (`AttackWeights`) | Charge 1, 2, 4; Ring 4, 2, 1; Leap 1, 4, 2 |
+| Near and far distance | `AttackChoiceStats::nearDistance`, `farDistance` | 250 and 550 units; the middle weights at 400 |
+| Random stretch of every warning | `AttackChoiceStats::minWarningScale`, `maxWarningScale` | 0.85 to 1.15 |
+| Combo chance | `ComboStats::chance` | 35% |
+| Follow-up warning, and the recovery after it | `ComboStats::warningScale`, `finalRecoverySeconds` | 0.7, at least 1.2 s |
+| The combos | `kCombos` (`src/core/AttackChoice.h`) | Rebound, Pursuit, Crash |
 | Charge warning, and its locked part | `ChargeStats::warningSeconds`, `aimLockSeconds` | 0.8 s, the last 0.3 s |
 | Charge speed and distance | `ChargeStats::speed`, `distance` | 1000 units/s, 800 units |
 | Charge damage and knockback | `ChargeStats::damage`, `knockback` | 30, 700 units/s |
@@ -140,20 +185,37 @@ The landing zone can be escaped on foot only by moving from the start of the jum
 | Camera lean and its cap | `kBossFraming`, `kMaxBossFramingOffset` (`src/core/World.cpp`) | 40%, 200 units |
 | Look | `kBossStyle`, `kBossBar`, the boss bar constants and the `kCharge...`, `kStun...`, `kRing...`, `kStrand...`, `kLeap...` and `kShockwave` constants (`src/app/Game.cpp`) | |
 
-In a Debug build, `F1` shows the boss's health next to the shots fired and hit, the strands in flight (`hair`), the shockwaves (`waves`), and what the boss is doing: stalking and the time to its next attack, or the attack, its stage, its clock, and whether it is in the air. `F4` defeats the boss at once (`DefeatBoss`), to reach the victory screen without shooting.
+In a Debug build, `F1` shows the boss's health next to the shots fired and hit, the strands in flight (`hair`), the shockwaves (`waves`), and what the boss is doing: stalking and the time to its next attack, or the attack, its stage, its clock against the warning's length this time, whether it is in the air, and `combo 1/2` or `combo 2/2` inside a combo. The `pick` line shows the distance to the player, the weight of each attack at that distance, and the attack the next pick skips. `F4` defeats the boss at once (`DefeatBoss`), to reach the victory screen without shooting.
 
 ## Tests
 
+The tests about one attack's timings use a boss without its chance (`tests/core/PredictableBoss.h`): every warning at its stats' exact length and no combos.
+
+- `tests/core/AttackChoiceTests.cpp`, on the choice alone:
+  - each attack weighs most at its own distance, and the weights blend in between;
+  - the attack that just ended is never picked again;
+  - the distance shifts the picks toward the attack that suits it, over 1000 picks;
+  - the same seed picks the same attacks;
+  - a charge or a leap opens a combo about a third of the time, and a hair ring never;
+  - a combo chance of 0 never chains, and of 1 always does.
+- `tests/core/BossComboTests.cpp`, on the boss alone, with its chance:
+  - a fight opens with a charge, then never repeats an attack outside a combo, over five seeds and 90 s each;
+  - the stalks and the warnings vary within their ranges;
+  - combos happen in a fight, and only the known ones;
+  - the same seed plays the same fight, and another seed does not;
+  - in a combo the second attack starts in place of the first one's recovery, with a shorter warning (the Rebound, off the wall);
+  - the last attack of a combo rests for the combo's longer recovery (the Crash);
+  - a longer or shorter warning keeps the charge's aim lock at its exact length;
+  - a shorter leap keeps the shadow's lock, and the boss is in the air after its shorter crouch.
 - `tests/core/BossChargeTests.cpp`, on the boss alone, without a world:
-  - the boss stalks the player, then starts a charge after its attack interval;
+  - the boss stalks the player for two seconds, then opens the fight with a charge;
   - during the warning it stands still, and its aim follows the player until it locks;
   - the charge runs in a straight line at its speed;
-  - a charge into a wall stops at the wall and stuns the boss for the long recovery, then the boss stalks again with the whole interval ahead;
+  - a charge into a wall stops at the wall and stuns the boss for the long recovery, then the boss stalks again for a stalk in its range;
   - a charge that runs out in the open stops after its distance and recovers quickly;
   - a charge path runs its full distance in the open and stops at the first wall, also on a diagonal;
   - a dead boss drops its attack and stays where it fell.
 - `tests/core/BossHairRingTests.cpp`, on the boss alone:
-  - the attacks take turns: a charge, a hair ring, a leap, then a charge again;
   - during the warning the boss holds its ground, and the gap opens 90 degrees from the player and stays there when the player moves;
   - the gap opens on one side of the player, and on the other side the next time;
   - the ring is spat once, as the warning ends, and the boss stalks again after the recovery;
@@ -165,9 +227,9 @@ In a Debug build, `F1` shows the boss's health next to the shots fired and hit, 
   - the shadow appears under the player, follows them at its speed, then locks;
   - the boss flies to its shadow and lands on it, once;
   - the shadow stays where the whole body fits inside the arena;
-  - after landing the boss recovers for a second, then stalks with the whole interval ahead.
+  - after landing the boss recovers for a second, then stalks again.
 - `tests/core/ShockwaveTests.cpp`: a shockwave grows at its speed and dies out past its reach; only the band of the ring touches, not inside it and not outside it.
-- `tests/core/BossTests.cpp`, in a world:
+- `tests/core/BossTests.cpp`, in a world, where every hit also checks that `World::lastHitBy` names the attack that landed it:
   - the boss walks toward the player, slower than a hairball;
   - it stops when it touches the player, and pushes the player rather than being pushed;
   - a touch takes its contact damage, and when the boss and a hairball touch the player in the same step, the boss's hit is the one that lands;
@@ -194,13 +256,14 @@ In a Debug build, `F1` shows the boss's health next to the shots fired and hit, 
   - the camera keeps a far boss in mind without pushing the player off screen;
   - once the boss is dead, the camera goes back to the player alone.
 - `tests/core/WorldTests.cpp`: a new world has the boss in the middle and the player south of it, facing it; nobody leaves the arena, the boss included; and two worlds with the boss, hairballs and the same inputs end in exactly the same state, strands included.
-- `tests/core/SessionTests.cpp`: standing still in front of the boss ends in death between 6.5 and 7.5 seconds in (7.1 in practice: the charge hits for 30 at about 2.9 s and ends stunned against the wall next to the player, then four touches 0.8 s apart; the Hair Ring that comes next starts its warning at 6.6 s, too late to matter); and the last bullet into the boss wins the fight in the step it lands.
+- `tests/core/SessionTests.cpp`: standing still in front of the boss ends in death for each of 20 seeds, before 20 s (between 6.3 and 18.8 s, most often to the boss's touch once a charge has left it next to the player); a dead player's world remembers what killed them; and the last bullet into the boss wins the fight in the step it lands.
 
-The drawing is not unit tested, because it needs a window. I checked it in a Release build with captures that never touch the real keyboard or mouse. For the Charge, standing still from the start: the path following the player, the brighter locked path with the boss crouched, the ghosts behind the running boss, the stun stars with the player's health at 70, and the "YOU DIED" screen at 0:07. For the Hair Ring, standing still dies before the first ring, so I drove the player with key presses posted to the game's window: a sidestep out of the Charge, a walk north, then a run into the gap. The captures show the swollen boss with the red ring and the pale lane, the ring leaving the boss, and the ring passing the player in the gap at full health. A first run that stopped at the edge of the gap took 15. For the Leap, the same run went on: the shadow under the player, the boss in the air with the shadow lagging behind the running player, the landing next to the player at 60 health, and a dash through the shockwave that left the player at 60 and the wave unspent. Runs that started running too late took the impact (60 to 25), and a dash pressed too late took the wave (60 to 40). In a Debug build, `F1` read "leap warning 0.90 airborne" and showed the seed. In a Debug build, `F1` read "ring warning" during the warning and 42 strands in flight after the spit. Dodging with the dash, punishing the recovery and how the timing feels need someone playing, so I check them by playing.
+The drawing is not unit tested, because it needs a window. I checked it in a Release build with captures that never touch the real keyboard or mouse. For the Charge, standing still from the start: the path following the player, the brighter locked path with the boss crouched, the ghosts behind the running boss, the stun stars with the player's health at 70, and the "YOU DIED" screen at 0:07. For the Hair Ring, standing still dies before the first ring, so I drove the player with key presses posted to the game's window: a sidestep out of the Charge, a walk north, then a run into the gap. The captures show the swollen boss with the red ring and the pale lane, the ring leaving the boss, and the ring passing the player in the gap at full health. A first run that stopped at the edge of the gap took 15. For the Leap, the same run went on: the shadow under the player, the boss in the air with the shadow lagging behind the running player, the landing next to the player at 60 health, and a dash through the shockwave that left the player at 60 and the wave unspent. Runs that started running too late took the impact (60 to 25), and a dash pressed too late took the wave (60 to 40). In a Debug build, `F1` read "ring warning" during the warning and 42 strands in flight after the spit, and "leap warning 0.90 airborne" with the seed during a Leap. For the random choice and the combos, every launch has a new seed, so I ran the game ten times in Debug and nine in Release with the same sidestep out of the opening Charge, and captured it just after the run. Three of the nineteen chained a combo (the tests measure the 35% over thousands of picks; nineteen runs are too few to show it): in Debug, `F1` read "charge warning 0.52/0.54 combo 2/2" with the Rebound's path drawn from the south wall back at the player; in Release, the Pursuit had the boss in the air over the player's shadow at 3.75 s, where a lone Charge would still be stunned. The Debug runs without a combo read "charge recovery" and "stunned", with warnings between 0.71 and 0.91 s, all inside the 0.68 to 0.92 s range. Dodging with the dash, punishing the recovery and how the timing feels need someone playing, so I check them by playing.
 
 ## Limitations
 
-- **The attacks always come in the same order.** Charge, Hair Ring, Leap. The choice between them (weighted, seeded, never the same twice in a row) comes next.
+- **The pick looks only at the distance.** It does not know whether the player is drinking, out of dash, or standing in a corner. A boss that punishes a drink is a good idea for the second phase, and it would be one more weight, not a new system.
+- **The numbers are a first guess.** The weights, the combo chance and the stalks are set from the captures and the tests, not from people playing. Day 9 moves them to a data file that reloads with `F5`, to tune them while playing.
 - **One bar is the whole fight.** Emptying it wins at once. The transformation and the second phase come on day 8.
 - **The Leap's arc is drawn, not simulated.** The body's position moves straight from the takeoff to the shadow, and the height is only an offset in the drawing. Nothing in the fight needs a third dimension.
 - **The crouch and the swell change the size, not the shape.** The body is drawn with circles, so it gets smaller or bigger instead of flatter or rounder. Squash and stretch come with the art pass.

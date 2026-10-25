@@ -1,5 +1,6 @@
 #include <doctest/doctest.h>
 
+#include "PredictableBoss.h"
 #include "core/Boss.h"
 #include "core/World.h"
 
@@ -17,9 +18,12 @@ constexpr float kDt = 1.0f / 60.0f;
 constexpr float kPlayerRadius = 20.0f;
 constexpr Vec2 kSouth = kCenter + Vec2{0.0f, 300.0f};
 
+// What the bosses below draw from. With their chance taken out, it only decides the stalks between attacks.
+horde::Random chance = horde::SeedRandom(3);
+
 // A boss standing at `position` that starts a Leap on the next step.
 Boss AboutToLeapFrom(Vec2 position) {
-    Boss boss;
+    Boss boss = horde::test::Predictable(Boss{});
     boss.motion = horde::MotionAt(position);
     boss.nextAttack = AttackKind::Leap;
     boss.secondsUntilAttack = 0.0f;
@@ -30,7 +34,7 @@ Boss AboutToLeapFrom(Vec2 position) {
 int Step(Boss& boss, Vec2 player, int steps) {
     int landings = 0;
     for (int i = 0; i < steps; ++i) {
-        if (horde::StepBoss(boss, player, kPlayerRadius, kArena, kDt).landed) {
+        if (horde::StepBoss(boss, player, kPlayerRadius, kArena, chance, kDt).landed) {
             ++landings;
         }
     }
@@ -108,7 +112,7 @@ TEST_CASE("the shadow stays where the whole body fits inside the arena") {
     CHECK(boss.attack->target == Vec2{boss.radius, boss.radius});
 }
 
-TEST_CASE("after landing the boss recovers for a second, then stalks with the whole interval ahead") {
+TEST_CASE("after landing the boss recovers for a second, then stalks again") {
     Boss boss = AboutToLeapFrom(kCenter);
     Step(boss, kSouth, 1);
     while (boss.attack && boss.attack->stage == AttackStage::Warning) {
@@ -121,6 +125,7 @@ TEST_CASE("after landing the boss recovers for a second, then stalks with the wh
         ++steps;
     }
     CHECK(steps == doctest::Approx(69).epsilon(0.05));
-    CHECK(boss.secondsUntilAttack == boss.attackInterval);
-    CHECK(boss.nextAttack == AttackKind::Charge);
+    CHECK(boss.secondsUntilAttack >= boss.choice.minStalkSeconds);
+    CHECK(boss.secondsUntilAttack <= boss.choice.maxStalkSeconds);
+    CHECK(boss.lastAttack == AttackKind::Leap);
 }

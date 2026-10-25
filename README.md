@@ -18,7 +18,7 @@ I chose plain C++ with a small library instead of an engine on purpose. raylib o
 
 ## Current status
 
-This is day 6 of 15, and the boss fight is in progress. Progress is tracked in the [roadmap](docs/ROADMAP.md) and the [changelog](CHANGELOG.md).
+This is day 7 of 15, and the boss fight is in progress. Progress is tracked in the [roadmap](docs/ROADMAP.md) and the [changelog](CHANGELOG.md).
 
 **What works today:**
 - A CMake project that downloads raylib and doctest at a pinned version, so a fresh clone builds with one command.
@@ -26,14 +26,16 @@ This is day 6 of 15, and the boss fight is in progress. Progress is tracked in t
 - A player you move around an arena with the keyboard or a gamepad. It speeds up and stops over a fraction of a second, turns back quickly, is never faster on a diagonal, faces the way you push, and slides along the walls. See [Movement](docs/MOVEMENT.md).
 - An arena bigger than the screen, with a camera that follows the player smoothly, looks a little ahead of where you run, leans toward the boss so you can see it, and stops at the walls. See [Camera](docs/CAMERA.md).
 - The Matriarch, a boss three times the size of a hairball, waiting in the middle of the arena. It walks at you slower than you run, shoves you out of its way, takes 20 hit points per touch, and needs 120 pistol bullets to go down. Its health bar runs along the bottom of the screen. See [The boss](docs/BOSS.md).
-- Its first attack, the Charge. Every 2 seconds of stalking it crouches and draws its path on the floor; the path follows you, then locks 0.3 s before it runs at 1000 units/s. A hit takes 30 and throws you aside. If the run ends at a wall, it is stunned for 1.5 s. See [The boss](docs/BOSS.md).
-- Its second attack, the Hair Ring, which takes turns with the Charge. It swells for 0.6 s while a red ring and a pale lane on the floor show where its hair will fly and where the gap is, always off to one side of you. Then it spits 42 slow strands in every direction but the gap, and each one that hits takes 15. Run to the gap or dash through the ring. See [The boss](docs/BOSS.md).
+- Its first attack, the Charge. It crouches and draws its path on the floor; the path follows you, then locks 0.3 s before it runs at 1000 units/s. A hit takes 30 and throws you aside. If the run ends at a wall, it is stunned for 1.5 s. See [The boss](docs/BOSS.md).
+- Its second attack, the Hair Ring. It swells for 0.6 s while a red ring and a pale lane on the floor show where its hair will fly and where the gap is, always off to one side of you. Then it spits 42 slow strands in every direction but the gap, and each one that hits takes 15. Run to the gap or dash through the ring. See [The boss](docs/BOSS.md).
 - Its third attack, the Leap. It crouches, jumps out of reach and comes down on its shadow, which follows you, slower than you run, then stops a moment before the landing. The landing takes 35, and a shockwave rolls out from it faster than you can run: dash through it. See [The boss](docs/BOSS.md).
-- A seeded random number generator (PCG32) behind the whole fight, with a new seed for every attempt, so a fight can be replayed exactly from its seed. Nothing uses it yet; the boss's choice of attack comes next. See [Random numbers](docs/RANDOM.md).
+- A boss that picks its next attack at random, weighted by how far you are: up close it favours the Hair Ring, far away the Charge, in between the Leap, and it never repeats the attack it just did. It stalks for 0.8 to 1.6 s between attacks, and every warning runs up to 15% longer or shorter, so you have to watch it instead of counting. The moment its aim or its shadow locks always lasts the same. See [The boss](docs/BOSS.md).
+- Combos. About a third of the Charges and Leaps chain straight into a second attack with a shorter warning and no opening in between: the Rebound (a second Charge back off the wall), the Pursuit (a Leap after you once the Charge is over) and the Crash (a Hair Ring on landing). The opening after a combo is longer. See [The boss](docs/BOSS.md).
+- A seeded random number generator (PCG32) behind all of it, with a new seed for every attempt, so a fight can be replayed exactly from its seed. See [Random numbers](docs/RANDOM.md).
 - The hairball, the boss's small child: it walks straight at you and stops when it touches you. It is no longer in the fight; the boss will summon hairballs in its second phase. See [Enemies](docs/ENEMIES.md).
 - Bodies push each other apart instead of stacking. You can shove a hairball out of your way but not the boss, and a crowd slows you down. See [Collisions](docs/COLLISIONS.md).
 - A health bar. A touch of the boss takes 20 of your 100 hit points (a hairball's takes 10), and after a hit you blink and cannot be hurt for 0.8 seconds. See [Health](docs/HEALTH.md).
-- A fight that ends one of two ways. "YOU DIED" shows your attempt number, how long you lasted and how much health the boss kept; "VICTORY" shows the attempt that won, the length of the fight and your accuracy. Both fade in, then a button starts a fresh fight. The attempt count survives every retry. See [Game flow](docs/GAME_FLOW.md).
+- A fight that ends one of two ways. "YOU DIED" shows your attempt number, what killed you and when, and how much health the boss kept; "VICTORY" shows the attempt that won, the length of the fight and your accuracy. Both fade in, then a button starts a fresh fight. The attempt count survives every retry. See [Game flow](docs/GAME_FLOW.md).
 - Aiming with the mouse, independent of where you walk, and two guns: a semi-automatic pistol (one shot per click) and an automatic SMG (hold to fire). A panel shows the gun in hand. See [Aiming and weapons](docs/WEAPONS.md).
 - Bullets that fly and hit the first body in their path. A hairball flashes white and gets knocked back; the boss only flashes, it is too heavy to push. See [Bullets and hits](docs/BULLETS.md).
 - Hairballs, bullets, the boss's strands and its shockwaves live in fixed object pools, so the game never allocates memory while you play. See [Object pool](docs/OBJECT_POOL.md).
@@ -42,7 +44,7 @@ This is day 6 of 15, and the boss fight is in progress. Progress is tracked in t
 - Unit tests for the pure logic, and a GitHub Actions workflow that builds and tests every push and pull request on Windows.
 - Warnings are errors for the project's own code (`/W4 /WX` on MSVC).
 
-**Still to do:** a random choice between the boss's attacks and combos, its alternating shield and its second phase, then the numbers in JSON, game feel and menus. See the [roadmap](docs/ROADMAP.md) for the order, and for the difficulty I am aiming for.
+**Still to do:** the boss's alternating shield and its second phase, then the numbers in JSON, game feel and menus. See the [roadmap](docs/ROADMAP.md) for the order, and for the difficulty I am aiming for.
 
 ## Tech stack
 

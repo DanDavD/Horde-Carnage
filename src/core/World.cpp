@@ -29,13 +29,15 @@ constexpr float kHitStunSeconds = 0.15f;
 constexpr float kBossFraming = 0.4f;
 constexpr float kMaxBossFramingOffset = 200.0f;
 
-// Every source of damage to the player goes through here, so a dash protects from all of them, and a hit
-// that lands spoils any drink in progress.
+// Every source of damage to the player goes through here, so a dash protects from all of them, a hit that
+// lands spoils any drink in progress, and the world remembers what landed it.
 //
 // @return Whether the hit landed, so a hit with extra effects (the charge's knockback) applies them once.
-bool HurtPlayer(Player& player, int damage) {
+bool HurtPlayer(World& world, int damage, DamageSource source) {
+    Player& player = world.player;
     if (!IsDashInvulnerable(player.dash) && ApplyDamage(player.health, damage)) {
         InterruptDrinking(player.flasks);
+        world.lastHitBy = source;
         return true;
     }
     return false;
@@ -283,14 +285,14 @@ void ApplyContactDamage(World& world) {
     const Boss& boss = world.boss;
     if (IsBossABody(boss) && AreTouching(player.motion.position, player.radius, boss.motion.position, boss.radius)) {
         if (!IsCharging(boss)) {
-            HurtPlayer(player, boss.contactDamage);
-        } else if (HurtPlayer(player, boss.charge.damage)) {
+            HurtPlayer(world, boss.contactDamage, DamageSource::BossTouch);
+        } else if (HurtPlayer(world, boss.charge.damage, DamageSource::Charge)) {
             player.motion.velocity += ChargeKnockback(boss, player.motion.position);
         }
     }
     for (const Enemy& enemy : world.enemies) {
         if (AreTouching(player.motion.position, player.radius, enemy.motion.position, enemy.radius)) {
-            HurtPlayer(player, enemy.contactDamage);
+            HurtPlayer(world, enemy.contactDamage, DamageSource::Hairball);
         }
     }
 }
@@ -307,7 +309,7 @@ void StepHostileProjectiles(World& world, float dt) {
                                          player.motion.position, player.radius)
                                  .has_value();
         if (touches && !IsDashInvulnerable(player.dash)) {
-            HurtPlayer(player, strand.damage);
+            HurtPlayer(world, strand.damage, DamageSource::HairRing);
             return true;
         }
         return !stillFlying || !Contains(world.arena, strand.motion.position);
@@ -323,7 +325,8 @@ void LandLeap(World& world) {
     const LeapStats& leap = boss.leap;
     const Vec2 center = boss.motion.position;
     const Vec2 away = player.motion.position - center;
-    if (Length(away) <= leap.impactRadius + player.radius && HurtPlayer(player, leap.impactDamage)) {
+    if (Length(away) <= leap.impactRadius + player.radius &&
+        HurtPlayer(world, leap.impactDamage, DamageSource::LeapImpact)) {
         const Vec2 out = LengthSquared(away) > 1.0f ? Normalized(away) : Vec2{0.0f, 1.0f};
         player.motion.velocity += out * leap.impactKnockback;
     }
@@ -334,11 +337,11 @@ void LandLeap(World& world) {
 // dashing player by; any other touch spends it, even inside the window after an earlier hit.
 void StepShockwaves(World& world, float dt) {
     Player& player = world.player;
-    world.shockwaves.RemoveIf([&player, dt](Shockwave& wave) {
+    world.shockwaves.RemoveIf([&world, &player, dt](Shockwave& wave) {
         const bool going = StepShockwave(wave, dt);
         if (!wave.spent && !IsDashInvulnerable(player.dash) &&
             ShockwaveTouches(wave, player.motion.position, player.radius)) {
-            HurtPlayer(player, wave.stats.damage);
+            HurtPlayer(world, wave.stats.damage, DamageSource::Shockwave);
             wave.spent = true;
         }
         return !going;
@@ -388,7 +391,8 @@ void StepWorld(World& world, const PlayerCommands& commands, float dt) {
     }
     HandleWeapons(world, commands, dt);
     StepEnemies(world, dt);
-    const BossActions actions = StepBoss(world.boss, player.motion.position, player.radius, world.arena, dt);
+    const BossActions actions =
+        StepBoss(world.boss, player.motion.position, player.radius, world.arena, world.random, dt);
     if (actions.spitHairRing) {
         SpitHairRing(world);
     }

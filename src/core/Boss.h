@@ -3,20 +3,15 @@
 #include <optional>
 
 #include "core/Arena.h"
+#include "core/AttackChoice.h"
 #include "core/Health.h"
 #include "core/Movement.h"
 #include "core/Projectile.h"
+#include "core/Random.h"
 #include "core/Shockwave.h"
 #include "core/Vec2.h"
 
 namespace horde {
-
-/// The boss's three attacks of the first phase.
-enum class AttackKind {
-    Charge,   ///< Crouches, then runs in a straight line across the arena.
-    HairRing, ///< Swells, then spits a ring of hair in every direction but one gap.
-    Leap,     ///< Jumps, comes down on its shadow and sends a shockwave across the floor.
-};
 
 /// Every attack runs through the same three stages, so the player learns one rhythm: a warning that shows
 /// what is coming and where, the attack itself, and a recovery that is the opening to punish it.
@@ -40,6 +35,13 @@ struct BossAttack {
     Vec2 takeoff; ///< Leap: where it left the ground.
     /// Leap: where it will land, drawn as its shadow. It follows the player through the air until it locks.
     Vec2 target;
+    /// How much longer or shorter than its stats the warning lasts, picked when the attack starts. Read it
+    /// through `WarningSeconds`.
+    float warningScale = 1.0f;
+    /// The attack that starts the moment this one would begin its recovery: set when this attack opens a
+    /// combo.
+    std::optional<AttackKind> followUp;
+    bool endsCombo = false; ///< The second attack of a combo: a shorter warning and a longer recovery.
 };
 
 /// The numbers of the Charge.
@@ -125,9 +127,11 @@ struct ChargePath {
 /// of its own rather than an `Enemy` with bigger numbers because its rules differ: bullets neither stagger
 /// nor push it, and its attacks run on their own state machine.
 ///
-/// Between attacks it stalks: it walks at the player for `attackInterval` seconds. Then it attacks, and
-/// the attack runs through its warning, active and recovery stages before it stalks again. For now the
-/// attacks take turns: a Charge, a Hair Ring, then a Leap.
+/// Between attacks it stalks: it walks at the player for a random stretch of time. Then it attacks, and the
+/// attack runs through its warning, active and recovery stages before it stalks again. Which attack comes
+/// next is picked at random, weighted by the distance to the player, never the same one twice in a row
+/// (see `ChooseAttack`). Sometimes an attack opens a combo, and a second one follows it at once (see
+/// `kCombos`).
 ///
 /// A dead boss takes no part in the simulation: it does not chase, attack, block, take bullets or hurt.
 struct Boss {
@@ -146,20 +150,38 @@ struct Boss {
     float hitFlashSeconds = 0.0f; ///< Time left on the white flash of the last hit.
 
     std::optional<BossAttack> attack; ///< Empty while it stalks the player between attacks.
-    float attackInterval = 2.0f;      ///< Seconds of stalking between the end of one attack and the next.
-    float secondsUntilAttack = 2.0f;  ///< Stalking time left before the next attack starts.
-    AttackKind nextAttack = AttackKind::Charge;
+    /// Stalking time left before the next attack starts. The first stalk is longer than the ones that
+    /// follow, so the fight opens with a moment to look at her.
+    float secondsUntilAttack = 2.0f;
+    /// The attack after this stalk, when it is already decided; otherwise it is picked when the stalk ends.
+    /// The fight opens with a Charge, the plainest attack to read.
+    std::optional<AttackKind> nextAttack = AttackKind::Charge;
+    std::optional<AttackKind> lastAttack; ///< The attack that ended last, which the next pick skips.
     int ringsStarted = 0; ///< Hair Rings started this fight. The gap opens on one side, then the other.
     ChargeStats charge;
     HairRingStats hairRing;
     LeapStats leap;
+    AttackChoiceStats choice;
+    ComboStats combo;
 };
 
 /// Advances the boss by one fixed step: the walk while it stalks, and every stage of its attack. Pushing
-/// bodies apart, bullets and damage to the player are handled by `StepWorld`.
+/// bodies apart, bullets and damage to the player are handled by `StepWorld`. Every random pick (the next
+/// attack, the stalk, the warning's length and the combos) draws from `random`.
 ///
 /// @return What the world has to do for the boss in this step, such as spawning a ring of hair.
-BossActions StepBoss(Boss& boss, Vec2 playerPosition, float playerRadius, const Arena& arena, float dt);
+BossActions StepBoss(Boss& boss, Vec2 playerPosition, float playerRadius, const Arena& arena, Random& random,
+                     float dt);
+
+/// How long the warning of `attack` lasts: its stats' warning, scaled by the attack's `warningScale`. For a
+/// Leap, the crouch and the air time together. Never shorter than the aim or shadow lock at its end.
+[[nodiscard]] float WarningSeconds(const Boss& boss, const BossAttack& attack);
+
+/// The part of a Leap's warning spent crouched on the ground, scaled like the rest of the warning.
+[[nodiscard]] float LeapCrouchSeconds(const Boss& boss, const BossAttack& leap);
+
+/// The part of a Leap's warning spent in the air, ending with the shadow's lock.
+[[nodiscard]] float LeapAirSeconds(const Boss& boss, const BossAttack& leap);
 
 /// Whether the boss is in the middle of a run. A running boss goes through the player instead of shoving
 /// them, and hits harder.

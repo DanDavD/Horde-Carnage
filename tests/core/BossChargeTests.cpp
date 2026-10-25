@@ -2,6 +2,7 @@
 
 #include <doctest/doctest.h>
 
+#include "PredictableBoss.h"
 #include "core/Boss.h"
 #include "core/World.h"
 
@@ -18,9 +19,12 @@ constexpr Vec2 kCenter{820.0f, 520.0f};
 constexpr float kDt = 1.0f / 60.0f;
 constexpr float kPlayerRadius = 20.0f;
 
+// What the bosses below draw from. With their chance taken out, it only decides the stalks between attacks.
+horde::Random chance = horde::SeedRandom(1);
+
 // A boss standing at `position`, at the very start of its charge warning.
 Boss AboutToChargeFrom(Vec2 position) {
-    Boss boss;
+    Boss boss = horde::test::Predictable(Boss{});
     boss.motion = horde::MotionAt(position);
     boss.attack = horde::BossAttack{};
     return boss;
@@ -28,8 +32,13 @@ Boss AboutToChargeFrom(Vec2 position) {
 
 void Step(Boss& boss, Vec2 player, int steps) {
     for (int i = 0; i < steps; ++i) {
-        horde::StepBoss(boss, player, kPlayerRadius, kArena, kDt);
+        horde::StepBoss(boss, player, kPlayerRadius, kArena, chance, kDt);
     }
+}
+
+bool StalkInRange(const Boss& boss) {
+    return boss.secondsUntilAttack >= boss.choice.minStalkSeconds &&
+           boss.secondsUntilAttack <= boss.choice.maxStalkSeconds;
 }
 
 bool InStage(const Boss& boss, AttackStage stage) {
@@ -46,8 +55,8 @@ void StepUntil(Boss& boss, Vec2 player, AttackStage stage) {
 
 } // namespace
 
-TEST_CASE("the boss stalks the player, then starts a charge after its attack interval") {
-    Boss boss;
+TEST_CASE("the boss stalks the player for two seconds, then opens the fight with a charge") {
+    Boss boss = horde::test::Predictable(Boss{});
     boss.motion = horde::MotionAt(kCenter);
     const Vec2 player = kCenter + Vec2{0.0f, 400.0f};
 
@@ -104,14 +113,14 @@ TEST_CASE("a charge into a wall stops at the wall and stuns the boss for the lon
 
     Step(boss, player, 60); // Past the short recovery, inside the stun.
     CHECK(InStage(boss, AttackStage::Recovery));
-    // The other half second of the stun, then it is back to stalking, with the whole interval ahead.
+    // The other half second of the stun, then it is back to stalking, for a stalk of random length.
     int steps = 0;
     while (boss.attack && steps < 60) {
         Step(boss, player, 1);
         ++steps;
     }
     CHECK(steps == doctest::Approx(30).epsilon(0.05));
-    CHECK(boss.secondsUntilAttack == boss.attackInterval);
+    CHECK(StalkInRange(boss));
 }
 
 TEST_CASE("a charge that runs out in the open stops after its distance and recovers quickly") {

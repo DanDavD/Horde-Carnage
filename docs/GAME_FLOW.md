@@ -7,7 +7,7 @@ What happens around a fight: playing, dying or winning, and starting again. It i
 The rules live in `horde_core`:
 
 - `src/core/Session.h`, `src/core/Session.cpp`: the `Session` (the `World`, the state machine and the attempt count), `StartSession`, `StepSession`, `CanRestart` and `TryRestart`.
-- `src/core/World.h`, `src/core/World.cpp`: `IsBossDefeated`, which says when the fight is won; `shotsHit` and `Accuracy`, for the victory screen; and `DefeatBoss`, for the Debug shortcut.
+- `src/core/World.h`, `src/core/World.cpp`: `IsBossDefeated`, which says when the fight is won; `shotsHit` and `Accuracy`, for the victory screen; `lastHitBy`, the `DamageSource` (`src/core/DamageSource.h`) of the last hit on the player, for the death screen; and `DefeatBoss`, for the Debug shortcut.
 
 The game executable connects it to the screen and the buttons:
 
@@ -40,7 +40,7 @@ Every state change goes through one helper, `EnterState`, which also resets the 
 
 **The end screens.** The world dims and a dark band with soft edges crosses the middle of the screen. It carries one big word:
 
-- **YOU DIED**, in blood red, with the attempt number, how long the player lasted (minutes and seconds), and how much of her health the boss kept, rounded up so a living boss never reads 0%.
+- **YOU DIED**, in blood red, with the attempt number, what killed the player and when ("Attempt 4. Slain by her Leap after 0:23."), and how much of her health the boss kept, rounded up so a living boss never reads 0%.
 - **VICTORY**, in gold, with the attempt that won, the length of the fight, and the shots on target out of the shots fired.
 
 Everything fades in over the restart delay, and the prompt to try again (or to fight her again) lights up when a press starts working. The attempt number also stays in the top right corner while playing.
@@ -63,6 +63,8 @@ Everything fades in over the restart delay, and the prompt to try again (or to f
 - **Restart buttons are read once per frame, not once per fixed step.** A press is an event. A frame that runs no fixed step (possible above 60 FPS) would lose it if it were read inside the step. Movement keys are held states, so reading them in the step is fine.
 - **A frozen world is drawn without interpolation.** Drawing blends the last two steps by `alpha`. When the world stops stepping, those two steps stay fixed while `alpha` keeps changing every frame, so everything would shake between them. In `Dead` and `Victory`, `Draw` uses `alpha = 1`, the last position.
 - **The prompt sits inside the band.** Below it, it landed on top of the player, who stands near the middle of the screen.
+- **The death screen names what killed the player.** The fight is learned by dying, and "Slain by her Charge" turns a death into a lesson: that is the attack to watch for next time. `HurtPlayer` is already the single door for damage, so it records the source of every hit that lands, and the last one is the one that killed.
+  - Rejected: naming the attack the boss was doing at the moment of death. A strand from a ring can land while the boss has already started its next attack, and a touch can kill during any of them.
 
 ## How to tune it
 
@@ -73,6 +75,7 @@ Everything fades in over the restart delay, and the prompt to try again (or to f
 | Restart buttons | `ReadRestartPressed` (`src/app/PlayerInput.cpp`) | Enter, R; A, Start |
 | Band size and position | `kEndBandTop`, `kEndBandHeight`, `kEndBandFeather` (`src/app/Game.cpp`) | 240, 220, 48 pixels |
 | Colours of the two words | `kBlood`, `kVictoryGold` (`src/app/Game.cpp`) | |
+| What the death screen calls each killer | `DeathCause` (`src/app/Game.cpp`) | "Slain by her Charge" and so on |
 
 ## Tests
 
@@ -80,6 +83,7 @@ Everything fades in over the restart delay, and the prompt to try again (or to f
   - a new session is the first attempt, playing, with the player at full health;
   - while playing, a session step is a world step;
   - the player is dead in the step their health reaches 0, and the world is frozen from then on (player, boss and the fight's clock do not change);
+  - a dead player's world remembers what killed them;
   - the fight is won in the step the last bullet lands, and the world is frozen from then on (no movement, no shots, no time);
   - when the boss and the player fall in the same step, the fight is won;
   - restart is refused while playing, and inside the delay after a death or a victory;
@@ -87,11 +91,11 @@ Everything fades in over the restart delay, and the prompt to try again (or to f
   - every retry after a death is the next attempt;
   - every attempt gets its own seed, and the session's seed decides them all;
   - a new fight after a victory starts the attempts over, while the victory screen still shows the attempt that won;
-  - standing still in front of the boss ends in death.
-- `tests/core/WorldTests.cpp`: a bullet that hits counts toward accuracy, and a miss does not.
+  - standing still in front of the boss ends in death, whatever the seed (20 seeds), and with a cause of death recorded.
+- `tests/core/WorldTests.cpp`: a bullet that hits counts toward accuracy, and a miss does not; a touching hairball's hit is recorded as the hairball's.
+- `tests/core/BossTests.cpp`: every attack's hit is recorded as that attack's (see [The boss](BOSS.md#tests)).
 
-The end screens and the restart buttons are not unit tested, because they need a window. I checked the screens in Release and Debug builds with window captures: standing still until "YOU DIED" (it read "Attempt 1. You lasted 0:07." and "The Matriarch kept 100% of her health.")
-, both screens halfway through the fade, and "VICTORY" after an `F4` key message sent straight to the window. Retrying from each screen, and winning with real bullets, I check by playing.
+The end screens and the restart buttons are not unit tested, because they need a window. I checked the screens in Release and Debug builds with window captures: standing still until "YOU DIED" (it read "Attempt 1. You lasted 0:07." and "The Matriarch kept 100% of her health."), both screens halfway through the fade, and "VICTORY" after an `F4` key message sent straight to the window. Retrying from each screen, and winning with real bullets, I check by playing. With the cause of death, three Release runs of a sidestep and then standing still read "Attempt 1. Slain by her touch after 0:09.", "Slain by her touch after 0:08." and "Slain by her Leap after 0:09."
 
 ## Limitations
 

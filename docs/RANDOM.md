@@ -4,13 +4,14 @@
 
 The seeded random number generator that everything random in the fight draws from. A fight is decided by its seed and the player's inputs alone: the same seed and the same inputs always play out the same way. That keeps the tests deterministic, and it makes a bug seen in one fight reproducible.
 
-Nothing in the fight is random yet. The generator and its seeding come first, and the boss's choice of attack is the first thing that will use them (see the [roadmap](ROADMAP.md)).
+Today the boss is its only user: which attack comes next, how long each stalk and each warning lasts, and when two attacks chain into a combo (see [The boss](BOSS.md#how-it-works)).
 
 The rules live in `horde_core`:
 
 - `src/core/Random.h`, `src/core/Random.cpp`: the `Random` struct and its functions, `SeedRandom`, `NextU32`, `NextFloat`, `RandomRange` and `Chance`.
 - `src/core/World.h`, `src/core/World.cpp`: every `World` has its own `Random`, seeded by `CreateWorld`, and keeps the `seed` it started from.
 - `src/core/Session.h`, `src/core/Session.cpp`: the session hands every new world its seed.
+- `src/core/Boss.cpp`, `src/core/AttackChoice.cpp`: the boss draws from the world's generator, which `StepWorld` passes to `StepBoss`.
 
 The game executable picks the session's seed from the system (`std::random_device`) at launch, and in a Debug build `F1` shows the seed of the current fight.
 
@@ -47,6 +48,8 @@ The game executable picks the session's seed from the system (`std::random_devic
   - Rejected: a fresh system seed for each attempt. Simpler, but a run of attempts could not be replayed.
 - **The session draws seeds on its own stream.** With the same stream, the first world's numbers would start right where the session's drawing of seeds left off, and the two sequences would be tied together for no reason.
 - **The seed shows in the Debug overlay.** When a fight goes wrong, the seed is what I need to play it again.
+- **The generator is passed in, not reached for.** `StepBoss` takes a `Random&` instead of reading a global, so the boss tests choose their own seed, and a boss stepped without a world still draws its numbers the same way.
+- **The boss always draws in the same order.** Every attack takes its numbers in the same sequence: the attack (unless it is already decided), the warning's length, the combo, then the next stalk. That order is part of what a seed means, so changing it changes every fight a seed gives, and it should only change on purpose.
 
 ## How to tune it
 
@@ -61,10 +64,11 @@ To replay a fight, pass the seed from the `F1` overlay to `CreateWorld` in a tes
 ## Tests
 
 - `tests/core/RandomTests.cpp`: the generator gives the reference PCG32 outputs for seed 42 on stream 54; the same seed gives the same numbers and another seed gives others; floats stay in [0, 1) and spread over the whole interval, and ranges stay in [min, max); a chance of 0 never happens, 1 always does, and a half happens about half the time.
-- `tests/core/SessionTests.cpp`: every attempt gets its own seed, and the session's seed decides them all; the world's generator starts from its seed.
+- `tests/core/SessionTests.cpp`: every attempt gets its own seed, and the session's seed decides them all; the world's generator starts from its seed; and standing still dies over each of 20 seeds.
+- `tests/core/AttackChoiceTests.cpp` and `tests/core/BossComboTests.cpp`: the same seed picks the same attacks and plays the same fight, and another seed plays another. See [The boss](BOSS.md#tests).
 
 ## Limitations
 
-- **Nothing draws from it yet.** The boss's choice of attack, in the next step of the roadmap, is the first user.
+- **One generator for the whole world.** When the summoned hairballs start drawing numbers too, a change to them will change the boss's picks for the same seed. That is fine for a game; a replay system that must survive code changes would want one stream per user.
 - **The app's seed comes from `std::random_device`**, which is not guaranteed to be random on every platform. On Windows with MSVC it is.
 - **There is no way to type a seed in the game.** Replaying a fight means changing code. A seed field in the pause menu could come with the menus on day 11.

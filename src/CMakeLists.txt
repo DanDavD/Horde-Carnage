@@ -1,6 +1,7 @@
 # Pure game logic. The tests link this library, so nothing in it may open a window.
 add_library(horde_core STATIC
     core/Arena.cpp
+    core/AttackChoice.cpp
     core/Boss.cpp
     core/Chase.cpp
     core/Collision.cpp

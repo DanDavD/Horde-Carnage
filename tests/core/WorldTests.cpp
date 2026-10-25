@@ -250,8 +250,10 @@ TEST_CASE("a touching hairball hurts the player once per invulnerability window"
     OnlyEnemyAt(world, player.motion.position + Vec2{player.radius + 18.0f, 0.0f});
     const int damage = world.enemies[0].contactDamage;
 
+    REQUIRE_FALSE(world.lastHitBy);
     Step(world, Vec2{}, 1);
     CHECK(player.health.current == player.health.max - damage);
+    CHECK(world.lastHitBy == horde::DamageSource::Hairball);
 
     // 0.7 s later the window (0.8 s) is still open.
     Step(world, Vec2{}, 42);

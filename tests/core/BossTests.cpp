@@ -4,6 +4,7 @@
 
 #include <doctest/doctest.h>
 
+#include "PredictableBoss.h"
 #include "core/Collision.h"
 #include "core/World.h"
 
@@ -20,8 +21,11 @@ namespace {
 constexpr Vec2 kView{1280.0f, 720.0f};
 constexpr float kDt = 1.0f / 60.0f;
 
+// A fight against a boss without its chance, so each attack plays at its stats' exact timings.
 World NewFight() {
-    return horde::CreateWorld(horde::kBossArena, kView);
+    World world = horde::CreateWorld(horde::kBossArena, kView);
+    world.boss = horde::test::Predictable(world.boss);
+    return world;
 }
 
 void Step(World& world, const PlayerCommands& commands, int steps) {
@@ -159,8 +163,10 @@ TEST_CASE("the boss stops when it touches the player, and pushes the player rath
 TEST_CASE("touching the boss hurts the player by the boss's contact damage") {
     World world = NewFight();
     PlayerTouchingBoss(world);
+    REQUIRE_FALSE(world.lastHitBy);
     Step(world, PlayerCommands{}, 1);
     CHECK(world.player.health.current == world.player.health.max - world.boss.contactDamage);
+    CHECK(world.lastHitBy == horde::DamageSource::BossTouch);
 }
 
 TEST_CASE("when the boss and a hairball touch the player in the same step, the boss's hit lands") {
@@ -267,6 +273,7 @@ TEST_CASE("a charge that catches the player takes the charge's damage and throws
         Step(world, PlayerCommands{}, 1);
     }
     CHECK(player.health.current == player.health.max - world.boss.charge.damage);
+    CHECK(world.lastHitBy == horde::DamageSource::Charge);
     // The charge runs south, so out of its path is sideways.
     CHECK(std::abs(player.motion.velocity.x) >= world.boss.charge.knockback * 0.9f);
 }
@@ -289,6 +296,7 @@ TEST_CASE("a dash through the charge takes no damage") {
     Step(world, PlayerCommands{.move = {0.0f, -1.0f}, .dashPressed = true}, 1);
     Step(world, PlayerCommands{}, 60);
     CHECK(world.player.health.current == world.player.health.max);
+    CHECK_FALSE(world.lastHitBy);
     CHECK(world.player.motion.position.y < world.boss.motion.position.y);
 }
 
@@ -313,6 +321,7 @@ TEST_CASE("the strands that reach the player take one strand's damage, and are s
     }
     const horde::HairRingStats& ring = world.boss.hairRing;
     CHECK(player.health.current == player.health.max - ring.damage);
+    CHECK(world.lastHitBy == horde::DamageSource::HairRing);
     CHECK(world.hostileProjectiles.Size() == static_cast<std::size_t>(horde::HairRingStrands(ring) - 2));
 }
 
@@ -386,6 +395,7 @@ TEST_CASE("landing on the player takes the impact's damage once and throws them 
     }
     const horde::LeapStats& leap = world.boss.leap;
     REQUIRE(player.health.current == player.health.max - leap.impactDamage);
+    CHECK(world.lastHitBy == horde::DamageSource::LeapImpact);
     CHECK(horde::Length(player.motion.velocity) > leap.impactKnockback * 0.5f);
 
     // The shockwave leaves through the player inside the window after the impact: one landing, one hit.
@@ -422,6 +432,7 @@ TEST_CASE("the shockwave hurts a player outside the landing zone once, when its 
         Step(world, PlayerCommands{}, 1);
     }
     CHECK(player.health.current == player.health.max - world.boss.leap.shockwave.damage);
+    CHECK(world.lastHitBy == horde::DamageSource::Shockwave);
     // Long after the window has closed, the same wave cannot hurt again.
     Step(world, PlayerCommands{}, 60);
     CHECK(player.health.current == player.health.max - world.boss.leap.shockwave.damage);

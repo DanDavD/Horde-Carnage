@@ -2,9 +2,11 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 
 #include "core/Arena.h"
 #include "core/Boss.h"
+#include "core/DamageSource.h"
 #include "core/Enemy.h"
 #include "core/FollowCamera.h"
 #include "core/ObjectPool.h"
@@ -57,6 +59,9 @@ struct World {
     float elapsedSeconds = 0.0f; ///< Simulated time since the world was created: how long the fight has lasted.
     int shotsFired = 0;          ///< Shots fired this run.
     int shotsHit = 0;            ///< Of those, the ones that hit the boss or a hairball.
+    /// What landed the last hit on the player, and so, once the player is dead, what killed them. Empty
+    /// until the first hit.
+    std::optional<DamageSource> lastHitBy;
 };
 
 /// The starting world: the boss in the middle of `arena`, the player `kStartingDistance` south of it and
