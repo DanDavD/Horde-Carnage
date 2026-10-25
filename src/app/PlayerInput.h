@@ -15,6 +15,17 @@ namespace horde {
 /// no step would lose it.
 [[nodiscard]] bool ReadRestartPressed();
 
+/// Where the mouse points, in screen pixels (1280x720, whatever size the window is shown at).
+///
+/// On the desktop that is raylib's mouse position. In a browser, raylib 5.5 stops following the mouse
+/// once the cursor is hidden, so the page (`web/shell.html`) tracks the aim point itself, and keeps
+/// following it while the pointer is locked to the game.
+[[nodiscard]] Vec2 ReadAimPoint();
+
+/// Shows or hides the system cursor over the game. The game draws its own crosshair while playing. In a
+/// browser the page hides the cursor itself, by locking the pointer on a click, so this does nothing.
+void SetCursorHidden(bool hidden);
+
 /// Whether the fire button (the left mouse button) is down right now. A held state, so reading it once
 /// per fixed step is right.
 [[nodiscard]] bool ReadFireHeld();
