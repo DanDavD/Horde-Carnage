@@ -8,6 +8,8 @@ One arena, one very hard boss: the Matriarch, a giant hairball. You run with the
 ![raylib](https://img.shields.io/badge/raylib-5.5-black)
 ![Status](https://img.shields.io/badge/status-in%20development-orange)
 
+**Play it:** download the latest zip from [Releases](https://github.com/DanDavD/Horde-Carnage/releases), unzip it and run `HordeCarnage.exe` (Windows 10 or 11, nothing to install).
+
 ---
 
 ## The idea
@@ -88,6 +90,8 @@ You can also open the folder in Visual Studio (*File > Open > Folder*). It reads
 | Try again after "YOU DIED" or "VICTORY" | `Enter` or `R` | `A` or `Start` |
 | Quit | `Esc` | |
 | Debug overlay (Debug builds only) | `F1` | |
+| Break the boss's shield (Debug builds only) | `F2` | |
+| Skip to the second phase, then to the frenzy (Debug builds only) | `F3` | |
 | Defeat the boss at once (Debug builds only) | `F4` | |
 
 ## Building and testing
@@ -120,8 +124,8 @@ See [Architecture](docs/ARCHITECTURE.md) for how the pieces fit together.
 The full day-by-day plan, with what I cut first if I fall behind, is in [docs/ROADMAP.md](docs/ROADMAP.md).
 
 - [x] `v0.0.1` Project setup: CMake, raylib, tests, CI, fixed-timestep loop
-- [ ] `v0.1.0` The fight: the boss with its attacks, shield and second phase, the dash and the flasks, death and victory
-- [ ] `v0.2.0` Vertical slice: numbers in JSON, game feel, menus, balancing
+- [x] `v0.1.0` The fight: the boss with its five attacks, its shield, its second phase and its frenzy, the dash and the flasks, death and victory
+- [ ] `v1.0.0` The version I present: art, game feel, sound, menus and balancing
 
 ## Contributing
 
