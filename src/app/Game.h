@@ -15,10 +15,13 @@ public:
     Game(const Game&) = delete;
     Game& operator=(const Game&) = delete;
 
-    /// Runs until the player closes the window or presses Esc.
+    /// Runs until the player closes the window or presses Esc. In a browser the page calls one frame at a
+    /// time instead, and this never returns.
     void Run();
 
 private:
+    /// One frame: the presses since the last one, the fixed steps that are due, and one render.
+    void Frame();
     void Update(float dt);
     void Draw(float alpha) const;
 

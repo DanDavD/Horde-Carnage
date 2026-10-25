@@ -33,6 +33,17 @@ target_link_libraries(HordeCarnage PRIVATE horde_core raylib)
 target_compile_definitions(HordeCarnage PRIVATE "HORDE_VERSION=\"${PROJECT_VERSION}\"")
 horde_set_warnings(HordeCarnage)
 
+# The browser build: index.html (from our page in web/), index.js and index.wasm, ready for itch.io.
+# The memory grows if it has to, and GLFW comes from Emscripten's own port, which raylib's web platform needs.
+if(EMSCRIPTEN)
+    set_target_properties(HordeCarnage PROPERTIES OUTPUT_NAME "index" SUFFIX ".html")
+    target_link_options(HordeCarnage PRIVATE
+        -sUSE_GLFW=3
+        -sALLOW_MEMORY_GROWTH=1
+        --shell-file ${PROJECT_SOURCE_DIR}/web/shell.html)
+    set_property(TARGET HordeCarnage APPEND PROPERTY LINK_DEPENDS ${PROJECT_SOURCE_DIR}/web/shell.html)
+endif()
+
 # Release builds are a plain windowed app. Debug keeps the console for raylib's log.
 set_target_properties(HordeCarnage PROPERTIES WIN32_EXECUTABLE $<CONFIG:Release>)
 if(MSVC)

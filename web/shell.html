@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Horde Carnage</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #141218; overflow: hidden; }
+  body { display: flex; align-items: center; justify-content: center; }
+  /* The game draws at 1280x720; the page scales it to the largest 16:9 box that fits the window, so a
+     laptop screen or a small itch.io frame shows all of it. Emscripten maps the mouse back to game pixels. */
+  canvas { display: block; outline: none; width: min(100vw, calc(100vh * 16 / 9)) !important;
+           height: auto !important; aspect-ratio: 16 / 9; }
+  #status { position: absolute; color: #aaa5b4; font: 18px sans-serif; }
+</style>
+</head>
+<body>
+<div id="status">Loading...</div>
+<canvas id="canvas" width="1280" height="720" tabindex="-1" oncontextmenu="event.preventDefault()"></canvas>
+<script>
+  // The page around the game: a dark frame the size of the game, and a loading line until it starts.
+  var statusLine = document.getElementById('status');
+  var Module = {
+    canvas: document.getElementById('canvas'),
+    setStatus: function (text) {
+      statusLine.textContent = text;
+      statusLine.style.display = text ? 'block' : 'none';
+    },
+    print: function () {},
+    printErr: function () {}
+  };
+  // Space and the arrow keys would otherwise scroll the page that holds the game, as on itch.io.
+  window.addEventListener('keydown', function (event) {
+    if ([' ', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].indexOf(event.key) >= 0) {
+      event.preventDefault();
+    }
+  });
+  // A click on the game gives it the keyboard.
+  Module.canvas.addEventListener('mousedown', function () { Module.canvas.focus(); });
+</script>
+{{{ SCRIPT }}}
+</body>
+</html>

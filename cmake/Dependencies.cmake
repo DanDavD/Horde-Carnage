@@ -8,6 +8,10 @@ set(CMAKE_POLICY_VERSION_MINIMUM 3.5 CACHE STRING "" FORCE)
 # raylib: window, input, 2D rendering and audio. SYSTEM keeps its headers out of our strict warnings.
 set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(BUILD_GAMES OFF CACHE BOOL "" FORCE)
+# With the Emscripten toolchain, raylib builds for the browser: WebGL and the browser's own input and audio.
+if(EMSCRIPTEN)
+    set(PLATFORM "Web" CACHE STRING "" FORCE)
+endif()
 FetchContent_Declare(raylib
     URL https://github.com/raysan5/raylib/archive/refs/tags/5.5.tar.gz
     DOWNLOAD_EXTRACT_TIMESTAMP TRUE

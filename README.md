@@ -45,7 +45,8 @@ This is day 7 of 15, and the boss fight is in progress. Progress is tracked in t
 - Hairballs, bullets, the boss's strands, its shockwaves and the marks of its Summon live in fixed object pools, so the game never allocates memory while you play. See [Object pool](docs/OBJECT_POOL.md).
 - A dash that covers about four body widths in 0.12 s, passes through enemies and makes you untouchable while it lasts. See [Player abilities](docs/ABILITIES.md).
 - Three healing flasks per attempt, Dark Souls style: drinking takes a second, slows you down, and a hit while drinking wastes the flask. See [Player abilities](docs/ABILITIES.md).
-- Unit tests for the pure logic, and a GitHub Actions workflow that builds and tests every push and pull request on Windows.
+- Unit tests for the pure logic, and a GitHub Actions workflow that builds and tests every push and pull request on Windows, and builds the web version.
+- A web build: the same game compiled to WebAssembly, playable in a browser tab, scaled to fit the window. See [The web build](docs/WEB_BUILD.md).
 - Warnings are errors for the project's own code (`/W4 /WX` on MSVC).
 
 **Still to do:** the numbers in JSON, game feel and menus. See the [roadmap](docs/ROADMAP.md) for the order, and for the difficulty I am aiming for.
@@ -58,7 +59,8 @@ This is day 7 of 15, and the boss fight is in progress. Progress is tracked in t
 | Window, input, 2D rendering, audio | [raylib](https://www.raylib.com/) 5.5 |
 | Build | CMake 3.25+ with presets |
 | Tests | [doctest](https://github.com/doctest/doctest) 2.4.11 |
-| CI | GitHub Actions (Windows, MSVC) |
+| Web | [Emscripten](https://emscripten.org/) 3.1.74, WebAssembly |
+| CI | GitHub Actions (Windows with MSVC, and the web build) |
 
 ## Getting started
 
@@ -99,6 +101,7 @@ You can also open the folder in Visual Studio (*File > Open > Folder*). It reads
 - **Debug build:** `cmake --build --preset debug`. It keeps a console window with raylib's log.
 - **Release build:** `cmake --build --preset release`. A plain windowed app, no console.
 - **Tests:** `ctest --preset release` (or `--preset debug`). The tests only cover code in `horde_core`, which never opens a window.
+- **Web build:** with the Emscripten SDK activated, `cmake --preset web` then `cmake --build --preset web`. It writes `index.html`, `index.js` and `index.wasm` to `build/web/src`, the page I publish on itch.io. See [The web build](docs/WEB_BUILD.md).
 
 ## Project structure
 
@@ -114,6 +117,7 @@ src/
   main.cpp
 tests/
   core/               Unit tests for src/core
+web/                  The page around the browser build
 docs/                 Design and architecture notes
 ```
 

@@ -25,3 +25,31 @@ jobs:
 
       - name: Test Release
         run: ctest --preset release
+
+  # The browser build, the one people play on itch.io. It has no tests of its own: the logic is the same
+  # code the Windows job tests. The page is kept as an artifact, ready to upload.
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: 3.1.74
+
+      - name: Install Ninja
+        run: sudo apt-get update && sudo apt-get install -y ninja-build
+
+      - name: Configure
+        run: cmake --preset web
+
+      - name: Build
+        run: cmake --build --preset web
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: horde-carnage-web
+          path: |
+            build/web/src/index.html
+            build/web/src/index.js
+            build/web/src/index.wasm
