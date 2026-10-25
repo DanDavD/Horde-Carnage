@@ -10,6 +10,10 @@
 
 #include <raylib.h>
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten/emscripten.h>
+#endif
+
 #include "app/PlayerInput.h"
 #include "app/RaylibConvert.h"
 
@@ -193,6 +197,9 @@ constexpr HairStyle kDeadBossStyle{kPlayerDeadFill, kPlayerDeadEdge, kPlayerDead
 #ifndef NDEBUG
 constexpr const char* kControlsHint =
     "WASD move  Mouse aim  Click fire  Space dash  E heal  Q/1/2 swap gun  Esc quit  Debug: F1 F2 F3 F4";
+#elif defined(__EMSCRIPTEN__)
+// In a browser the tab is closed, not the game: Esc only gives the mouse back to the page.
+constexpr const char* kControlsHint = "WASD move  Mouse aim  Click fire  Space dash  E heal  Q/1/2/wheel swap gun";
 #else
 constexpr const char* kControlsHint =
     "WASD move  Mouse aim  Click fire  Space dash  E heal  Q/1/2/wheel swap gun  Esc quit";
@@ -998,47 +1005,57 @@ Game::~Game() {
 }
 
 void Game::Run() {
+#ifdef __EMSCRIPTEN__
+    // A browser tab cannot be held in a loop: the page calls one frame at a time, at its own refresh rate.
+    // With the last argument set, this never returns, so `this` stays alive for the life of the page.
+    emscripten_set_main_loop_arg([](void* game) { static_cast<Game*>(game)->Frame(); }, this, 0, true);
+#else
     while (!WindowShouldClose()) {
-        // Key presses are read once per frame, not per fixed step: a frame with no step would miss them.
-        if (ReadRestartPressed()) {
-            TryRestart(_session);
-        }
-        CollectButtonPresses(_pendingPresses);
-
-        // The crosshair replaces the system cursor while playing. On the end screens the cursor is back.
-        const bool playing = _session.state == SessionState::Playing;
-        if (playing && !IsCursorHidden()) {
-            HideCursor();
-        } else if (!playing && IsCursorHidden()) {
-            ShowCursor();
-        }
-#ifndef NDEBUG
-        if (IsKeyPressed(KEY_F1)) {
-            _showDebugOverlay = !_showDebugOverlay;
-        }
-        // Skips to the victory screen without firing 120 bullets. The next step ends the fight.
-        // Breaks the shield at once, to reach the exposed window without the right gun.
-        if (IsKeyPressed(KEY_F2) && _session.state == SessionState::Playing) {
-            BreakBossShield(_session.world);
-        }
-        // Skips ahead: the transformation in the first phase, the frenzy in the second.
-        if (IsKeyPressed(KEY_F3) && _session.state == SessionState::Playing) {
-            if (_session.world.boss.phase == BossPhase::One) {
-                TransformBoss(_session.world);
-            } else {
-                FrenzyBoss(_session.world);
-            }
-        }
-        if (IsKeyPressed(KEY_F4) && _session.state == SessionState::Playing) {
-            DefeatBoss(_session.world);
-        }
-#endif
-        const int steps = _timestep.Advance(GetFrameTime());
-        for (int i = 0; i < steps; ++i) {
-            Update(static_cast<float>(_timestep.StepSeconds()));
-        }
-        Draw(static_cast<float>(_timestep.Alpha()));
+        Frame();
     }
+#endif
+}
+
+void Game::Frame() {
+    // Key presses are read once per frame, not per fixed step: a frame with no step would miss them.
+    if (ReadRestartPressed()) {
+        TryRestart(_session);
+    }
+    CollectButtonPresses(_pendingPresses);
+
+    // The crosshair replaces the system cursor while playing. On the end screens the cursor is back.
+    const bool playing = _session.state == SessionState::Playing;
+    if (playing && !IsCursorHidden()) {
+        HideCursor();
+    } else if (!playing && IsCursorHidden()) {
+        ShowCursor();
+    }
+#ifndef NDEBUG
+    if (IsKeyPressed(KEY_F1)) {
+        _showDebugOverlay = !_showDebugOverlay;
+    }
+    // Breaks the shield at once, to reach the exposed window without the right gun.
+    if (IsKeyPressed(KEY_F2) && _session.state == SessionState::Playing) {
+        BreakBossShield(_session.world);
+    }
+    // Skips ahead: the transformation in the first phase, the frenzy in the second.
+    if (IsKeyPressed(KEY_F3) && _session.state == SessionState::Playing) {
+        if (_session.world.boss.phase == BossPhase::One) {
+            TransformBoss(_session.world);
+        } else {
+            FrenzyBoss(_session.world);
+        }
+    }
+    // Skips to the victory screen without emptying both bars. The next step ends the fight.
+    if (IsKeyPressed(KEY_F4) && _session.state == SessionState::Playing) {
+        DefeatBoss(_session.world);
+    }
+#endif
+    const int steps = _timestep.Advance(GetFrameTime());
+    for (int i = 0; i < steps; ++i) {
+        Update(static_cast<float>(_timestep.StepSeconds()));
+    }
+    Draw(static_cast<float>(_timestep.Alpha()));
 }
 
 void Game::Update(float dt) {

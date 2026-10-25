@@ -21,7 +21,7 @@ When a feature has rules (damage, cooldowns, attack timing), the rules go into `
 
 ### The main loop
 
-`Game::Run` (`src/app/Game.cpp`) does this every frame:
+`Game::Frame` (`src/app/Game.cpp`) does this every frame. On the desktop `Game::Run` calls it in a loop until the window closes; in a browser it hands it to the page, which calls it once per frame (see [The web build](WEB_BUILD.md)):
 
 1. Ask raylib how long the last frame took (`GetFrameTime`).
 2. Give that time to `FixedTimestep::Advance`, which answers how many fixed 1/60 s steps are due.

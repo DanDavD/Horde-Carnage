@@ -6,11 +6,24 @@
       "name": "default",
       "displayName": "Default (multi-config, newest Visual Studio on Windows)",
       "binaryDir": "${sourceDir}/build/default"
+    },
+    {
+      "name": "web",
+      "displayName": "Web (Emscripten, Ninja, Release, no tests)",
+      "description": "Needs emsdk activated (emsdk_env), which sets EMSDK and puts emcc on the PATH.",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/web",
+      "toolchainFile": "$env{EMSDK}/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "HORDE_BUILD_TESTS": "OFF"
+      }
     }
   ],
   "buildPresets": [
     { "name": "debug", "configurePreset": "default", "configuration": "Debug" },
-    { "name": "release", "configurePreset": "default", "configuration": "Release" }
+    { "name": "release", "configurePreset": "default", "configuration": "Release" },
+    { "name": "web", "configurePreset": "web" }
   ],
   "testPresets": [
     {
