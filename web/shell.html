@@ -7,10 +7,9 @@
 <style>
   html, body { margin: 0; height: 100%; background: #141218; overflow: hidden; }
   body { display: flex; align-items: center; justify-content: center; }
-  /* The game draws at 1280x720; the page scales it to the largest 16:9 box that fits the window, so a
-     laptop screen or a small itch.io frame shows all of it. Emscripten maps the mouse back to game pixels. */
-  canvas { display: block; outline: none; width: min(100vw, calc(100vh * 16 / 9)) !important;
-           height: auto !important; aspect-ratio: 16 / 9; }
+  /* The game sizes the canvas to the whole page and draws at that resolution, with bars of its own where
+     the shape differs, so the page must not scale it. */
+  canvas { display: block; outline: none; }
   #status { position: absolute; color: #aaa5b4; font: 18px sans-serif; }
 </style>
 </head>
@@ -18,7 +17,7 @@
 <div id="status">Loading...</div>
 <canvas id="canvas" width="1280" height="720" tabindex="-1" oncontextmenu="event.preventDefault()"></canvas>
 <script>
-  // The page around the game: a dark frame the size of the game, and a loading line until it starts.
+  // The page around the game: the game over the whole page, and a loading line until it starts.
   var statusLine = document.getElementById('status');
   var Module = {
     canvas: document.getElementById('canvas'),
@@ -35,13 +34,13 @@
       event.preventDefault();
     }
   });
-  // Where the player aims, in game pixels, read by the game every frame (ReadAimPoint). raylib 5.5
+  // Where the player aims, in canvas pixels, read by the game every frame (ReadAimPoint). raylib 5.5
   // stops following the mouse in a browser once the game hides the cursor, so the page tracks it.
   var canvas = Module.canvas;
   Module.hordeAim = { x: canvas.width / 2, y: canvas.height / 2 };
   function clamp(value, low, high) { return Math.min(Math.max(value, low), high); }
   function locked() { return document.pointerLockElement === canvas; }
-  // The canvas is scaled to fit the window, so page pixels are turned into game pixels.
+  // Page pixels into canvas pixels, in case the browser scales the canvas (a zoomed page).
   function aimAt(event) {
     var box = canvas.getBoundingClientRect();
     Module.hordeAim.x = clamp((event.clientX - box.left) * canvas.width / box.width, 0, canvas.width);

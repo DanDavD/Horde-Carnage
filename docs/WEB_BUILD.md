@@ -19,9 +19,9 @@ The pieces:
 
 **The main loop.** On the desktop, `Game::Run` loops until the window closes. A browser tab cannot be held in a loop: the page would freeze. So the body of the loop is `Game::Frame`, and in a browser `Run` gives it to `emscripten_set_main_loop_arg`, which calls it once per browser frame (`requestAnimationFrame`). The fixed timestep does the rest, exactly as on the desktop: however often the browser draws, the simulation steps at 60 Hz. With its last argument set, the call never returns, so the `Game` on `main`'s stack lives as long as the page.
 
-**The page.** `web/shell.html` is a dark page with the game in the middle and a "Loading..." line until it starts. The game always draws at 1280x720; the page scales the canvas to the largest 16:9 box that fits the window, so a laptop screen or a small itch.io frame shows all of it. The page also keeps Space and the arrow keys from scrolling it.
+**The page.** `web/shell.html` is a dark page with the game in the middle and a "Loading..." line until it starts. The canvas covers the whole page and raylib resizes it with the page, so going fullscreen on itch.io fills the screen; the game draws at the canvas's resolution and adds its own bars (see [Screen and fullscreen](SCREEN.md)). The page also keeps Space and the arrow keys from scrolling it.
 
-**The aim.** In a browser, raylib 5.5 stops following the mouse as soon as the cursor is hidden, which the game does while playing to draw its own crosshair: the shots still fired, but the aim froze. So the page tracks the aim point itself, in `Module.hordeAim`, in game pixels (it divides by the canvas's scale), and `ReadAimPoint` (`src/app/PlayerInput.cpp`) reads it every frame. A click on the game gives it the keyboard and locks the pointer to it, as browser shooters do, so the mouse cannot wander out of the game in the middle of a fight; while locked, the mouse only reports how far it moved, and the page moves the aim point by that, inside the game. Esc gives the pointer back, and the next click locks it again. On the desktop, `ReadAimPoint` is raylib's mouse position, as before.
+**The aim.** In a browser, raylib 5.5 stops following the mouse as soon as the cursor is hidden, which the game does while playing to draw its own crosshair: the shots still fired, but the aim froze. So the page tracks the aim point itself, in `Module.hordeAim`, in canvas pixels (it divides by any scale the browser applies), and `ReadAimPoint` (`src/app/PlayerInput.cpp`) reads it every frame. A click on the game gives it the keyboard and locks the pointer to it, as browser shooters do, so the mouse cannot wander out of the game in the middle of a fight; while locked, the mouse only reports how far it moved, and the page moves the aim point by that, inside the game. Esc gives the pointer back, and the next click locks it again. On the desktop, `ReadAimPoint` is raylib's mouse position, as before.
 
 **What the player sees differently.** The controls line leaves out "Esc quit": in a browser the tab is closed, not the game, and Esc gives the mouse back. The system cursor is hidden by the pointer lock, not by the game (`SetCursorHidden` does nothing in a browser).
 
@@ -30,7 +30,7 @@ The pieces:
 - **Emscripten, through raylib's own web platform.** raylib supports the browser out of the box, so the port is build settings and one change to the main loop, not a second renderer.
   - Rejected: a separate web front end. Two renderers would drift apart, and the point of the project is one game.
 - **`emscripten_set_main_loop_arg`, not ASYNCIFY.** ASYNCIFY would let the desktop `while` loop run unchanged, but it rewrites the whole program to pause and resume, which makes it bigger and slower. Splitting the loop body into `Frame` is a small change that keeps the desktop and the web on the same code.
-- **The page scales the canvas, the game does not.** The game keeps one resolution, 1280x720, so the HUD, the camera and the aim are the same everywhere. The browser scales the picture, which costs nothing.
+- **The game fits itself to the canvas, the page does not scale it.** At first the page scaled a 1280x720 canvas with CSS, which blurred it on a big screen. Now the canvas has the page's real size and the game draws at that resolution, the same way it does on the desktop (see [Screen and fullscreen](SCREEN.md)).
 - **Release only, without tests.** The tests run on the Windows job against the same `horde_core`; running them again under Node would add a slow step and test nothing new. The web job proves that the game builds for the browser.
 - **A pinned Emscripten (3.1.74).** Like raylib and doctest, the compiler is pinned, so a new Emscripten release cannot break the build on its own.
 - **The page tracks the aim, not raylib.** raylib's web platform treats a hidden cursor as a locked one and stops updating the mouse position. Rather than patch raylib, the page, which already knows the canvas's scale, keeps the aim point, and the game asks for it.
@@ -77,7 +77,7 @@ and open `http://localhost:8085`.
 |---|---|---|
 | Emscripten version | `.github/workflows/ci.yml` and the install commands above | 3.1.74 |
 | Link options | `target_link_options` in `src/CMakeLists.txt` | `-sUSE_GLFW=3 -sALLOW_MEMORY_GROWTH=1` |
-| The page around the game | `web/shell.html` | Dark, centred, scaled to fit |
+| The page around the game | `web/shell.html` | Dark, the canvas over the whole page |
 
 ## Tests
 

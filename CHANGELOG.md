@@ -6,6 +6,7 @@ Versions follow [Semantic Versioning](https://semver.org/) while the game is a p
 ## [Unreleased]
 
 ### Added
+- **Fullscreen at the screen's resolution** (`ScreenFit.cpp`, `Game.cpp`, `main.cpp`, `web/shell.html`): the game always runs fullscreen, as a borderless window at the monitor's resolution and refresh rate, and in a browser the canvas follows the page. It is laid out for 1280x720 and drawn at the real resolution through scaled cameras, with black bars on screens that are not 16:9, so it is sharp and everyone sees the same arena. The mouse is converted back to game pixels. `--windowed` opens a window that can be resized. Covered by `ScreenFitTests`, explained in `docs/SCREEN.md`.
 - **Web build** (`CMakePresets.json`, `src/CMakeLists.txt`, `web/shell.html`, `Game.cpp`): the game compiles to WebAssembly with Emscripten 3.1.74 (`cmake --preset web`), so it can be played in a browser tab on itch.io. `Game::Run` hands each frame to the browser through `Game::Frame` instead of looping, and the page scales the 1280x720 game to fit the window while the mouse keeps aiming where the cursor is. A CI job builds it on every push and pull request. Checked by hand in a local server; explained in `docs/WEB_BUILD.md`.
 
 ### Fixed
