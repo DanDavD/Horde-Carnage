@@ -9,6 +9,7 @@
 
 #include "app/render/Hud.h"
 #include "app/render/Palette.h"
+#include "app/render/Text.h"
 #include "app/render/View.h"
 
 namespace horde {
@@ -19,11 +20,6 @@ namespace {
 constexpr int kEndBandTop = kScreenHeight / 2 - 120;
 constexpr int kEndBandHeight = 220;
 constexpr int kEndBandFeather = 48;
-
-void DrawCenteredText(const char* text, int y, int fontSize, Color color) {
-    const int width = MeasureText(text, fontSize);
-    DrawText(text, (kScreenWidth - width) / 2, y, fontSize, color);
-}
 
 // What killed the player, for the death screen: knowing which attack did it is how the fight is learned.
 const char* DeathCause(std::optional<DamageSource> source) {
@@ -67,7 +63,7 @@ int HealthPercent(const Health& health) {
 // The end of a fight, in the style of the games it borrows from: the world dims and a dark band across
 // the middle carries one big word. It all fades in over the restart delay, so the moment the prompt lights
 // up is the moment a press works.
-void DrawEndScreen(const Session& session) {
+void DrawEndScreen(const Session& session, const Art& art) {
     const float shown = std::min(session.stateSeconds / kRestartDelaySeconds, 1.0f);
     const bool won = session.state == SessionState::Victory;
     const World& world = session.world;
@@ -79,7 +75,11 @@ void DrawEndScreen(const Session& session) {
     DrawRectangle(0, kEndBandTop, kScreenWidth, kEndBandHeight, band);
     DrawRectangleGradientV(0, kEndBandTop + kEndBandHeight, kScreenWidth, kEndBandFeather, band, clear);
 
-    DrawCenteredText(won ? "VICTORY" : "YOU DIED", kEndBandTop + 28, 80, Fade(won ? kVictoryGold : kBlood, shown));
+    // The one big word, in the serif of old inscriptions, spaced wide.
+    constexpr float kMiddle = kScreenWidth / 2.0f;
+    constexpr auto kTop = static_cast<float>(kEndBandTop);
+    DrawGameTextCentered(art.titleFont, won ? "VICTORY" : "YOU DIED", kMiddle, kTop + 22.0f, 88.0f,
+                         Fade(won ? kVictoryGold : kBlood, shown), kTitleTracking);
 
     const std::string duration = FormatDuration(world.elapsedSeconds);
     std::string summary;
@@ -93,15 +93,15 @@ void DrawEndScreen(const Session& session) {
             TextFormat("Attempt %d. %s after %s.", session.attempt, DeathCause(world.lastHitBy), duration.c_str());
         detail = TextFormat("%s kept %d%% of her health.", kBossName, HealthPercent(world.boss.health));
     }
-    DrawCenteredText(summary.c_str(), kEndBandTop + 124, 26, Fade(RAYWHITE, shown));
-    DrawCenteredText(detail.c_str(), kEndBandTop + 154, 22, Fade(kSoftText, shown));
+    DrawGameTextCentered(art.titleFont, summary.c_str(), kMiddle, kTop + 122.0f, 26.0f, Fade(kText, shown));
+    DrawGameTextCentered(art.titleFont, detail.c_str(), kMiddle, kTop + 154.0f, 20.0f, Fade(kSoftText, shown));
 
     // Dimmed until the restart delay has passed, so it is clear why an early press did nothing.
-    const Color prompt = CanRestart(session) ? RAYWHITE : Fade(kSoftText, 0.4f * shown);
+    const Color prompt = CanRestart(session) ? kText : Fade(kSoftText, 0.4f * shown);
     const char* again = won ? "Press Enter or R (A or Start on a gamepad) to fight her again"
                             : "Press Enter or R (A or Start on a gamepad) to try again";
     // Inside the band, so it never lands on top of the player, who stands in the middle of the screen.
-    DrawCenteredText(again, kEndBandTop + 192, 22, prompt);
+    DrawGameTextCentered(art.uiFont, again, kMiddle, kTop + 190.0f, 16.0f, prompt);
 }
 
 } // namespace horde

@@ -392,5 +392,5 @@ The drawing is not unit tested, because it needs a window. I checked it in a Rel
 - **The Leap's arc is drawn, not simulated.** The body's position moves straight from the takeoff to the shadow, and the height is only an offset in the drawing. Nothing in the fight needs a third dimension.
 - **The crouch and the swell change the size, not the shape.** The body is drawn with circles, so it gets smaller or bigger instead of flatter or rounder. Squash and stretch come with the art pass.
 - **A strand is a dot with a short tail.** Real hair, and strands that fall to the floor at the end of their range, come with the art pass.
-- **At the south wall the boss is partly hidden by the HUD.** The boss bar and the controls line cover the bottom of the screen, where the camera stops for the south wall. The art pass will rework the HUD.
+- **At the south wall the boss is partly hidden by the HUD.** The boss bar and the controls line cover the bottom of the screen, where the camera stops for the south wall. The new HUD of the art pass is thinner, but still sits there.
 - **The bar has no animation.** It jumps to the new value. A trailing chunk that drains behind it is part of the game feel pass.

@@ -15,6 +15,7 @@ option(HORDE_BUILD_TESTS "Build the unit tests" ON)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 include(Dependencies)
+include(EmbedFile)
 include(Warnings)
 
 add_subdirectory(src)

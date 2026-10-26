@@ -25,7 +25,7 @@ In a browser, the window is the canvas, and raylib resizes it with the page (`FL
 - the world is drawn through the follow camera, with its zoom set to the scale and its centre moved to the middle of the game's area on the screen;
 - the HUD, the end screens and the crosshair are drawn through a second camera, `ScreenCamera`, which maps game pixels to the screen with the same scale and offset.
 
-Both are drawn at the screen's real resolution. Since everything is shapes and text, not images, nothing is stretched: a circle drawn at 1920x1080 is as sharp as the screen allows. The default font is a small bitmap, so it is smoothed (`TEXTURE_FILTER_BILINEAR`) to scale evenly.
+Both are drawn at the screen's real resolution. Almost everything is shapes, so nothing is stretched: a circle drawn at 1920x1080 is as sharp as the screen allows. The few textures (the stone grain, the torchlight, the shadows) are soft gradients that scale without showing it. The Cinzel fonts are rasterised large and shrunk with mipmaps (see [Art direction](ART.md)). raylib's default font, which only the Debug overlay uses, is a small bitmap, so it is smoothed (`TEXTURE_FILTER_BILINEAR`) to scale evenly.
 
 **The mouse.** `ReadAimPoint` gives the mouse in screen pixels. `AimInGame` turns it into game pixels with `ScreenToGame` and keeps it inside the game, so a mouse over a bar aims at the edge. The world point the player aims at comes from that, through the camera at 1280x720, exactly as before.
 
@@ -46,7 +46,8 @@ Both are drawn at the screen's real resolution. Since everything is shapes and t
 | The game's resolution | `kScreenWidth`, `kScreenHeight` (`src/app/render/View.h`) | 1280x720 |
 | Fullscreen or windowed | `--windowed` on the command line | Fullscreen |
 | Colour of the bars | `ClearBackground` in `Game::Draw` | Black |
-| How the default font scales | `SetTextureFilter` in `Game::Game` | Bilinear |
+| How the Debug overlay's font scales | `SetTextureFilter` in `Game::Game` | Bilinear |
+| Size of the game's fonts before scaling | `kTitleFontPixels`, `kUiFontPixels` (`src/app/render/Art.cpp`) | 160 and 64 pixels |
 
 ## Tests
 
@@ -57,6 +58,6 @@ The window and the drawing need a real screen. On my 1920x1080, 165 Hz monitor, 
 ## Limitations
 
 - **There is no key to leave fullscreen.** Esc still quits at once. A pause menu, where Esc will lead, comes with the menus.
-- **The default font looks soft when scaled.** It is a small bitmap font. The art pass brings a real font, loaded at the size it is drawn at.
+- **The titles soften above 1440p.** They are rasterised at 160 pixels and grow past that on a 4K screen. The Debug overlay's bitmap font looks soft at any scale.
 - **In a browser the canvas ignores the screen's pixel density.** On a laptop with a high-density screen, the canvas has as many pixels as the page has CSS pixels, so the picture is a little softer than the screen could show.
 - **Only the primary monitor.** The borderless window covers the monitor the window opens on.

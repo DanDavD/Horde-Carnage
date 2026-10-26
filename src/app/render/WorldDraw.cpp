@@ -3,17 +3,17 @@
 #include <algorithm>
 
 #include "app/RaylibConvert.h"
+#include "app/render/ArenaDraw.h"
 #include "app/render/BossDraw.h"
 #include "app/render/HairBody.h"
 #include "app/render/Palette.h"
 #include "app/render/PlayerDraw.h"
+#include "app/render/View.h"
 
 namespace horde {
 
 namespace {
 
-constexpr float kGridSpacing = 80.0f;
-constexpr float kWallThickness = 4.0f;
 // A strand of hair is a short streak behind a round tip.
 constexpr float kStrandTail = 12.0f;
 // A summon mark is a dark pit with a red rim that starts this many times wider and closes in on it.
@@ -22,25 +22,6 @@ constexpr float kMarkerRimStart = 2.5f;
 // A bullet is drawn as a short streak behind its head, so its direction reads even in a still frame.
 constexpr float kBulletStreak = 14.0f;
 constexpr float kBulletWidth = 4.0f;
-
-void DrawArena(const Arena& arena) {
-    const Vec2 size = arena.max - arena.min;
-    DrawRectangleV(ToRaylib(arena.min), ToRaylib(size), kFloor);
-
-    // The grid gives the eye something fixed to judge speed against.
-    for (float x = arena.min.x + kGridSpacing; x < arena.max.x; x += kGridSpacing) {
-        DrawLineV(ToRaylib({x, arena.min.y}), ToRaylib({x, arena.max.y}), kGrid);
-    }
-    for (float y = arena.min.y + kGridSpacing; y < arena.max.y; y += kGridSpacing) {
-        DrawLineV(ToRaylib({arena.min.x, y}), ToRaylib({arena.max.x, y}), kGrid);
-    }
-
-    // raylib draws the outline inward, so the rectangle grows by the wall thickness. Otherwise a mover
-    // confined to the arena would overlap the wall.
-    const Rectangle walls{arena.min.x - kWallThickness, arena.min.y - kWallThickness,
-                          size.x + 2.0f * kWallThickness, size.y + 2.0f * kWallThickness};
-    DrawRectangleLinesEx(walls, kWallThickness, kWall);
-}
 
 // A dark pit the size of a hairball, with a red rim that closes in on it: when the rim reaches the pit, the
 // hairball comes out.
@@ -81,12 +62,29 @@ void DrawHairStrand(const Projectile& strand, float alpha) {
 
 } // namespace
 
-void DrawWorld(const World& world, float alpha) {
+void DrawWorld(const World& world, float alpha, const Art& art) {
     const Player& player = world.player;
     const Vec2 playerPosition = Lerp(player.motion.previousPosition, player.motion.position, alpha);
+    const bool bossAirborne = IsAirborne(world.boss);
 
-    DrawArena(world.arena);
-    // On the floor, under every body.
+    DrawFloor(world.arena, art);
+    DrawWalls(world.arena);
+    // Shadows go on the floor before the light, so they sink into the dark with it. A boss in the air has
+    // the Leap's own shadow instead.
+    if (!bossAirborne) {
+        const Vec2 bossPosition = Lerp(world.boss.motion.previousPosition, world.boss.motion.position, alpha);
+        DrawBodyShadow(bossPosition, world.boss.radius, playerPosition, art);
+    }
+    for (const Enemy& enemy : world.enemies) {
+        const Vec2 position = Lerp(enemy.motion.previousPosition, enemy.motion.position, alpha);
+        DrawBodyShadow(position, enemy.radius, playerPosition, art);
+    }
+    DrawBodyShadow(playerPosition, player.radius, playerPosition, art);
+    const Vec2 viewCenter = Lerp(world.camera.previousCenter, world.camera.center, alpha);
+    DrawTorchLight(playerPosition, viewCenter - kViewSize * 0.5f, viewCenter + kViewSize * 0.5f,
+                   world.elapsedSeconds, art);
+
+    // On the floor, under every body, and over the dark, so a warning reads wherever it is.
     DrawBossTelegraphs(world.boss, world.arena);
     for (const Shockwave& wave : world.shockwaves) {
         DrawShockwave(wave);
@@ -97,7 +95,6 @@ void DrawWorld(const World& world, float alpha) {
 
     // The boss goes under its children, so a dead boss lies on the floor. In the air it goes over
     // everything, the player included.
-    const bool bossAirborne = IsAirborne(world.boss);
     if (!bossAirborne) {
         DrawBoss(world.boss, playerPosition, alpha);
     }
@@ -111,7 +108,7 @@ void DrawWorld(const World& world, float alpha) {
         DrawHairStrand(strand, alpha);
     }
     // The player is drawn after every body on the floor, so it is never hidden under a crowd.
-    DrawPlayer(player, alpha);
+    DrawPlayer(player, world.elapsedSeconds, alpha);
     if (bossAirborne) {
         DrawBoss(world.boss, playerPosition, alpha);
     }

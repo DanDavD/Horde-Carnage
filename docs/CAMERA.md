@@ -77,5 +77,5 @@ Most tests set `wallMargin` to 0 so the expected centers are easy to read. The m
 
 - Zoom is fixed at 1, so one world unit is one pixel. A zoom setting would scale `viewSize`, and nothing else in the camera would change.
 - The boss can still leave the screen. With the 200 unit cap, its centre leaves the view when it is more than about 560 units above or below the player, or about 840 units to the side. In a 1640x1040 arena that takes the two of them near opposite walls.
-- The camera position is not rounded to whole pixels. Thin grid lines can shimmer at sub-pixel positions. I have not checked for it in motion yet, only in still screenshots. If it shows up, rounding the `Camera2D` target is the fix.
+- The camera position is not rounded to whole pixels. The thin joints between the floor slabs could shimmer at sub-pixel positions. I have not checked for it in motion yet, only in still screenshots. If it shows up, rounding the `Camera2D` target is the fix.
 - The window is not resizable. If it becomes resizable, `viewSize` has to follow the window size.

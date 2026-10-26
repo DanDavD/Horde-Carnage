@@ -40,7 +40,7 @@ The game executable reads the hardware and draws:
 
 **Switching.** `SelectSlot` puts a slot in hand; `CycleWeapon` goes to the next one. Switching is instant. Both guns keep cooling down while in the holster, and a press buffered on the gun being put away is dropped.
 
-**On screen.** The system cursor is hidden while playing and a crosshair is drawn instead. The gun is a light barrel that sticks out of the body toward the aim, longer and thicker for the SMG, with a yellow flash at its tip after a shot. The panel in the bottom right corner shows both slots with their number, name and fire mode, and lights the one in hand.
+**On screen.** The system cursor is hidden while playing and a crosshair is drawn instead. The hunter holds the gun in both hands toward the aim, the pistol out in front and the SMG like a rifle, with a yellow flash at the muzzle after a shot; the other gun hangs on the hunter (see [Art direction](ART.md)). The panel in the bottom right corner shows both slots with their number, name and fire mode, and lights the one in hand.
 
 ## Design decisions
 
@@ -65,7 +65,7 @@ The game executable reads the hardware and draws:
 | SMG fire rate and mode | `kSmg` (`src/core/Weapon.h`) | 10 per second, automatic |
 | Early press buffer | `kTriggerBufferSeconds` | 0.15 s |
 | Muzzle flash | `kMuzzleFlashSeconds` | 0.05 s |
-| Barrel length (where bullets start) | `WeaponStats::barrelLength` (`src/core/Weapon.h`) | 14 and 22 units |
+| Barrel length (where bullets start) | `WeaponStats::barrelLength` (`src/core/Weapon.h`) | 18 and 30 units |
 | Damage, bullet speed, range, knockback | `WeaponStats` (`src/core/Weapon.h`) | See [Bullets and hits](BULLETS.md#how-to-tune-it) |
 | Controls | `CollectButtonPresses`, `ReadFireHeld` (`src/app/PlayerInput.cpp`) | Left click; 1, 2, Q, wheel |
 

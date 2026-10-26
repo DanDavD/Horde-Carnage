@@ -1,6 +1,7 @@
 #pragma once
 
 #include "app/PlayerInput.h"
+#include "app/render/Art.h"
 #include "core/FixedTimestep.h"
 #include "core/Session.h"
 
@@ -31,6 +32,7 @@ private:
     FixedTimestep _timestep;
     Session _session;
     ButtonPresses _pendingPresses; ///< Presses since the last fixed step, used by the next one.
+    Art _art; ///< Loaded once the window is open, unloaded before it closes.
 
 #ifndef NDEBUG
     bool _showDebugOverlay = false;

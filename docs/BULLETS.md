@@ -50,7 +50,7 @@ The game executable draws bullets as short yellow streaks and flashes the bodies
 | Bullet speed | `WeaponStats::bulletSpeed` | Pistol 950, SMG 850 units/s |
 | Range | `WeaponStats::range` | Pistol 750, SMG 600 units |
 | Knockback | `WeaponStats::knockback` | Pistol 300, SMG 120 units/s |
-| Barrel length (where bullets start) | `WeaponStats::barrelLength` | Pistol 14, SMG 22 units |
+| Barrel length (where bullets start) | `WeaponStats::barrelLength` | Pistol 18, SMG 30 units |
 | Bullet radius | `Projectile::radius` (`src/core/Projectile.h`) | 4 units |
 | Hairball health | `Enemy::health` (`src/core/Enemy.h`) | 30: 3 pistol bullets, 5 SMG bullets |
 | Hit flash and stun | `kHitFlashSeconds`, `kHitStunSeconds` (`src/core/World.cpp`) | 0.1 s, 0.15 s |

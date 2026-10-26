@@ -20,6 +20,7 @@ add_library(horde_core STATIC
     core/Shield.cpp
     core/Shockwave.cpp
     core/SpawnMarker.cpp
+    core/StoneFloor.cpp
     core/Weapon.cpp
     core/World.cpp)
 target_include_directories(horde_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
@@ -30,17 +31,28 @@ add_executable(HordeCarnage
     main.cpp
     app/Game.cpp
     app/PlayerInput.cpp
+    app/render/ArenaDraw.cpp
+    app/render/Art.cpp
     app/render/BossDraw.cpp
     app/render/DebugOverlay.cpp
     app/render/EndScreen.cpp
     app/render/HairBody.cpp
     app/render/Hud.cpp
     app/render/PlayerDraw.cpp
+    app/render/Text.cpp
     app/render/View.cpp
     app/render/WorldDraw.cpp)
 target_link_libraries(HordeCarnage PRIVATE horde_core raylib)
 target_compile_definitions(HordeCarnage PRIVATE "HORDE_VERSION=\"${PROJECT_VERSION}\"")
 horde_set_warnings(HordeCarnage)
+
+# The fonts are compiled into the executable (see cmake/EmbedFile.cmake), and their license is copied next to
+# it, where the release zip and the web build pick it up.
+horde_embed_file(HordeCarnage "${cinzel_regular_SOURCE_DIR}/Cinzel-Regular.ttf" kCinzelRegular)
+horde_embed_file(HordeCarnage "${cinzel_bold_SOURCE_DIR}/Cinzel-Bold.ttf" kCinzelBold)
+add_custom_command(TARGET HordeCarnage POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${cinzel_license_SOURCE_DIR}/OFL.txt"
+            "$<TARGET_FILE_DIR:HordeCarnage>/Cinzel-OFL.txt")
 
 # The browser build: index.html (from our page in web/), index.js and index.wasm, ready for itch.io.
 # The memory grows if it has to, and GLFW comes from Emscripten's own port, which raylib's web platform needs.
