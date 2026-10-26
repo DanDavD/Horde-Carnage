@@ -26,13 +26,13 @@ When a feature has rules (damage, cooldowns, attack timing), the rules go into `
 1. Ask raylib how long the last frame took (`GetFrameTime`).
 2. Give that time to `FixedTimestep::Advance`, which answers how many fixed 1/60 s steps are due.
 3. Run `Update` that many times, always with the same `dt`. `Update` reads the input (`ReadMoveInput`) and passes it to `StepSession`, which runs all the rules.
+4. Draw once, passing `FixedTimestep::Alpha` (how far we are into the next step) so drawing can interpolate between two steps.
 
 Before the steps, `Run` also reads button presses that are events rather than held states (fire, weapon switch, restart, and the Debug overlay toggle), once per frame, so a frame that runs no step cannot lose them.
 
 ### Input becomes commands
 
 The simulation never reads a key or the mouse. Every step, `Game::Update` turns the hardware into a `PlayerCommands` (`src/core/PlayerCommands.h`): the movement input, the world point the mouse aims at, the fire button, and weapon switches. Tests drive the world with the same struct, and a gamepad will fill it later without the rules changing. See [Aiming and weapons](WEAPONS.md).
-4. Draw once, passing `FixedTimestep::Alpha` (how far we are into the next step) so drawing can interpolate between two steps.
 
 ### The world
 
@@ -46,6 +46,25 @@ The simulation never reads a key or the mouse. Every step, `Game::Update` turns 
 `Session` (`src/core/Session.h`) wraps the world in a small state machine: `Playing` steps the world, `Victory` freezes it once the boss is defeated, and `Dead` freezes it once the player's health reaches 0. `TryRestart` replaces the world with a fresh one from `CreateWorld`, with the next seed, and the session keeps the attempt count across it. See [Game flow](GAME_FLOW.md).
 
 `Game` owns one `Session`. It reads the input, calls `StepSession`, and draws the result. It never changes the world itself.
+
+### Drawing
+
+`Game::Draw` only sets up the frame: the black bars and the two cameras (see [Screen and fullscreen](SCREEN.md)). What goes on screen is in `src/app/render/`, one file per part of the picture, each a few free functions that read the world and never change it:
+
+```
+src/app/render/
+  View          The game's resolution, the screen fit, the world and screen cameras, the mouse in game pixels
+  Palette.h     Every colour the game draws with
+  WorldDraw     DrawWorld: the arena, the warnings on the floor, the bodies and projectiles, in draw order
+  HairBody      The hairy body that hairballs and the boss share (DrawHairBody), and DrawHairball
+  BossDraw      The boss in each pose, its shield, and the warnings of its attacks
+  PlayerDraw    The player, the gun, the dash trail and the drink ring
+  Hud           The bars, the flasks, the weapon panel, the crosshair, the attempt and the controls line
+  EndScreen     YOU DIED and VICTORY
+  DebugOverlay  The F1 overlay, compiled into Debug builds only
+```
+
+Each file keeps its own sizes and helpers in an anonymous namespace; only what another file needs is in its header (for example `ShieldColor`, which the boss and the HUD share). `Draw` calls `DrawWorld` inside the world camera, and `DrawHud` and `DrawEndScreen` inside the screen camera.
 
 ### Components and systems
 
@@ -62,12 +81,15 @@ Game objects are plain structs (components) that hold data, and free functions (
 - **Dependencies pinned with CMake's FetchContent.** A fresh clone builds with one command, with no package manager to install, and everyone gets the same versions.
 - **The whole simulation step lives in `horde_core` (`StepWorld`), and the app only reads input and draws.** A full game step can then run in a unit test, without a window. One test plays 400 steps twice with the same inputs and checks that both worlds end identical, which is the fixed timestep's promise put to the test. Restarting the game (later on day 3) is creating a fresh `World`, so nothing from the last run can leak into the next.
   - Rejected: keeping the update logic in `Game`. It would grow into a class that does everything, and could only be tested by playing.
+- **Drawing split by part of the picture, as free functions.** All of it used to be in `Game.cpp`, which had grown past 1200 lines, so changing the look of the boss meant scrolling past the HUD and the debug overlay. Now the art of each part can change in its own file, and `Game.cpp` is the loop, the input and a short `Draw`.
+  - Rejected: a renderer class or a draw method on each entity. The entities are plain data in `horde_core`, which must not know about raylib, and a class would only hold functions that need no state of their own.
 - **Warnings as errors only for my code.** `horde_set_warnings` adds `/W4 /WX` to the project's targets. raylib and doctest are added as `SYSTEM`, so a warning in their headers cannot break my build.
 
 ## How to tune it
 
 - The simulation rate and the frame clamp are the two constructor arguments of `FixedTimestep` (`1.0 / 60.0` and `0.25` by default). `Game` uses the defaults.
-- The window size is `kScreenWidth` and `kScreenHeight` at the top of `src/app/Game.cpp`.
+- The game's resolution is `kScreenWidth` and `kScreenHeight` in `src/app/render/View.h`.
+- The colours are all in `src/app/render/Palette.h`; the sizes of each drawing are at the top of its own file in `src/app/render/`.
 
 ## Tests
 
@@ -79,8 +101,7 @@ Game objects are plain structs (components) that hold data, and free functions (
 - `tests/core/RandomTests.cpp`: see [Random numbers](RANDOM.md#tests).
 - `tests/core/ScreenFitTests.cpp`: see [Screen and fullscreen](SCREEN.md#tests).
 - `tests/core/ShieldTests.cpp`: see [The boss's shield](SHIELD.md#tests).
-- `tests/core/CollisionTests.cpp`
- and the crowd cases in `WorldTests.cpp`: see [Collisions](COLLISIONS.md#tests).
+- `tests/core/CollisionTests.cpp` and the crowd cases in `WorldTests.cpp`: see [Collisions](COLLISIONS.md#tests).
 - `tests/core/HealthTests.cpp` and the contact damage cases in `WorldTests.cpp`: see [Health](HEALTH.md#tests).
 - `tests/core/SessionTests.cpp`: see [Game flow](GAME_FLOW.md#tests).
 - `tests/core/WeaponTests.cpp`, `LoadoutTests.cpp` and the aim and fire cases in `FacingTests.cpp` and `WorldTests.cpp`: see [Aiming and weapons](WEAPONS.md#tests).

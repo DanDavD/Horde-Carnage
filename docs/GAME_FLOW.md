@@ -11,7 +11,7 @@ The rules live in `horde_core`:
 
 The game executable connects it to the screen and the buttons:
 
-- `src/app/Game.cpp`: `Game` owns one `Session`. `Run` reads the restart buttons once per frame, `Update` calls `StepSession` every fixed step, and `Draw` shows the end screens (`DrawEndScreen`) and the attempt number (`DrawAttempt`).
+- `src/app/Game.cpp`: `Game` owns one `Session`. `Run` reads the restart buttons once per frame, `Update` calls `StepSession` every fixed step, and `Draw` shows the end screens (`DrawEndScreen`, `src/app/render/EndScreen.cpp`) and the attempt number (`DrawAttempt`, `src/app/render/Hud.cpp`).
 - `src/app/PlayerInput.cpp`: `ReadRestartPressed` reads Enter or R, and A or Start on the first gamepad.
 
 ## How it works
@@ -73,9 +73,9 @@ Everything fades in over the restart delay, and the prompt to try again (or to f
 | Delay before restart is accepted (and the fade-in) | `kRestartDelaySeconds` (`src/core/Session.h`) | 1 s |
 | When the fight is won | `IsBossDefeated` (`src/core/World.cpp`) | the boss's health at 0 in its second phase |
 | Restart buttons | `ReadRestartPressed` (`src/app/PlayerInput.cpp`) | Enter, R; A, Start |
-| Band size and position | `kEndBandTop`, `kEndBandHeight`, `kEndBandFeather` (`src/app/Game.cpp`) | 240, 220, 48 pixels |
-| Colours of the two words | `kBlood`, `kVictoryGold` (`src/app/Game.cpp`) | |
-| What the death screen calls each killer | `DeathCause` (`src/app/Game.cpp`) | "Slain by her Charge" and so on |
+| Band size and position | `kEndBandTop`, `kEndBandHeight`, `kEndBandFeather` (`src/app/render/EndScreen.cpp`) | 240, 220, 48 pixels |
+| Colours of the two words | `kBlood`, `kVictoryGold` (`src/app/render/Palette.h`) | |
+| What the death screen calls each killer | `DeathCause` (`src/app/render/EndScreen.cpp`) | "Slain by her Charge" and so on |
 
 ## Tests
 

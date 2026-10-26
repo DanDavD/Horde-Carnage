@@ -11,7 +11,8 @@ The rules live in `horde_core` and know nothing about raylib:
 The game executable turns it into a raylib `Camera2D`:
 
 - `src/core/World.cpp`: `CameraFocus` picks the point the camera follows, between the player and the boss.
-- `src/app/Game.cpp`: `ToRaylibCamera` builds the `Camera2D`, and `Draw` wraps the arena, the boss, the hairballs and the player in `BeginMode2D` and `EndMode2D`. The HUD (FPS, version, controls, the Debug overlay text) is drawn after `EndMode2D`, so it stays fixed on screen.
+- `src/app/render/View.cpp`: `ToRaylibCamera` builds the `Camera2D`, and `WorldCamera` scales it onto the screen.
+- `src/app/Game.cpp`: `Draw` wraps the world (`DrawWorld`) in `BeginMode2D` and `EndMode2D`. The HUD (FPS, version, controls, the Debug overlay text) is drawn after `EndMode2D`, so it stays fixed on screen.
 
 ## How it works
 
@@ -57,7 +58,7 @@ Other values:
 | Value | Where | Default |
 |---|---|---|
 | Arena rectangle | `kBossArena` (`src/core/World.h`) | (0, 0) to (1640, 1040) |
-| View size | `kViewSize` (`src/app/Game.cpp`) | The window size, 1280x720 |
+| View size | `kViewSize` (`src/app/render/View.h`) | The window size, 1280x720 |
 | Lean toward the boss, and its cap | `kBossFraming`, `kMaxBossFramingOffset` (`src/core/World.cpp`) | 40%, 200 units |
 
 In a Debug build, `F1` shows the camera center in the overlay, and an orange cross where the camera is centred. The gap between the cross and the player is the look-ahead minus the follow lag.

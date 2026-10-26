@@ -12,7 +12,7 @@ The rules live in `horde_core`:
 
 The game executable draws it:
 
-- `src/app/Game.cpp`: `DrawBossShield` draws the band around the body (through `DrawBossBody`, so it follows every pose of the boss), and `DrawShieldBar` the bar under the boss's health bar, with the shield's name at its right end.
+- `src/app/render/BossDraw.cpp` and `Hud.cpp`: `DrawBossShield` draws the band around the body (through `DrawBossBody`, so it follows every pose of the boss), and `DrawShieldBar` the bar under the boss's health bar, with the shield's name at its right end.
 
 ## How it works
 
@@ -64,7 +64,7 @@ The bullet is spent in every case: a bounce does not fly on. Every bullet that r
 | Flash of a hit or a bounce | `ShieldStats::flashSeconds` | 0.1 s |
 | First shield | `Shield::kind` | The Shell |
 | Stagger of a break | `Boss::breakStaggerSeconds` (`src/core/Boss.h`) | 1 s |
-| Look | `kShell`, `kBarrier`, `kExposed`, `kShieldGap`, `kShieldWidth`, `kShieldBounceWidth`, `kBarrierPulse`, `kShieldBarHeight` (`src/app/Game.cpp`) | |
+| Look | `kShell`, `kBarrier`, `kExposed`, `kShieldGap`, `kShieldWidth`, `kShieldBounceWidth`, `kBarrierPulse`, `kShieldBarHeight` (`src/app/render/Palette.h`, `BossDraw.cpp`, `Hud.cpp`) | |
 
 In a Debug build, `F2` breaks the shield at once and staggers the boss, like a real break (`BreakBossShield`), and the last line of the `F1` overlay shows the shield's kind and strength, or the exposed time and the stagger left.
 

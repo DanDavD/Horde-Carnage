@@ -16,7 +16,7 @@ The rules live in `horde_core`, so they have no idea where the input comes from 
 The game executable connects them to the hardware and the screen:
 
 - `src/app/PlayerInput.h`, `src/app/PlayerInput.cpp`: `ReadMoveInput` reads the keyboard and the first gamepad.
-- `src/app/Game.cpp`: passes the input to `StepSession`, which steps the world (`StepWorld` in `src/core/World.cpp`) every fixed step, draws the arena and the player, and in Debug builds draws a movement overlay.
+- `src/app/Game.cpp`: passes the input to `StepSession`, which steps the world (`StepWorld` in `src/core/World.cpp`) every fixed step, then draws the world (`src/app/render/WorldDraw.cpp`), and in Debug builds a movement overlay (`src/app/render/DebugOverlay.cpp`).
 
 ## How it works
 

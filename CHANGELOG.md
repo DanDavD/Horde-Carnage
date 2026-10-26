@@ -13,6 +13,7 @@ Versions follow [Semantic Versioning](https://semver.org/) while the game is a p
 - **Aim in the browser** (`web/shell.html`, `PlayerInput.cpp`, `Game.cpp`): on itch.io the crosshair froze once the fight started, because raylib 5.5 stops following the mouse in a browser when the cursor is hidden. The page now tracks the aim point in game pixels and `ReadAimPoint` reads it, and a click locks the pointer to the game, so the mouse no longer leaves it mid-fight (Esc gives it back). Checked in a browser by moving the mouse to three points during a fight; explained in `docs/WEB_BUILD.md`.
 
 ### Changed
+- **Rendering split out of `Game.cpp`** (`src/app/render/`): the drawing code had grown to about 1000 of the file's 1215 lines. It now lives in one file per part of the picture (the world and its draw order, the boss, the player, the hairy body, the HUD, the end screens, the Debug overlay), with every colour in `Palette.h` and the screen fit and cameras in `View`. `Game.cpp` keeps the loop, the input and a short `Draw`. Nothing on screen changes: before and after captures match, apart from the frame counter. Explained in `docs/ARCHITECTURE.md`.
 - **Warnings for GCC and Clang** (`cmake/Warnings.cmake`): `-Wno-missing-field-initializers`, because Clang flags every designated initializer that names only some fields, which is how the code sets its numbers. Every other warning is still an error.
 
 ## [0.1.0] - 2026-10-25
