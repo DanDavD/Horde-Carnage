@@ -37,13 +37,20 @@ inline constexpr Color kGunDark{44, 46, 54, 255};
 inline constexpr Color kGun{175, 180, 195, 255};
 inline constexpr Color kPlayerDeadFill{95, 95, 105, 255};
 inline constexpr Color kPlayerDeadEdge{45, 45, 52, 255};
-inline constexpr Color kHairballFill{150, 92, 70, 255};
-inline constexpr Color kHairballEdge{70, 40, 32, 255};
-inline constexpr Color kHairballEye{235, 225, 200, 255};
-// The boss is darker and redder than its children, with eyes that glow.
-inline constexpr Color kBossFill{112, 58, 64, 255};
-inline constexpr Color kBossEdge{48, 24, 30, 255};
+// The hairballs are lighter and browner than their mother, so a summon reads against her and the floor.
+inline constexpr Color kHairballFill{128, 82, 62, 255};
+inline constexpr Color kHairballEdge{50, 29, 23, 255};
+inline constexpr Color kHairballSheen{178, 126, 96, 255};
+inline constexpr Color kHairballEye{236, 206, 128, 255};
+// The boss is a dark, matted mass of maroon hair, with amber eyes that glow.
+inline constexpr Color kBossFill{86, 46, 50, 255};
+inline constexpr Color kBossEdge{30, 15, 19, 255};
+inline constexpr Color kBossSheen{142, 92, 86, 255};
+inline constexpr Color kBossEnragedFill{96, 40, 46, 255};
 inline constexpr Color kBossEye{255, 190, 90, 255};
+inline constexpr Color kMouth{24, 5, 8, 255};
+inline constexpr Color kTooth{222, 208, 180, 255};
+inline constexpr Color kPupil{12, 6, 6, 255};
 inline constexpr Color kBossBar{150, 26, 32, 255};
 // Text and the frames of the HUD are the colour of old bone and parchment, not white.
 inline constexpr Color kText{226, 218, 198, 255};
@@ -64,7 +71,7 @@ inline constexpr Color kRingLane{205, 205, 220, 255};
 // The shockwave is dust thrown up by the landing, red where it still hurts.
 inline constexpr Color kShockwave{230, 120, 95, 255};
 inline constexpr Color kBossEyeEnraged{255, 60, 50, 255};
-inline constexpr Color kFrenzyFill{135, 42, 50, 255};
+inline constexpr Color kFrenzyFill{116, 32, 40, 255};
 inline constexpr Color kBarBack{22, 14, 14, 255};
 inline constexpr Color kBarHurt{228, 128, 112, 255};
 inline constexpr Color kMuzzleFlash{255, 220, 120, 255};

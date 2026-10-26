@@ -59,7 +59,8 @@ src/app/render/
   Text          Text in the game's fonts: spaced, centred or aligned to the right
   WorldDraw     DrawWorld: the arena, the warnings on the floor, the bodies and projectiles, in draw order
   ArenaDraw     The stone floor, the walls, the shadows under bodies, the torchlight and the vignette
-  HairBody      The hairy body that hairballs and the boss share (DrawHairBody), and DrawHairball
+  HairBody      The body of matted hair that hairballs and the boss share (DrawHairBody), and DrawHairball
+  Shapes        Shapes raylib does not have: a radius at each angle, a rotated ellipse
   BossDraw      The boss in each pose, its shield, and the warnings of its attacks
   PlayerDraw    The player, the gun, the dash trail and the drink ring
   Hud           The bars, the flasks, the weapon panel, the crosshair, the attempt and the controls line

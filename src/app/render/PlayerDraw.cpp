@@ -1,20 +1,17 @@
 #include "app/render/PlayerDraw.h"
 
 #include <algorithm>
-#include <array>
 #include <cmath>
-#include <numbers>
 
 #include "app/RaylibConvert.h"
 #include "app/render/HairBody.h"
 #include "app/render/Palette.h"
+#include "app/render/Shapes.h"
 #include "core/Loadout.h"
 
 namespace horde {
 
 namespace {
-
-constexpr float kPi = std::numbers::pi_v<float>;
 
 // The hunter, seen from above. Sizes are fractions of the body radius, so the drawing follows
 // `Player::radius`, and the body circle the rules use is the round part of the cape. Outlines are in world
@@ -81,55 +78,11 @@ constexpr float kDrinkRingGap = 4.0f;
 constexpr float kDrinkRingWidth = 4.0f;
 constexpr float kMuzzleFlashRadius = 8.0f;
 
-// The angle of `v`, in radians.
-float Angle(Vec2 v) {
-    return std::atan2(v.y, v.x);
-}
-
-// A number from 0 to 1 that looks random but is always the same for the same `n`.
-float Hash(float n) {
-    const float x = std::sin(n * 12.9898f) * 43758.5453f;
-    return x - std::floor(x);
-}
-
-// A closed shape around `center` whose distance from it at each angle is `radiusAt(angle)`. raylib only
-// draws triangles that wind one way, so the points go round clockwise on screen, as its own circles do.
-template <int Points, typename RadiusAt>
-void DrawRadialShape(Vec2 center, RadiusAt radiusAt, Color color) {
-    std::array<Vector2, Points + 2> fan{};
-    fan[0] = ToRaylib(center);
-    for (int i = 0; i <= Points; ++i) {
-        const float angle = -2.0f * kPi * static_cast<float>(i) / Points;
-        const Vec2 out{std::cos(angle), std::sin(angle)};
-        fan[static_cast<std::size_t>(i) + 1] = ToRaylib(center + out * radiusAt(angle));
-    }
-    DrawTriangleFan(fan.data(), static_cast<int>(fan.size()), color);
-}
-
-// An ellipse with its `alongRadius` axis on `along`, a unit vector: raylib has no rotated ellipse.
-void DrawOrientedEllipse(Vec2 center, Vec2 along, float alongRadius, float acrossRadius, Color color) {
-    const float turn = Angle(along);
-    DrawRadialShape<40>(
-        center,
-        [&](float angle) {
-            const float c = std::cos(angle - turn) / alongRadius;
-            const float s = std::sin(angle - turn) / acrossRadius;
-            return 1.0f / std::sqrt(c * c + s * s);
-        },
-        color);
-}
-
 // A straight piece, from `from` to `to`, with a dark outline all round it: an arm, a gun, a strap.
 void DrawPiece(Vec2 from, Vec2 to, float width, Color fill, Color edge) {
     const Vec2 along = Normalized(to - from) * (kOutline * 0.5f);
     DrawLineEx(ToRaylib(from - along), ToRaylib(to + along), width + kOutline, edge);
     DrawLineEx(ToRaylib(from), ToRaylib(to), width, fill);
-}
-
-// How far `angle` points along `direction` (also an angle): 1 straight along it, 0 at right angles or
-// further away, rising steeply, so a shape bulges out only around that direction.
-float Bulge(float angle, float direction, float steepness) {
-    return std::pow(std::max(std::cos(angle - direction), 0.0f), steepness);
 }
 
 // The hem's torn teeth, from 1 at the root of a tooth down to its tip. `fromTrail` is the angle from the
