@@ -10,6 +10,7 @@
 
 #include "app/PlayerInput.h"
 #include "app/RaylibConvert.h"
+#include "app/render/ArenaDraw.h"
 #include "app/render/DebugOverlay.h"
 #include "app/render/EndScreen.h"
 #include "app/render/Hud.h"
@@ -41,11 +42,14 @@ Game::Game(bool windowed) : _session{StartSession(kBossArena, kViewSize, std::ra
         ToggleBorderlessWindowed();
     }
 #endif
-    // The default font is drawn scaled with the rest of the picture; smoothed, it scales evenly.
+    // The default font, which the Debug overlay uses, is drawn scaled with the rest of the picture; smoothed,
+    // it scales evenly.
     SetTextureFilter(GetFontDefault().texture, TEXTURE_FILTER_BILINEAR);
+    _art = LoadArt(kBossArena);
 }
 
 Game::~Game() {
+    UnloadArt(_art);
     CloseWindow();
 }
 
@@ -145,7 +149,7 @@ void Game::Draw(float alpha) const {
 
     // The world camera, scaled and moved onto the screen with the rest of the game.
     BeginMode2D(WorldCamera(world.camera, alpha, fit));
-    DrawWorld(world, alpha);
+    DrawWorld(world, alpha, _art);
 #ifndef NDEBUG
     if (_showDebugOverlay) {
         DrawDebugWorld(world.player, world.camera, alpha);
@@ -155,14 +159,15 @@ void Game::Draw(float alpha) const {
 
     // Everything below is in game pixels on the screen and does not move with the camera.
     BeginMode2D(ScreenCamera(fit));
+    DrawVignette(_art);
 #ifndef NDEBUG
     if (_showDebugOverlay) {
         DrawDebugHud(world, _lastMoveInput);
     }
 #endif
-    DrawHud(world, _session.attempt, playing, AimInGame(fit));
+    DrawHud(world, _session.attempt, playing, AimInGame(fit), _art);
     if (!playing) {
-        DrawEndScreen(_session);
+        DrawEndScreen(_session, _art);
     }
     EndMode2D();
     EndScissorMode();

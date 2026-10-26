@@ -66,7 +66,7 @@ and open `http://localhost:8085`.
 
 ## How to publish it on itch.io
 
-1. Zip `index.html`, `index.js` and `index.wasm` (the three files at the top of the zip, not in a folder).
+1. Zip `index.html`, `index.js`, `index.wasm` and `Cinzel-OFL.txt`, the font's license (the files at the top of the zip, not in a folder).
 2. On itch.io: *Create new project*, kind of project *HTML*, upload the zip and tick *This file will be played in the browser*.
 3. Embed options: viewport 1280x720, *Fullscreen button* on, and *Click to launch in fullscreen* off.
 4. Save, check the page, and set it to public.
@@ -81,7 +81,7 @@ and open `http://localhost:8085`.
 
 ## Tests
 
-There are no web-only tests: the rules are the same `horde_core` the Windows job tests (278 cases). I checked the browser build by hand in a local server, in a window smaller than the game: the whole arena scaled into it; eight pistol clicks took the Shell to about half; standing still ended in "YOU DIED", "Slain by her Leap after 0:07"; and Enter started attempt 2. My first check of the aim was wrong: I had placed the mouse before the restart and not moved it after, so the frozen crosshair happened to sit under it. On itch.io the aim did not follow the mouse. After the fix, during a fight, I moved the mouse to three points in turn and the crosshair and the gun followed each one. The pointer lock needs a real click in a real browser, which my test browser cannot give, so it is checked on the itch.io draft page. The web job in CI only checks that it builds.
+There are no web-only tests: the rules are the same `horde_core` the Windows job tests. I checked the browser build by hand in a local server, in a window smaller than the game: the whole arena scaled into it; eight pistol clicks took the Shell to about half; standing still ended in "YOU DIED", "Slain by her Leap after 0:07"; and Enter started attempt 2. My first check of the aim was wrong: I had placed the mouse before the restart and not moved it after, so the frozen crosshair happened to sit under it. On itch.io the aim did not follow the mouse. After the fix, during a fight, I moved the mouse to three points in turn and the crosshair and the gun followed each one. The pointer lock needs a real click in a real browser, which my test browser cannot give, so it is checked on the itch.io draft page. The web job in CI only checks that it builds.
 
 ## Limitations
 

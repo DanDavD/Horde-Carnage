@@ -22,7 +22,7 @@ struct WeaponStats {
     float bulletSpeed = 950.0f;  ///< Units per second.
     float range = 750.0f;        ///< How far a bullet flies before it is gone.
     float knockback = 300.0f;    ///< Speed a bullet adds to what it hits.
-    float barrelLength = 14.0f;  ///< How far the muzzle sticks out of the body. Bullets start there.
+    float barrelLength = 18.0f;  ///< How far the muzzle sticks out of the body. Bullets start there.
 };
 
 /// The starting guns. The pistol rewards clicking with harder, longer shots; the SMG fires a steadier
@@ -35,7 +35,7 @@ inline constexpr WeaponStats kPistol{.name = "Pistol",
                                      .bulletSpeed = 950.0f,
                                      .range = 750.0f,
                                      .knockback = 300.0f,
-                                     .barrelLength = 14.0f};
+                                     .barrelLength = 18.0f};
 inline constexpr WeaponStats kSmg{.name = "SMG",
                                   .mode = FireMode::Auto,
                                   .shotsPerSecond = 10.0f,
@@ -43,7 +43,7 @@ inline constexpr WeaponStats kSmg{.name = "SMG",
                                   .bulletSpeed = 850.0f,
                                   .range = 600.0f,
                                   .knockback = 120.0f,
-                                  .barrelLength = 22.0f};
+                                  .barrelLength = 30.0f};
 
 /// Where the muzzle of `weapon` is, held by a body of `bodyRadius` at `center` that faces `facing`.
 /// The simulation fires bullets from here and the renderer draws the barrel up to here, so both agree.

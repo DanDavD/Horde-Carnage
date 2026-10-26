@@ -47,10 +47,11 @@ This is day 7 of 15, and the boss fight is in progress. Progress is tracked in t
 - Three healing flasks per attempt, Dark Souls style: drinking takes a second, slows you down, and a hit while drinking wastes the flask. See [Player abilities](docs/ABILITIES.md).
 - Unit tests for the pure logic, and a GitHub Actions workflow that builds and tests every push and pull request on Windows, and builds the web version.
 - A web build: the same game compiled to WebAssembly, playable in a browser tab. See [The web build](docs/WEB_BUILD.md).
+- A dark look drawn entirely in code: a crypt of cracked stone slabs and black walls, lit only by the torch you carry, with shadows that lean away from it; a hunter in a tricorn hat and a torn cape, both hands on the gun, the other gun slung or holstered; and a HUD of thin bars in the Cinzel typeface. See [Art direction](docs/ART.md).
 - Always fullscreen, at the monitor's own resolution and refresh rate, drawn sharp at that resolution, with black bars on screens that are not 16:9 so everyone sees the same arena. `--windowed` opens a window instead. See [Screen and fullscreen](docs/SCREEN.md).
 - Warnings are errors for the project's own code (`/W4 /WX` on MSVC).
 
-**Still to do:** the numbers in JSON, game feel and menus. See the [roadmap](docs/ROADMAP.md) for the order, and for the difficulty I am aiming for.
+**Still to do:** the boss and the hairballs in the new look, game feel, sound and menus, and maybe the numbers in JSON. See the [roadmap](docs/ROADMAP.md) for the order, and for the difficulty I am aiming for.
 
 ## Tech stack
 
@@ -62,13 +63,14 @@ This is day 7 of 15, and the boss fight is in progress. Progress is tracked in t
 | Tests | [doctest](https://github.com/doctest/doctest) 2.4.11 |
 | Web | [Emscripten](https://emscripten.org/) 3.1.74, WebAssembly |
 | CI | GitHub Actions (Windows with MSVC, and the web build) |
+| Font | [Cinzel](https://github.com/NDISCOVER/Cinzel) by Natanael Gama, SIL Open Font License 1.1 |
 
 ## Getting started
 
 **You need:**
 - Windows: Visual Studio 2026 (or 2022) with the **Desktop development with C++** workload. It includes MSVC, the Windows SDK and CMake.
 - Other platforms: any C++20 compiler and CMake 3.25 or newer. I only test on Windows for now.
-- An internet connection for the first configure, which downloads raylib and doctest.
+- An internet connection for the first configure, which downloads raylib, doctest and the Cinzel font.
 
 From a *Developer PowerShell for VS*, in the repository folder:
 
@@ -111,7 +113,8 @@ You can also open the folder in Visual Studio (*File > Open > Folder*). It reads
 CMakeLists.txt        Project root: C++ standard, options, dependencies
 CMakePresets.json     Configure, build and test presets
 cmake/
-  Dependencies.cmake  raylib and doctest, pinned with FetchContent
+  Dependencies.cmake  raylib, doctest and the Cinzel font, pinned with FetchContent
+  EmbedFile.cmake     Compiles the font files into the executable
   Warnings.cmake      Strict warnings for the project's own targets
 src/
   core/               Pure game logic, no window (library horde_core)
@@ -133,6 +136,11 @@ The full day-by-day plan, with what I cut first if I fall behind, is in [docs/RO
 - [x] `v0.0.1` Project setup: CMake, raylib, tests, CI, fixed-timestep loop
 - [x] `v0.1.0` The fight: the boss with its five attacks, its shield, its second phase and its frenzy, the dash and the flasks, death and victory
 - [ ] `v1.0.0` The version I present: art, game feel, sound, menus and balancing
+
+## Credits
+
+- The Cinzel typeface is by Natanael Gama and the Cinzel Project Authors, under the SIL Open Font License 1.1. The license ships next to the game as `Cinzel-OFL.txt`.
+- Everything else, the art included, is drawn in code in this repository.
 
 ## Contributing
 

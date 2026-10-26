@@ -103,5 +103,4 @@ The end screens and the restart buttons are not unit tested, because they need a
 - **The victory comes the moment the second bar is empty.** There is no death animation for the boss yet. It comes with the game feel pass.
 - **There is no best time.** The end screens show only the last fight, and nothing is saved between launches. The attempt count is lost when the game closes.
 - **After `F4` the victory screen reads "0 of 0 shots on target (0%)".** The shortcut skips the shooting, so there is nothing to count. It only exists in Debug builds.
-- **The font is raylib's default.** A serif font for the two words comes with the art pass.
 - **Esc still quits at once, even in the middle of a fight.** Pause comes on day 11.

@@ -55,7 +55,10 @@ The simulation never reads a key or the mouse. Every step, `Game::Update` turns 
 src/app/render/
   View          The game's resolution, the screen fit, the world and screen cameras, the mouse in game pixels
   Palette.h     Every colour the game draws with
+  Art           The fonts, the textures made in code and the floor's layout, loaded once at the start
+  Text          Text in the game's fonts: spaced, centred or aligned to the right
   WorldDraw     DrawWorld: the arena, the warnings on the floor, the bodies and projectiles, in draw order
+  ArenaDraw     The stone floor, the walls, the shadows under bodies, the torchlight and the vignette
   HairBody      The hairy body that hairballs and the boss share (DrawHairBody), and DrawHairball
   BossDraw      The boss in each pose, its shield, and the warnings of its attacks
   PlayerDraw    The player, the gun, the dash trail and the drink ring
@@ -64,7 +67,7 @@ src/app/render/
   DebugOverlay  The F1 overlay, compiled into Debug builds only
 ```
 
-Each file keeps its own sizes and helpers in an anonymous namespace; only what another file needs is in its header (for example `ShieldColor`, which the boss and the HUD share). `Draw` calls `DrawWorld` inside the world camera, and `DrawHud` and `DrawEndScreen` inside the screen camera.
+Each file keeps its own sizes and helpers in an anonymous namespace; only what another file needs is in its header (for example `ShieldColor`, which the boss and the HUD share). `Draw` calls `DrawWorld` inside the world camera, and `DrawVignette`, `DrawHud` and `DrawEndScreen` inside the screen camera. `Game` owns the one `Art`, loaded after the window opens and unloaded before it closes, and hands it to the drawing. How the game looks, and why, is in [Art direction](ART.md).
 
 ### Components and systems
 
@@ -100,6 +103,7 @@ Game objects are plain structs (components) that hold data, and free functions (
 - `tests/core/AttackChoiceTests.cpp`, `BossTests.cpp`, `BossChargeTests.cpp`, `BossComboTests.cpp`, `BossHairRingTests.cpp`, `BossLeapTests.cpp`, `BossVolleyTests.cpp`, `FrenzyTests.cpp`, `PhaseTwoTests.cpp`, `ShockwaveTests.cpp` and `SummonTests.cpp`: see [The boss](BOSS.md#tests). The boss tests share `PredictableBoss.h`, a boss without its chance.
 - `tests/core/RandomTests.cpp`: see [Random numbers](RANDOM.md#tests).
 - `tests/core/ScreenFitTests.cpp`: see [Screen and fullscreen](SCREEN.md#tests).
+- `tests/core/StoneFloorTests.cpp`: see [Art direction](ART.md#tests).
 - `tests/core/ShieldTests.cpp`: see [The boss's shield](SHIELD.md#tests).
 - `tests/core/CollisionTests.cpp` and the crowd cases in `WorldTests.cpp`: see [Collisions](COLLISIONS.md#tests).
 - `tests/core/HealthTests.cpp` and the contact damage cases in `WorldTests.cpp`: see [Health](HEALTH.md#tests).

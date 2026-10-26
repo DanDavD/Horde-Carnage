@@ -52,7 +52,7 @@ Scopes are the module that changes: `core`, `player`, `enemies`, `combat`, `wave
   1. Branch `chore/release-vX.Y.Z`.
   2. Bump `VERSION` in the `project()` call of the root `CMakeLists.txt`.
   3. Move `[Unreleased]` in the changelog to `## [X.Y.Z] - YYYY-MM-DD`, with a one-line summary.
-  4. Release build, and a zip with `HordeCarnage.exe` and its data folder. Web build (`cmake --preset web`), and a zip with `index.html`, `index.js` and `index.wasm` for itch.io (see [The web build](docs/WEB_BUILD.md)).
+  4. Release build, and a zip with `HordeCarnage.exe` and `Cinzel-OFL.txt`, the font's license. Web build (`cmake --preset web`), and a zip with `index.html`, `index.js`, `index.wasm` and `Cinzel-OFL.txt` for itch.io (see [The web build](docs/WEB_BUILD.md)).
   5. PR, and squash merge.
   6. GitHub > Releases > Draft a new release: tag `vX.Y.Z` on `main`, title `Horde Carnage vX.Y.Z`, notes (what you can play, how to run it, known problems) and the zip. Marked as pre-release until the version I present. Then the web zip goes to the itch.io page, replacing the last one.
 - Every version is a new release. I never replace the zip of a published one.

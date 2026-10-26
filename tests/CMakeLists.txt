@@ -30,6 +30,7 @@ add_executable(horde_tests
     core/SummonTests.cpp
     core/ShieldTests.cpp
     core/ShockwaveTests.cpp
+    core/StoneFloorTests.cpp
     core/Vec2Tests.cpp
     core/WeaponTests.cpp
     core/WorldTests.cpp)
