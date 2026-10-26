@@ -6,7 +6,7 @@ How the game looks, and how that look is made. The direction: the readable shape
 
 Everything is drawn in code, with no image files: the floor, the walls, the light, the hunter and the HUD. The only asset is the font, Cinzel.
 
-This first pass covers the arena, the player and the HUD. The boss and the hairballs still use their first drawings.
+It covers the arena, the player, the HUD, and the boss with her hairballs.
 
 Where it lives:
 
@@ -14,6 +14,9 @@ Where it lives:
 - `src/app/render/Art.h`, `src/app/render/Art.cpp`: `Art`, everything made once when the game starts: the two fonts, four textures made in code, and the floor's layout. `LoadArt`, `UnloadArt`, and `DrawGlow`, a soft round blot used for shadows, stains and warmth.
 - `src/app/render/ArenaDraw.h`, `src/app/render/ArenaDraw.cpp`: the floor, the walls, the shadows under bodies, the torchlight and the vignette.
 - `src/app/render/PlayerDraw.cpp`: the hunter.
+- `src/app/render/HairBody.h`, `src/app/render/HairBody.cpp`: `DrawHairBody`, the body of matted hair the boss and the hairballs share, and `DrawHairball`.
+- `src/app/render/BossDraw.cpp`: the boss's styles for each phase, and its pose in each attack: where it looks, how it is squashed or stretched, how wide its mouth is open.
+- `src/app/render/Shapes.h`, `src/app/render/Shapes.cpp`: shapes raylib does not have, shared by the hunter and the hair: a closed shape from a radius at each angle, a rotated ellipse, a triangle of either winding.
 - `src/app/render/Hud.cpp`, `src/app/render/EndScreen.cpp`: the HUD and the end screens, in Cinzel.
 - `src/app/render/Text.h`, `src/app/render/Text.cpp`: text in the game's fonts, with letter spacing, centred or aligned to the right.
 - `src/app/render/Palette.h`: every colour.
@@ -51,6 +54,21 @@ Where it lives:
 
 raylib has no rotated ellipse and no free shape, so the cape, the coat and the hat are triangle fans drawn by `DrawRadialShape`, which takes the shape's distance from its centre at each angle; straight pieces (arms, guns, straps) are thick lines with a dark outline. The blink, the dash trail and the drink ring work as before. A dead hunter's colours sink toward grey and the cape stops swaying.
 
+**The Matriarch and her hairballs.** The boss and its children are the same drawing, `DrawHairBody`, in different styles (`HairStyle`) and poses (`HairPose`). From the bottom up:
+
+1. The outer locks: a closed shape whose distance from the centre rises at each of 24 to 42 locks of uneven length, over a few big, slow lumps, so the body is a matted clump and not a circle. Soft locks are rounded; as `bristle` grows toward 1 they come to a point. Each lock grows and shrinks a little on its own beat, and the whole body swells and shrinks by 2%, so it breathes.
+2. An inner layer of shorter locks between the outer ones, for depth.
+3. A sheen: a patch of lighter hair shifted toward the player's torch, so the lit side matches the shadow on the floor.
+4. Short strands drawn into the hair, sweeping round the body in both directions, like tangled hair.
+5. In the second phase, a mouth in front of the eyes: a dark slit with a row of teeth on each jaw, shut in a snarl, a little open in the frenzy, and wide open when it roars into the second phase, howls for a Summon, spits a Hair Ring or fires a Volley burst.
+6. The eyes: slits tilted down toward the middle, which reads as a scowl, with a narrow pupil and a glow on the hair around them. Amber in the first phase, red after. The boss's eyes also cast a faint glow on the floor.
+
+The locks stay fixed in the world while the face turns to the player, so the boss does not spin as it watches you. Squash and stretch warp every point of the body along one axis, longer one way and thinner the other so the body keeps its size: it squashes as it crouches for a Charge or a Leap, stretches along the run, stretches upward in the air, flattens on landing, and jolts toward the player on every Volley burst. The second phase bristles (32 locks, longer and sharper), and the frenzy bristles all over (42 stiff locks) and reddens. A dead boss turns grey, its locks fall flatter, and its eyes shut.
+
+The hairballs are lighter and browner than their mother, with her slit eyes in a paler amber, a little bigger for their size so they still read at 18 units across. One about to spit swells, bristles and turns its eyes red.
+
+The strands the boss spits are small, spiky clumps of her hair that spin as they fly, their spikes twitching. The solid ball is exactly the strand's hit circle, so what the player sees is what can hurt them; only the short spikes reach past it.
+
 **The HUD.** Thin bars in dark frames, filled with a colour a little lighter along the top, and no numbers on them: how much is left is read from the length. Health and the dash recharge in the top left, with the flasks as small glass bottles next to them; the boss's name in Cinzel Regular over its bar at the bottom, with the shield's bar and name under and over it; the guns in the bottom right, the one in hand framed in bone; the version, the attempt and the frame rate in Cinzel. Text is the colour of old bone and parchment, not white. The crosshair has a dark outline under its pale lines, so it shows over the lit floor and the dark alike. "YOU DIED" and "VICTORY" are Cinzel Regular at 88 game pixels with wide spacing. The Debug overlay keeps raylib's own font: it is for me, not for the player.
 
 **The font.** `cmake/Dependencies.cmake` downloads Cinzel Regular, Cinzel Bold and their license with FetchContent, from the font's own repository, pinned to one commit and checked against their SHA-256 hashes. `horde_embed_file` in `cmake/EmbedFile.cmake` turns each font into a C++ source holding its bytes as an array, written only when the bytes change, and `LoadArt` loads them from memory. The build copies the license next to the executable as `Cinzel-OFL.txt`, in both the desktop and the web build.
@@ -67,6 +85,13 @@ raylib has no rotated ellipse and no free shape, so the cape, the coat and the h
 - **A hunter in a tricorn, not a hood.** Seen from above, the head is what shows most, and a hood alone read as a monk. A tricorn, a torn cape and a bandolier read as a hunter at a glance, and the hat's front point shows where the player aims.
   - Rejected: a knight in armour. Pauldrons and a helm read well from above, but a knight is the boss-fight hero everyone draws; the hunter fits a creature hunt better.
 - **Both hands on the gun, and both guns always in sight.** Each gun has its own hold, so the pistol and the SMG are told apart by the pose as well as the shape, and the gun not in hand hangs on the hunter. The guns are drawn bigger than life, as in other top-down shooters, so they read at 40 units across. For that the barrels grew from 14 and 22 units to 18 and 30, so the bullets still leave from the drawn muzzle.
+- **One body of hair for the mother and her children.** The hairballs are her children, so they share her drawing at another size and in lighter colours, and every change to one shows on the other.
+  - Rejected: round eyes for the hairballs. They read as cute, and the direction is never cute.
+- **The mouth comes with the second phase.** In the first phase the boss is a watching mass of hair; growing a mouth full of teeth is the clearest way to say the fight has changed, next to the red eyes.
+- **The locks stay put while the face turns.** Turning the whole body to face the player would make the hair spin as the player runs round it. Only the eyes and the mouth follow.
+- **Squash and stretch keep the size.** Stretching one way and thinning the other keeps the body about as big as its hit circle, so the animation never makes the boss look bigger or smaller than the body the rules use.
+- **Strands are spinning clumps, not streaks.** A clump of hair torn from her reads as part of the boss, and a ball shows its hit circle from every side.
+  - Rejected: a round tip with a waving tail. A ring of them looked like a swarm of tadpoles.
 - **Bodies and warnings are drawn after the dark.** The fight is hard and has to stay fair: a warning or a strand in the dark would be a death the player could not read. So only the floor and the walls fall into darkness, and everything that can hurt stays bright.
 - **Shadows lean away from the torch.** It is cheap, and it sells the torch as the one light in the room better than any other detail.
 - **Cinzel, in two weights, as static files.** It is drawn from Roman inscriptions, which suits "YOU DIED", and its lower case are small capitals, so whole sentences keep the same voice. The Bold holds up at the small sizes of the HUD, where the Regular's thin strokes fade. raylib's font loader cannot read the variable version that Google Fonts ships, so I take the static files from the font's own repository.
@@ -90,6 +115,10 @@ raylib has no rotated ellipse and no free shape, so the cape, the coat and the h
 | Vignette | `kVignetteStrength` (`ArenaDraw.cpp`) | 60% |
 | The hunter's proportions | `kCape...`, `kCoat...`, `kHat...`, `kPistol...`, `kSmg...` (`PlayerDraw.cpp`) | Fractions of the radius |
 | Where the bullets leave the barrel | `WeaponStats::barrelLength` (`src/core/Weapon.h`) | 18 and 30 units |
+| The boss in each phase | `kBossStyle`, `kEnragedBossStyle`, `kFrenziedBossStyle` (`BossDraw.cpp`) | 24, 32 and 42 locks; bristle 0, 0.55, 0.95 |
+| Squash and stretch, and how wide the mouth opens | `kCrouchSquash`, `kRunStretch`, `kAirStretch`, `kLandingSquash`, `kBurstStretch`, `k...Mouth` (`BossDraw.cpp`) | 0.88, 1.22, 1.1, 0.84, 1.12 |
+| The hairballs | `kHairballStyle` (`HairBody.cpp`) | 13 locks, eyes 1.3 times bigger |
+| Breathing, lumps, sheen, eyes and teeth | `kBreath...`, `kLumpDepth`, `kSheen...`, `kEye...`, `kSlit...`, `kMouth...` (`HairBody.cpp`) | |
 | Font sizes in the atlas | `kTitleFontPixels`, `kUiFontPixels` (`Art.cpp`) | 160, 64 |
 | Letter spacing | `kTextTracking`, `kTitleTracking` (`Text.h`) | 6%, 14% of the size |
 
@@ -97,12 +126,13 @@ raylib has no rotated ellipse and no free shape, so the cape, the coat and the h
 
 - `tests/core/StoneFloorTests.cpp`: the slabs cover the whole arena exactly once (their areas add up to the arena's, and every point of a 5-unit grid lies in exactly one); every slab is between the narrowest and the widest, in rows of 80, with a tone from -1 to 1; the same seed lays the same floor and another seed another; cracks stay inside their slab and run across it from left to right, about one slab in five is cracked, and the stains are inside the arena and within their sizes; and an arena narrower than one slab gets one slab per row.
 
-The drawing needs a window, so it is not unit tested. I checked it with window captures of a Release build, before and after, in a window of 1600x900: the start of a fight, a run into the bottom left corner (the walls, the lip, the shadow at their foot, the light following the player), the Charge's warning over the stone, the hunter with each gun, standing and running (the hold changing with the gun, the other gun slung or holstered, the cape trailing behind the run), "YOU DIED" after standing still, and, in a Debug build, the F1 overlay and "VICTORY" after F4. The web build showed the same picture in a browser, with no errors in the console. The frame rate stayed at 164 to 165 on my 165 Hz monitor.
+The drawing needs a window, so it is not unit tested. I checked it with window captures of a Release build, before and after, in a window of 1600x900: the start of a fight, a run into the bottom left corner (the walls, the lip, the shadow at their foot, the light following the player), the Charge's warning over the stone, the hunter with each gun, standing and running (the hold changing with the gun, the other gun slung or holstered, the cape trailing behind the run), "YOU DIED" after standing still, and, in a Debug build, the F1 overlay and "VICTORY" after F4. For the boss, before and after in the same window: the first phase standing, the Charge stretched along its run, the transformation into a roar (F3), the second phase's snarl and Volley, the frenzy (F3 again), a Hair Ring and a Leap. To see the hairballs I made the second phase open with a Summon for one Debug build, and put the line back after the captures. The web build showed the same picture in a browser, with no errors in the console. The frame rate stayed at 164 to 165 on my 165 Hz monitor.
 
 ## Limitations
 
-- **The boss and the hairballs keep their first drawings.** Flat shapes next to the new floor and hunter. They are the next part of the art pass.
-- **The torch is the only light.** The boss's eyes do not glow on the floor, and a muzzle flash does not light the room.
+- **The torch is the only light that matters.** The boss's eyes only add a faint glow to the floor, and a muzzle flash does not light the room.
+- **Every hairball has the same locks.** They differ only in where they look. Giving each its own pattern would need a number that stays with it, and the pool moves hairballs around as others die.
+- **Strands vanish at the end of their range.** They do not fall to the floor.
 - **The light does not touch the bodies.** It is on purpose (see above), but a body in a dark corner looks lit from nowhere.
 - **The HUD can cover the player at the south wall.** The camera stops 64 units past the wall, and the boss's bar and the controls line sit over the bottom of the screen, as before the art pass.
 - **Captures of a window that fills the whole monitor show only its first frame,** as with fullscreen. The captures come from a window resized below the screen's size.

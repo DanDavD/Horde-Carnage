@@ -39,6 +39,7 @@ add_executable(HordeCarnage
     app/render/HairBody.cpp
     app/render/Hud.cpp
     app/render/PlayerDraw.cpp
+    app/render/Shapes.cpp
     app/render/Text.cpp
     app/render/View.cpp
     app/render/WorldDraw.cpp)

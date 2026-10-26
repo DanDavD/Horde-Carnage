@@ -1,6 +1,7 @@
 #include "app/render/WorldDraw.h"
 
 #include <algorithm>
+#include <cmath>
 
 #include "app/RaylibConvert.h"
 #include "app/render/ArenaDraw.h"
@@ -8,14 +9,18 @@
 #include "app/render/HairBody.h"
 #include "app/render/Palette.h"
 #include "app/render/PlayerDraw.h"
+#include "app/render/Shapes.h"
 #include "app/render/View.h"
 
 namespace horde {
 
 namespace {
 
-// A strand of hair is a short streak behind a round tip.
-constexpr float kStrandTail = 12.0f;
+// A strand is a clump of hair with this many spikes, reaching this share of its radius past the ball, and
+// spinning this many radians per unit it travels.
+constexpr float kClumpSpikes = 7.0f;
+constexpr float kClumpSpikeLength = 0.55f;
+constexpr float kClumpSpinRate = 0.06f;
 // A summon mark is a dark pit with a red rim that starts this many times wider and closes in on it.
 constexpr float kMarkerRadius = 18.0f;
 constexpr float kMarkerRimStart = 2.5f;
@@ -50,14 +55,27 @@ void DrawBullet(const Projectile& bullet, float alpha) {
     DrawCircleV(ToRaylib(head), bullet.radius, kBullet);
 }
 
-// A dark streak behind a pale tip, as wide as the strand's hit circle, so what the player sees is what can
-// hurt them.
+// A small, spiky clump of the boss's hair, spinning as it flies, its spikes twitching, so it reads as torn
+// from her and thrown. The solid ball is exactly the strand's hit circle, so what the player sees is what
+// can hurt them; only the spikes reach past it.
 void DrawHairStrand(const Projectile& strand, float alpha) {
     const Vec2 head = Lerp(strand.motion.previousPosition, strand.motion.position, alpha);
-    const Vec2 tail = head - Normalized(strand.motion.velocity) * kStrandTail;
-    DrawLineEx(ToRaylib(tail), ToRaylib(head), strand.radius * 1.2f, kBossEdge);
-    DrawCircleV(ToRaylib(head), strand.radius, kBossEdge);
-    DrawCircleV(ToRaylib(head), strand.radius - 3.0f, kStrand);
+    // Spin and twitch come from where it is, so every clump moves on its own, with no clock to keep.
+    const float spin = (head.x - head.y) * kClumpSpinRate;
+    const float twitch = head.x + head.y;
+    const auto spikes = [&](float extra) {
+        return [&, extra](float angle) {
+            const float turned = angle + spin;
+            const float spike = std::pow(std::abs(std::cos(turned * kClumpSpikes * 0.5f)), 6.0f);
+            const float which = std::floor(turned * kClumpSpikes / (2.0f * kPi));
+            const float wobble = 0.75f + 0.25f * std::sin(twitch * 0.3f + which);
+            return strand.radius * (1.0f + kClumpSpikeLength * spike * wobble) + extra;
+        };
+    };
+    DrawRadialShape<48>(head, spikes(2.0f), kBossEdge);
+    DrawRadialShape<48>(head, spikes(0.0f), kStrand);
+    DrawCircleV(ToRaylib(head), strand.radius * 0.55f, Mix(kStrand, kBossEdge, 0.35f));
+    DrawCircleV(ToRaylib(head + Vec2{-0.3f, -0.3f} * strand.radius), strand.radius * 0.25f, Fade(WHITE, 0.45f));
 }
 
 } // namespace
@@ -96,10 +114,11 @@ void DrawWorld(const World& world, float alpha, const Art& art) {
     // The boss goes under its children, so a dead boss lies on the floor. In the air it goes over
     // everything, the player included.
     if (!bossAirborne) {
-        DrawBoss(world.boss, playerPosition, alpha);
+        DrawBoss(world.boss, playerPosition, world.elapsedSeconds, alpha, art);
     }
     for (const Enemy& enemy : world.enemies) {
-        DrawHairball(enemy, playerPosition, world.boss.summon.spitWarningSeconds, alpha);
+        DrawHairball(enemy, playerPosition, world.boss.summon.spitWarningSeconds, world.elapsedSeconds, alpha,
+                     art);
     }
     for (const Projectile& bullet : world.bullets) {
         DrawBullet(bullet, alpha);
@@ -110,7 +129,7 @@ void DrawWorld(const World& world, float alpha, const Art& art) {
     // The player is drawn after every body on the floor, so it is never hidden under a crowd.
     DrawPlayer(player, world.elapsedSeconds, alpha);
     if (bossAirborne) {
-        DrawBoss(world.boss, playerPosition, alpha);
+        DrawBoss(world.boss, playerPosition, world.elapsedSeconds, alpha, art);
     }
 }
 

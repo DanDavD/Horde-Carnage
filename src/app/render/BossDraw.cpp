@@ -58,14 +58,35 @@ constexpr float kSummonShudder = 2.0f;
 constexpr float kTransformSwell = 0.2f;
 constexpr float kTransformTremble = 4.0f;
 
-constexpr HairStyle kBossStyle{kBossFill, kBossEdge, kBossEye, 28, 6.0f, 5.0f, 0.45f};
-// In the second phase the eyes turn red, so the change reads at a glance.
-constexpr HairStyle kEnragedBossStyle{kBossFill, kBossEdge, kBossEyeEnraged, 28, 6.0f, 5.0f, 0.45f};
-// In a frenzy it bristles (more tufts) and reddens, over a pulsing glow on the floor.
-constexpr HairStyle kFrenziedBossStyle{kFrenzyFill, kBossEdge, kBossEyeEnraged, 40, 6.0f, 5.0f, 0.45f};
+// Squash and stretch. Crouching for a Charge or a Leap squashes the body along the way it is about to go;
+// running stretches it along the run; the air stretches it upward and the landing flattens it; every
+// Volley burst jolts it toward the player.
+constexpr float kCrouchSquash = 0.88f;
+constexpr float kRunStretch = 1.22f;
+constexpr float kAirStretch = 1.1f;
+constexpr float kLandingSquash = 0.84f;
+constexpr float kBurstStretch = 1.12f;
+// How far the mouth is open, from 0 (shut) to 1, when the boss has one. It grows a mouth in the second
+// phase: shut in a snarl, a little open in the frenzy, and wide open whenever it roars, howls or spits.
+constexpr float kFrenzyMouth = 0.25f;
+constexpr float kChargeMouth = 0.45f;
+constexpr float kSpitMouth = 0.85f;
+constexpr float kBurstMouth = 0.6f;
+// The boss's eyes light the floor around it, faintly.
+constexpr float kEyeLightReach = 2.2f;
+constexpr float kEyeLight = 0.07f;
+
+// A dark, matted mass with amber eyes. In the second phase the eyes turn red and the hair bristles; in a
+// frenzy it bristles all over and reddens, over a pulsing glow on the floor.
+constexpr HairStyle kBossStyle{kBossFill, kBossEdge, kBossSheen, kBossEye, 24, 0.26f, 0.0f, 0.45f, 1.0f};
+constexpr HairStyle kEnragedBossStyle{kBossEnragedFill, kBossEdge, kBossSheen, kBossEyeEnraged, 32, 0.36f, 0.55f,
+                                      0.45f, 1.0f};
+constexpr HairStyle kFrenziedBossStyle{kFrenzyFill, kBossEdge, kBossSheen, kBossEyeEnraged, 42, 0.46f, 0.95f,
+                                       0.45f, 1.0f};
 constexpr float kFrenzyGlow = 0.7f;
-// A dead boss turns grey like a dead player, and its eyes go dark.
-constexpr HairStyle kDeadBossStyle{kPlayerDeadFill, kPlayerDeadEdge, kPlayerDeadEdge, 28, 6.0f, 5.0f, 0.0f};
+// A dead boss turns grey like a dead player, its hair falls flat and its eyes shut.
+constexpr HairStyle kDeadBossStyle{kPlayerDeadFill, kPlayerDeadEdge, kPlayerDeadFill, kPlayerDeadEdge, 24, 0.26f,
+                                   0.0f, 0.0f, 1.0f};
 
 bool InAttack(const Boss& boss, AttackKind kind, AttackStage stage) {
     return boss.attack && boss.attack->kind == kind && boss.attack->stage == stage;
@@ -188,34 +209,57 @@ void DrawBossShield(const Shield& shield, Vec2 position, float radius, float sec
     DrawRing(ToRaylib(position), inner, inner + width, 0.0f, 360.0f, 64, Fade(band, 0.35f + 0.6f * left));
 }
 
-// Every pose of the boss ends here: the body, its shield around it, and stars while its broken shield
-// staggers it.
-void DrawBossBody(const Boss& boss, Vec2 position, float radius, Vec2 lookAt) {
+// The mouth the boss has when it is not roaring: none in the first phase, a shut snarl in the second, and
+// a little open in the frenzy.
+float RestingMouth(const Boss& boss) {
+    if (boss.phase != BossPhase::Two) {
+        return -1.0f;
+    }
+    return boss.frenzied ? kFrenzyMouth : 0.0f;
+}
+
+// A wider mouth for a moment of the attack, only once the boss has a mouth at all.
+void OpenMouth(const Boss& boss, HairPose& pose, float open) {
+    if (boss.phase == BossPhase::Two) {
+        pose.mouth = std::max(pose.mouth, open);
+    }
+}
+
+// Every pose of the boss ends here: the glow of its eyes on the floor, the body, its shield around it, and
+// stars while its broken shield staggers it.
+void DrawBossBody(const Boss& boss, Vec2 position, float radius, const HairPose& pose, const Art& art) {
     const HairStyle* style = &kBossStyle;
     if (boss.frenzied) {
         style = &kFrenziedBossStyle;
-        const float pulse = 0.5f + 0.5f * std::sin(static_cast<float>(GetTime()) * 8.0f);
+        const float pulse = 0.5f + 0.5f * std::sin(pose.seconds * 8.0f);
         DrawCircleV(ToRaylib(position), radius * (1.0f + kFrenzyGlow), Fade(kBlood, 0.08f + 0.1f * pulse));
     } else if (boss.phase == BossPhase::Two) {
         style = &kEnragedBossStyle;
     }
-    DrawHairBody(position, radius, lookAt, *style, boss.hitFlashSeconds > 0.0f);
-    DrawBossShield(boss.shield, position, radius, static_cast<float>(GetTime()));
+    BeginBlendMode(BLEND_ADDITIVE);
+    DrawGlow(art, position, radius * kEyeLightReach, Fade(style->eye, kEyeLight));
+    EndBlendMode();
+    DrawHairBody(position, radius, *style, pose, art);
+    DrawBossShield(boss.shield, position, radius, pose.seconds);
     if (IsStaggered(boss)) {
         DrawStunStars(position, radius, boss.staggerSeconds);
     }
 }
 
-// Crouched and trembling through the warning, with ghosts behind it while it runs and stars over its head
-// while it is stunned. The eyes look down its path instead of at the player.
-void DrawChargingBoss(const Boss& boss, Vec2 position) {
+// Crouched and trembling through the warning, stretched along the run with ghosts behind it while it runs,
+// and with stars over its head while it is stunned. The eyes look down its path instead of at the player.
+void DrawChargingBoss(const Boss& boss, Vec2 position, HairPose pose, const Art& art) {
     const BossAttack& attack = *boss.attack;
     const ChargeStats& stats = boss.charge;
     float radius = boss.radius;
+    pose.lookAt = position + attack.direction * boss.radius;
+    pose.stretchAlong = attack.direction;
     switch (attack.stage) {
     case AttackStage::Warning: {
         const float warning = WarningSeconds(boss, attack);
-        radius *= 1.0f - kChargeCrouch * std::min(attack.stageSeconds / warning, 1.0f);
+        const float crouch = std::min(attack.stageSeconds / warning, 1.0f);
+        radius *= 1.0f - kChargeCrouch * crouch;
+        pose.stretch = 1.0f + (kCrouchSquash - 1.0f) * crouch;
         if (attack.stageSeconds > warning - stats.aimLockSeconds) {
             const Vec2 side{-attack.direction.y, attack.direction.x};
             position += side * (kChargeTremble * std::sin(attack.stageSeconds * 90.0f));
@@ -223,6 +267,8 @@ void DrawChargingBoss(const Boss& boss, Vec2 position) {
         break;
     }
     case AttackStage::Active:
+        pose.stretch = kRunStretch;
+        OpenMouth(boss, pose, kChargeMouth);
         for (int i = kChargeGhosts; i >= 1; --i) {
             const Vec2 ghost = position - attack.direction * (radius * 0.5f * static_cast<float>(i));
             DrawCircleV(ToRaylib(ghost), radius * (1.0f - 0.1f * static_cast<float>(i)),
@@ -232,55 +278,62 @@ void DrawChargingBoss(const Boss& boss, Vec2 position) {
     case AttackStage::Recovery:
         break;
     }
-    DrawBossBody(boss, position, radius, position + attack.direction);
+    pose.lookAt = position + attack.direction * boss.radius;
+    DrawBossBody(boss, position, radius, pose, art);
     if (attack.stage == AttackStage::Recovery && attack.stunned) {
         DrawStunStars(position, radius, attack.stageSeconds);
     }
 }
 
-// Swells through the warning, deflates as it spits, and is back to its size while it recovers. It watches
-// the player the whole time.
-void DrawSpittingBoss(const Boss& boss, Vec2 position, Vec2 playerPosition) {
+// Swells through the warning, deflates as it spits, mouth wide, and is back to its size while it recovers.
+// It watches the player the whole time.
+void DrawSpittingBoss(const Boss& boss, Vec2 position, HairPose pose, const Art& art) {
     const BossAttack& ring = *boss.attack;
     float radius = boss.radius;
     if (ring.stage == AttackStage::Warning) {
         radius *= 1.0f + kRingSwell * std::min(ring.stageSeconds / WarningSeconds(boss, ring), 1.0f);
     } else if (ring.stage == AttackStage::Active) {
         radius *= 1.0f - kRingSpitShrink;
+        OpenMouth(boss, pose, kSpitMouth);
     }
-    DrawBossBody(boss, position, radius, playerPosition);
+    DrawBossBody(boss, position, radius, pose, art);
 }
 
-// Crouches, flies up in an arc toward its shadow, growing as it rises, and lands squashed. In the air it is
-// drawn above everything else, since it is over the player's head.
-void DrawLeapingBoss(const Boss& boss, Vec2 position, Vec2 playerPosition) {
+// Crouches, flies up in an arc toward its shadow, stretched and growing as it rises, and lands flattened.
+// In the air it is drawn above everything else, since it is over the player's head.
+void DrawLeapingBoss(const Boss& boss, Vec2 position, HairPose pose, const Art& art) {
     const BossAttack& leap = *boss.attack;
     float radius = boss.radius;
+    pose.stretchAlong = Vec2{0.0f, 1.0f};
     switch (leap.stage) {
     case AttackStage::Warning: {
         const float crouch = LeapCrouchSeconds(boss, leap);
         const float airborne = leap.stageSeconds - crouch;
         if (airborne <= 0.0f) {
-            radius *= 1.0f - kLeapCrouch * leap.stageSeconds / crouch;
+            const float down = leap.stageSeconds / crouch;
+            radius *= 1.0f - kLeapCrouch * down;
+            pose.stretch = 1.0f + (kCrouchSquash - 1.0f) * down;
             break;
         }
         const float air = std::min(airborne / LeapAirSeconds(boss, leap), 1.0f);
         const float arc = std::sin(std::numbers::pi_v<float> * air);
         position.y -= kLeapHeight * arc;
         radius *= 1.0f + kLeapGrow * arc;
+        pose.stretch = 1.0f + (kAirStretch - 1.0f) * arc;
         break;
     }
     case AttackStage::Active:
         radius *= 1.0f + kLeapLandingSquash;
+        pose.stretch = kLandingSquash;
         break;
     case AttackStage::Recovery:
         break;
     }
-    DrawBossBody(boss, position, radius, playerPosition);
+    DrawBossBody(boss, position, radius, pose, art);
 }
 
-// Leans back through the warning, and swells for a moment with every burst. It watches the player.
-void DrawVolleyingBoss(const Boss& boss, Vec2 position, Vec2 playerPosition) {
+// Leans back through the warning, and jolts toward the player for a moment with every burst.
+void DrawVolleyingBoss(const Boss& boss, Vec2 position, HairPose pose, const Art& art) {
     const BossAttack& volley = *boss.attack;
     float radius = boss.radius;
     if (volley.stage == AttackStage::Warning) {
@@ -289,32 +342,39 @@ void DrawVolleyingBoss(const Boss& boss, Vec2 position, Vec2 playerPosition) {
         const float sinceBurst = std::fmod(volley.stageSeconds, boss.volley.burstIntervalSeconds);
         if (sinceBurst < kVolleyBurstFlash) {
             radius *= 1.0f + kVolleyBurstSwell;
+            pose.stretchAlong = volley.direction;
+            pose.stretch = kBurstStretch;
+            OpenMouth(boss, pose, kBurstMouth);
         }
     }
-    DrawBossBody(boss, position, radius, playerPosition);
+    DrawBossBody(boss, position, radius, pose, art);
 }
 
-// Swells and shudders while it howls, and settles back as the hairballs come out.
-void DrawSummoningBoss(const Boss& boss, Vec2 position, Vec2 playerPosition) {
+// Swells and shudders while it howls, its mouth opening wider, and settles back as the hairballs come out.
+void DrawSummoningBoss(const Boss& boss, Vec2 position, HairPose pose, const Art& art) {
     const BossAttack& summon = *boss.attack;
     float radius = boss.radius;
     if (summon.stage == AttackStage::Warning) {
-        radius *= 1.0f + kSummonSwell * std::min(summon.stageSeconds / WarningSeconds(boss, summon), 1.0f);
+        const float howl = std::min(summon.stageSeconds / WarningSeconds(boss, summon), 1.0f);
+        radius *= 1.0f + kSummonSwell * howl;
         position.x += kSummonShudder * std::sin(summon.stageSeconds * 60.0f);
+        OpenMouth(boss, pose, howl);
     }
-    DrawBossBody(boss, position, radius, playerPosition);
+    DrawBossBody(boss, position, radius, pose, art);
 }
 
-// Swells and trembles harder as the transformation goes on, with its eyes flickering to red, faster toward
-// the end. No shield is drawn: nothing can hurt it.
-void DrawTransformingBoss(const Boss& boss, Vec2 position, Vec2 playerPosition) {
+// Swells and trembles harder as the transformation goes on, grows a mouth that opens into a roar, and its
+// eyes flicker from amber to red, faster toward the end. No shield is drawn: nothing can hurt it.
+void DrawTransformingBoss(const Boss& boss, Vec2 position, HairPose pose, const Art& art) {
     const float total = boss.phaseTwo.transformSeconds;
     const float progress = std::clamp(1.0f - boss.transformSecondsLeft / total, 0.0f, 1.0f);
     const float seconds = total - boss.transformSecondsLeft;
     position.x += kTransformTremble * progress * std::sin(seconds * 70.0f);
     const float radius = boss.radius * (1.0f + kTransformSwell * progress);
     const bool red = std::sin(seconds * (6.0f + 30.0f * progress)) > 0.0f;
-    DrawHairBody(position, radius, playerPosition, red ? kEnragedBossStyle : kBossStyle, false);
+    pose.mouth = progress;
+    pose.flashing = false;
+    DrawHairBody(position, radius, red ? kEnragedBossStyle : kBossStyle, pose, art);
 }
 
 } // namespace
@@ -330,35 +390,42 @@ Color ShieldColor(ShieldKind kind) {
     return kind == ShieldKind::Shell ? kShell : kBarrier;
 }
 
-void DrawBoss(const Boss& boss, Vec2 playerPosition, float alpha) {
+void DrawBoss(const Boss& boss, Vec2 playerPosition, float seconds, float alpha, const Art& art) {
     const Vec2 position = Lerp(boss.motion.previousPosition, boss.motion.position, alpha);
+    const HairPose pose{.lookAt = playerPosition,
+                        .light = playerPosition,
+                        .seconds = seconds,
+                        .mouth = RestingMouth(boss),
+                        .flashing = boss.hitFlashSeconds > 0.0f};
     if (IsDead(boss.health)) {
-        DrawHairBody(position, boss.radius, playerPosition, kDeadBossStyle, false);
+        HairPose dead = pose;
+        dead.dead = true;
+        DrawHairBody(position, boss.radius, kDeadBossStyle, dead, art);
         return;
     }
     if (IsTransforming(boss)) {
-        DrawTransformingBoss(boss, position, playerPosition);
+        DrawTransformingBoss(boss, position, pose, art);
         return;
     }
     if (!boss.attack) {
-        DrawBossBody(boss, position, boss.radius, playerPosition);
+        DrawBossBody(boss, position, boss.radius, pose, art);
         return;
     }
     switch (boss.attack->kind) {
     case AttackKind::Charge:
-        DrawChargingBoss(boss, position);
+        DrawChargingBoss(boss, position, pose, art);
         break;
     case AttackKind::HairRing:
-        DrawSpittingBoss(boss, position, playerPosition);
+        DrawSpittingBoss(boss, position, pose, art);
         break;
     case AttackKind::Leap:
-        DrawLeapingBoss(boss, position, playerPosition);
+        DrawLeapingBoss(boss, position, pose, art);
         break;
     case AttackKind::Volley:
-        DrawVolleyingBoss(boss, position, playerPosition);
+        DrawVolleyingBoss(boss, position, pose, art);
         break;
     case AttackKind::Summon:
-        DrawSummoningBoss(boss, position, playerPosition);
+        DrawSummoningBoss(boss, position, pose, art);
         break;
     }
 }

@@ -16,7 +16,7 @@ The rules live in `horde_core`:
 
 The game executable draws it:
 
-- `src/app/render/BossDraw.cpp`: `DrawBoss` draws the same hairy body as a hairball (`DrawHairBody`), three times bigger, darker, with glowing eyes, plus the crouch, the ghosts and the stun stars of the Charge (`DrawChargingBoss`), the lean of the Volley (`DrawVolleyingBoss`) and its line on the floor (`DrawVolleyTelegraph`), the transformation (`DrawTransformingBoss`), the red eyes of the second phase, the swell of the Hair Ring (`DrawSpittingBoss`), and the jump of the Leap (`DrawLeapingBoss`). `DrawChargeTelegraph`, `DrawHairRingTelegraph` and `DrawLeapTelegraph` draw the warnings on the floor. In `src/app/render/WorldDraw.cpp`, `DrawHairStrand` draws the strands and `DrawShockwave` the shockwaves; in `src/app/render/Hud.cpp`, `DrawBossBar` draws its health along the bottom of the screen, under its name.
+- `src/app/render/BossDraw.cpp`: `DrawBoss` draws the same body of matted hair as a hairball (`DrawHairBody`, see [Art direction](ART.md)), three times bigger, darker, with glowing slit eyes and, in the second phase, a mouth, plus the crouch, the ghosts and the stun stars of the Charge (`DrawChargingBoss`), the lean of the Volley (`DrawVolleyingBoss`) and its line on the floor (`DrawVolleyTelegraph`), the transformation (`DrawTransformingBoss`), the red eyes of the second phase, the swell of the Hair Ring (`DrawSpittingBoss`), and the jump of the Leap (`DrawLeapingBoss`). `DrawChargeTelegraph`, `DrawHairRingTelegraph` and `DrawLeapTelegraph` draw the warnings on the floor. In `src/app/render/WorldDraw.cpp`, `DrawHairStrand` draws the strands and `DrawShockwave` the shockwaves; in `src/app/render/Hud.cpp`, `DrawBossBar` draws its health along the bottom of the screen, under its name.
 
 ## How it works
 
@@ -390,7 +390,6 @@ The drawing is not unit tested, because it needs a window. I checked it in a Rel
 - **Hairballs do not avoid the boss's attacks.** A Charge bowls them aside and the boss's strands fly through them, so a crowd can never shield the player, and the boss never hurts its own children.
 - **The transformation and the second phase are only checked in Debug.** Reaching the second phase in a Release build takes emptying the first bar through its shields, which the captures cannot do. I used `F3` in a Debug build.
 - **The Leap's arc is drawn, not simulated.** The body's position moves straight from the takeoff to the shadow, and the height is only an offset in the drawing. Nothing in the fight needs a third dimension.
-- **The crouch and the swell change the size, not the shape.** The body is drawn with circles, so it gets smaller or bigger instead of flatter or rounder. Squash and stretch come with the art pass.
-- **A strand is a dot with a short tail.** Real hair, and strands that fall to the floor at the end of their range, come with the art pass.
+- **Strands vanish at the end of their range.** They do not fall to the floor.
 - **At the south wall the boss is partly hidden by the HUD.** The boss bar and the controls line cover the bottom of the screen, where the camera stops for the south wall. The new HUD of the art pass is thinner, but still sits there.
 - **The bar has no animation.** It jumps to the new value. A trailing chunk that drains behind it is part of the game feel pass.
