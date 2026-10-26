@@ -15,6 +15,7 @@ add_library(horde_core STATIC
     core/Movement.cpp
     core/Projectile.cpp
     core/Random.cpp
+    core/ScreenFit.cpp
     core/Session.cpp
     core/Shield.cpp
     core/Shockwave.cpp

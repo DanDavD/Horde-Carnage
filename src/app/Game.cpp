@@ -16,11 +16,14 @@
 
 #include "app/PlayerInput.h"
 #include "app/RaylibConvert.h"
+#include "core/ScreenFit.h"
 
 namespace horde {
 
 namespace {
 
+// The game's own resolution. Everything is laid out for it, and the whole picture is scaled to the real
+// screen (see ScreenFit), so every screen shows the same part of the arena.
 constexpr int kScreenWidth = 1280;
 constexpr int kScreenHeight = 720;
 
@@ -847,6 +850,24 @@ void DrawAttempt(int attempt) {
     DrawText(text, kScreenWidth - kHudMargin - MeasureText(text, 20), 36, 20, kSoftText);
 }
 
+// Where the game sits on the screen this frame. The screen's size can change (a browser window resized,
+// itch.io going fullscreen), so it is worked out every frame.
+ScreenFit CurrentScreenFit() {
+    return FitScreen(kViewSize, Vec2{static_cast<float>(GetScreenWidth()), static_cast<float>(GetScreenHeight())});
+}
+
+// The mouse in game pixels, kept inside the game: a mouse over the black bars aims at the edge.
+Vec2 AimInGame(const ScreenFit& fit) {
+    const Vec2 aim = ScreenToGame(fit, ReadAimPoint());
+    return Vec2{std::clamp(aim.x, 0.0f, kViewSize.x), std::clamp(aim.y, 0.0f, kViewSize.y)};
+}
+
+// The screen-space camera for everything drawn in game pixels that does not move with the world: the
+// HUD, the end screens and the crosshair.
+Camera2D ScreenCamera(const ScreenFit& fit) {
+    return Camera2D{.offset = ToRaylib(fit.offset), .target = {0.0f, 0.0f}, .rotation = 0.0f, .zoom = fit.scale};
+}
+
 Camera2D ToRaylibCamera(const FollowCamera& camera, float alpha) {
     // The camera is interpolated like the player. If only the player were, the two would drift apart
     // by a fraction of a step every frame and the player would shimmer against the floor.
@@ -994,10 +1015,28 @@ void DrawDebugHud(const World& world, Vec2 moveInput) {
 } // namespace
 
 // Every launch starts from a seed the system picks, so no two runs of the game repeat the same fights.
-Game::Game() : _session{StartSession(kBossArena, kViewSize, std::random_device{}())} {
-    // Vsync caps how often we render. How often the game simulates comes from FixedTimestep.
-    SetConfigFlags(FLAG_VSYNC_HINT | FLAG_MSAA_4X_HINT);
+Game::Game(bool windowed) : _session{StartSession(kBossArena, kViewSize, std::random_device{}())} {
+    // Vsync caps how often we render, at the monitor's own rate. How often the game simulates comes from
+    // FixedTimestep.
+#ifdef __EMSCRIPTEN__
+    (void)windowed;
+    // In a browser the canvas follows the page's size, so going fullscreen on itch.io fills the screen.
+    SetConfigFlags(FLAG_VSYNC_HINT | FLAG_MSAA_4X_HINT | FLAG_WINDOW_RESIZABLE);
     InitWindow(kScreenWidth, kScreenHeight, "Horde Carnage");
+    // Setting a minimum size makes raylib fit the canvas to the page once, right away.
+    SetWindowMinSize(kScreenWidth / 4, kScreenHeight / 4);
+#else
+    // Fullscreen, at the monitor's own resolution: a borderless window over the whole monitor, so switching
+    // to another program is instant and the resolution of the desktop is not changed. `--windowed` gives a
+    // window that can be resized instead, for recording and debugging.
+    SetConfigFlags(FLAG_VSYNC_HINT | FLAG_MSAA_4X_HINT | (windowed ? FLAG_WINDOW_RESIZABLE : 0));
+    InitWindow(kScreenWidth, kScreenHeight, "Horde Carnage");
+    if (!windowed) {
+        ToggleBorderlessWindowed();
+    }
+#endif
+    // The default font is drawn scaled with the rest of the picture; smoothed, it scales evenly.
+    SetTextureFilter(GetFontDefault().texture, TEXTURE_FILTER_BILINEAR);
 }
 
 Game::~Game() {
@@ -1060,8 +1099,9 @@ void Game::Update(float dt) {
     // The mouse is turned into a world point with the camera as of the last step. The camera drawn on
     // screen is a fraction of a step behind that, which is far below a pixel of aiming error.
     const Camera2D camera = ToRaylibCamera(_session.world.camera, 1.0f);
+    const Vec2 aim = AimInGame(CurrentScreenFit());
     const PlayerCommands commands{.move = ReadMoveInput(),
-                                  .aimAt = FromRaylib(GetScreenToWorld2D(ToRaylib(ReadAimPoint()), camera)),
+                                  .aimAt = FromRaylib(GetScreenToWorld2D(ToRaylib(aim), camera)),
                                   .fireHeld = ReadFireHeld(),
                                   .firePressed = _pendingPresses.fire,
                                   .selectSlot = _pendingPresses.weaponSlot,
@@ -1078,8 +1118,16 @@ void Game::Update(float dt) {
 }
 
 void Game::Draw(float alpha) const {
+    const ScreenFit fit = CurrentScreenFit();
     BeginDrawing();
-    ClearBackground(kBackground);
+    // Black bars where the screen's shape differs from the game's; nothing is drawn on them.
+    ClearBackground(BLACK);
+    const Vec2 area = kViewSize * fit.scale;
+    BeginScissorMode(static_cast<int>(fit.offset.x), static_cast<int>(fit.offset.y), static_cast<int>(area.x + 0.5f),
+                     static_cast<int>(area.y + 0.5f));
+    BeginMode2D(ScreenCamera(fit));
+    DrawRectangle(0, 0, kScreenWidth, kScreenHeight, kBackground);
+    EndMode2D();
 
     const World& world = _session.world;
     const bool playing = _session.state == SessionState::Playing;
@@ -1092,7 +1140,11 @@ void Game::Draw(float alpha) const {
     const Player& player = world.player;
     const Vec2 playerPosition = Lerp(player.motion.previousPosition, player.motion.position, alpha);
 
-    BeginMode2D(ToRaylibCamera(world.camera, alpha));
+    // The world camera, scaled and moved onto the screen with the rest of the game.
+    Camera2D worldCamera = ToRaylibCamera(world.camera, alpha);
+    worldCamera.offset = ToRaylib(GameToScreen(fit, kViewSize * 0.5f));
+    worldCamera.zoom = fit.scale;
+    BeginMode2D(worldCamera);
     DrawArena(world.arena);
     // On the floor, under every body.
     DrawChargeTelegraph(world.boss, world.arena);
@@ -1133,7 +1185,8 @@ void Game::Draw(float alpha) const {
 #endif
     EndMode2D();
 
-    // Everything below is in screen space and does not move with the camera.
+    // Everything below is in game pixels on the screen and does not move with the camera.
+    BeginMode2D(ScreenCamera(fit));
 #ifndef NDEBUG
     if (_showDebugOverlay) {
         DrawDebugHud(world, _lastMoveInput);
@@ -1150,10 +1203,12 @@ void Game::Draw(float alpha) const {
     DrawAttempt(_session.attempt);
     if (playing) {
         DrawText(kControlsHint, kHudMargin, kScreenHeight - 30, 18, kSoftText);
-        DrawCrosshair(ToRaylib(ReadAimPoint()));
+        DrawCrosshair(ToRaylib(AimInGame(fit)));
     } else {
         DrawEndScreen(_session);
     }
+    EndMode2D();
+    EndScissorMode();
     EndDrawing();
 }
 

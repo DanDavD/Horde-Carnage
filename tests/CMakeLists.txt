@@ -25,6 +25,7 @@ add_executable(horde_tests
     core/PhaseTwoTests.cpp
     core/ProjectileTests.cpp
     core/RandomTests.cpp
+    core/ScreenFitTests.cpp
     core/SessionTests.cpp
     core/SummonTests.cpp
     core/ShieldTests.cpp

@@ -9,7 +9,10 @@ namespace horde {
 /// Owns the window and runs the main loop: fixed-rate updates, then one render per frame.
 class Game {
 public:
-    Game();
+    /// Opens the game fullscreen at the monitor's resolution, or in a window that can be resized when
+    /// `windowed` is set (`--windowed` on the command line). In a browser the page decides, and this is
+    /// ignored.
+    explicit Game(bool windowed = false);
     ~Game();
 
     Game(const Game&) = delete;

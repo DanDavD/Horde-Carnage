@@ -46,7 +46,8 @@ This is day 7 of 15, and the boss fight is in progress. Progress is tracked in t
 - A dash that covers about four body widths in 0.12 s, passes through enemies and makes you untouchable while it lasts. See [Player abilities](docs/ABILITIES.md).
 - Three healing flasks per attempt, Dark Souls style: drinking takes a second, slows you down, and a hit while drinking wastes the flask. See [Player abilities](docs/ABILITIES.md).
 - Unit tests for the pure logic, and a GitHub Actions workflow that builds and tests every push and pull request on Windows, and builds the web version.
-- A web build: the same game compiled to WebAssembly, playable in a browser tab, scaled to fit the window. See [The web build](docs/WEB_BUILD.md).
+- A web build: the same game compiled to WebAssembly, playable in a browser tab. See [The web build](docs/WEB_BUILD.md).
+- Always fullscreen, at the monitor's own resolution and refresh rate, drawn sharp at that resolution, with black bars on screens that are not 16:9 so everyone sees the same arena. `--windowed` opens a window instead. See [Screen and fullscreen](docs/SCREEN.md).
 - Warnings are errors for the project's own code (`/W4 /WX` on MSVC).
 
 **Still to do:** the numbers in JSON, game feel and menus. See the [roadmap](docs/ROADMAP.md) for the order, and for the difficulty I am aiming for.
@@ -91,6 +92,7 @@ You can also open the folder in Visual Studio (*File > Open > Folder*). It reads
 | Drink a flask | `E` | Not yet |
 | Try again after "YOU DIED" or "VICTORY" | `Enter` or `R` | `A` or `Start` |
 | Quit | `Esc` | |
+| Play in a window instead of fullscreen | Start it with `--windowed` | |
 | Debug overlay (Debug builds only) | `F1` | |
 | Break the boss's shield (Debug builds only) | `F2` | |
 | Skip to the second phase, then to the frenzy (Debug builds only) | `F3` | |
