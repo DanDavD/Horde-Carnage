@@ -29,7 +29,15 @@ horde_set_warnings(horde_core)
 add_executable(HordeCarnage
     main.cpp
     app/Game.cpp
-    app/PlayerInput.cpp)
+    app/PlayerInput.cpp
+    app/render/BossDraw.cpp
+    app/render/DebugOverlay.cpp
+    app/render/EndScreen.cpp
+    app/render/HairBody.cpp
+    app/render/Hud.cpp
+    app/render/PlayerDraw.cpp
+    app/render/View.cpp
+    app/render/WorldDraw.cpp)
 target_link_libraries(HordeCarnage PRIVATE horde_core raylib)
 target_compile_definitions(HordeCarnage PRIVATE "HORDE_VERSION=\"${PROJECT_VERSION}\"")
 horde_set_warnings(HordeCarnage)

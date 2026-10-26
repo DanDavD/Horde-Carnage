@@ -17,7 +17,8 @@ The rules live in `horde_core`:
 The game executable reads the hardware and draws:
 
 - `src/app/PlayerInput.cpp`: `ReadFireHeld` and `CollectButtonPresses` (left click, 1, 2, Q, mouse wheel).
-- `src/app/Game.cpp`: turns the mouse into a world point, builds the `PlayerCommands`, and draws the crosshair, the gun barrel, the muzzle flash and the weapon panel.
+- `src/app/Game.cpp`: turns the mouse into a world point and builds the `PlayerCommands`.
+- `src/app/render/PlayerDraw.cpp` and `Hud.cpp`: draw the gun barrel and the muzzle flash, and the crosshair and the weapon panel.
 
 ## How it works
 

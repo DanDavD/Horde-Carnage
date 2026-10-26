@@ -16,7 +16,7 @@ The rules live in `horde_core`:
 
 The game executable draws it:
 
-- `src/app/Game.cpp`: `DrawBoss` draws the same hairy body as a hairball (`DrawHairBody`), three times bigger, darker, with glowing eyes, plus the crouch, the ghosts and the stun stars of the Charge (`DrawChargingBoss`), the lean of the Volley (`DrawVolleyingBoss`) and its line on the floor (`DrawVolleyTelegraph`), the transformation (`DrawTransformingBoss`), the red eyes of the second phase, the swell of the Hair Ring (`DrawSpittingBoss`), and the jump of the Leap (`DrawLeapingBoss`). `DrawChargeTelegraph`, `DrawHairRingTelegraph` and `DrawLeapTelegraph` draw the warnings on the floor, `DrawHairStrand` draws the strands, and `DrawShockwave` the shockwaves. `DrawBossBar` draws its health along the bottom of the screen, under its name.
+- `src/app/render/BossDraw.cpp`: `DrawBoss` draws the same hairy body as a hairball (`DrawHairBody`), three times bigger, darker, with glowing eyes, plus the crouch, the ghosts and the stun stars of the Charge (`DrawChargingBoss`), the lean of the Volley (`DrawVolleyingBoss`) and its line on the floor (`DrawVolleyTelegraph`), the transformation (`DrawTransformingBoss`), the red eyes of the second phase, the swell of the Hair Ring (`DrawSpittingBoss`), and the jump of the Leap (`DrawLeapingBoss`). `DrawChargeTelegraph`, `DrawHairRingTelegraph` and `DrawLeapTelegraph` draw the warnings on the floor. In `src/app/render/WorldDraw.cpp`, `DrawHairStrand` draws the strands and `DrawShockwave` the shockwaves; in `src/app/render/Hud.cpp`, `DrawBossBar` draws its health along the bottom of the screen, under its name.
 
 ## How it works
 
@@ -268,7 +268,7 @@ The frenzy's strands carry `DamageSource::Frenzy`, so the death screen reads "Sl
 | Arena | `kBossArena` (`src/core/World.h`) | 1640x1040 |
 | Starting distance | `kStartingDistance` (`src/core/World.h`) | 400 units |
 | Camera lean and its cap | `kBossFraming`, `kMaxBossFramingOffset` (`src/core/World.cpp`) | 40%, 200 units |
-| Look | `kBossStyle`, `kBossBar`, the boss bar constants and the `kCharge...`, `kStun...`, `kRing...`, `kStrand...`, `kLeap...` and `kShockwave` constants (`src/app/Game.cpp`) | |
+| Look | `kBossStyle`, `kBossBar`, the boss bar constants and the `kCharge...`, `kStun...`, `kRing...`, `kStrand...`, `kLeap...` and `kShockwave` constants (`src/app/render/Palette.h`, `BossDraw.cpp`, `Hud.cpp`, `WorldDraw.cpp`) | |
 
 In a Debug build, `F1` shows the boss's health next to the shots fired and hit, the strands in flight (`hair`), the shockwaves (`waves`), and what the boss is doing: stalking and the time to its next attack, or the attack, its stage, its clock against the warning's length this time, whether it is in the air, and `combo 1/2` or `combo 2/2` inside a combo. The `pick` line shows the distance to the player, the weight of each attack at that distance, and the attack the next pick skips. Its first word is the phase (`p1` or `p2`), or `transforming` with the time left. `F3` starts the transformation at once (`TransformBoss`), to skip the first phase. `F4` defeats the boss at once (`DefeatBoss`), to reach the victory screen without shooting.
 

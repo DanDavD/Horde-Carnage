@@ -16,7 +16,7 @@ Hairballs can be shot and killed; that part is in [Bullets and hits](BULLETS.md)
 
 The game executable only draws them:
 
-- `src/app/Game.cpp`: `DrawHairball` draws a round body with tufts of hair and two eyes that look at the player.
+- `src/app/render/HairBody.cpp`: `DrawHairball` draws a round body with tufts of hair and two eyes that look at the player.
 
 ## How it works
 

@@ -7,7 +7,8 @@ How the game fills the screen. On the desktop it always runs fullscreen, at the 
 The pieces:
 
 - `src/core/ScreenFit.h`, `src/core/ScreenFit.cpp`: `FitScreen` works out the scale and the offset that place the game on a screen, and `ScreenToGame` and `GameToScreen` convert points between the two. Pure math, with tests.
-- `src/app/Game.cpp`: the window (`Game::Game`), the two cameras and the bars (`Game::Draw`), and the mouse in game pixels (`AimInGame`).
+- `src/app/Game.cpp`: the window (`Game::Game`), and the bars and the two cameras around each frame (`Game::Draw`).
+- `src/app/render/View.cpp`: the fit of this frame (`CurrentScreenFit`), the two cameras (`WorldCamera`, `ScreenCamera`), and the mouse in game pixels (`AimInGame`).
 - `src/main.cpp`: the `--windowed` option.
 - `web/shell.html`: in a browser, the canvas follows the page's size.
 
@@ -42,7 +43,7 @@ Both are drawn at the screen's real resolution. Since everything is shapes and t
 
 | Value | Where | Default |
 |---|---|---|
-| The game's resolution | `kScreenWidth`, `kScreenHeight` (`src/app/Game.cpp`) | 1280x720 |
+| The game's resolution | `kScreenWidth`, `kScreenHeight` (`src/app/render/View.h`) | 1280x720 |
 | Fullscreen or windowed | `--windowed` on the command line | Fullscreen |
 | Colour of the bars | `ClearBackground` in `Game::Draw` | Black |
 | How the default font scales | `SetTextureFilter` in `Game::Game` | Bilinear |

@@ -13,7 +13,7 @@ The rules live in `horde_core`:
 
 The game executable shows it:
 
-- `src/app/Game.cpp`: `DrawHealthBar` draws the bar in the top left corner, and `DrawPlayer` makes the player blink while invulnerable and turns them grey when dead.
+- `src/app/render/Hud.cpp` and `PlayerDraw.cpp`: `DrawHealthBar` draws the bar in the top left corner, and `DrawPlayer` makes the player blink while invulnerable and turns them grey when dead.
 
 ## How it works
 
@@ -55,7 +55,7 @@ On screen:
 | Damage of one strand of the Hair Ring | `HairRingStats::damage` (`src/core/Boss.h`) | 15 |
 | Damage of the Leap's landing and of its shockwave | `LeapStats::impactDamage`, `LeapStats::shockwave.damage` | 35, 20 |
 | Hairball contact damage | `Enemy::contactDamage` (`src/core/Enemy.h`) | 10 |
-| Blink period and fade | `kBlinkPeriod`, `kBlinkFade` (`src/app/Game.cpp`) | 0.1 s, 35% |
+| Blink period and fade | `kBlinkPeriod`, `kBlinkFade` (`src/app/render/PlayerDraw.cpp`) | 0.1 s, 35% |
 
 With the defaults the player survives 4 touches of the boss and dies on the 5th, 6 strands and dies on the 7th, or survives 9 hairball touches and dies on the 10th. Standing still from the start, the boss stalks for 2 seconds and charges: the run hits for 30 at about 2.9 s and ends stunned against the wall next to the player. After the stun it lands a touch every 0.8 s, so a player who does nothing dies after about 7.1 seconds, just before the first Hair Ring. In a Release build the "YOU DIED" screen read "You lasted 0:07" for that case.
 

@@ -115,7 +115,8 @@ cmake/
   Warnings.cmake      Strict warnings for the project's own targets
 src/
   core/               Pure game logic, no window (library horde_core)
-  app/                The game: window, main loop, rendering (executable HordeCarnage)
+  app/                The game: window, main loop, input (executable HordeCarnage)
+    render/           Drawing, one file per part of the picture
   main.cpp
 tests/
   core/               Unit tests for src/core
