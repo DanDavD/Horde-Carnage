@@ -17,6 +17,7 @@
 #include "core/Shockwave.h"
 #include "core/SpawnMarker.h"
 #include "core/Vec2.h"
+#include "core/WorldEvent.h"
 
 namespace horde {
 
@@ -37,6 +38,9 @@ inline constexpr std::size_t kMaxHostileProjectiles = 128;
 inline constexpr std::size_t kMaxShockwaves = 8;
 /// A summon puts down 6 marks at most, and they last under a second, so 16 is room for two at once.
 inline constexpr std::size_t kMaxSpawnMarkers = 16;
+/// A step records a shot, a few bullet hits and maybe a hurt player and a landing. 64 holds several steps'
+/// worth, in case the game runs a few steps in one frame before it reads them.
+inline constexpr std::size_t kMaxWorldEvents = 64;
 
 /// Everything the simulation needs, as plain data: the arena, the player, the boss, the hairballs, the
 /// bullets, the boss's projectiles and shockwaves, the camera, and the random generator.
@@ -66,6 +70,10 @@ struct World {
     /// What landed the last hit on the player, and so, once the player is dead, what killed them. Empty
     /// until the first hit.
     std::optional<DamageSource> lastHitBy;
+    /// What happened that the player should feel: hits, breaks, landings. The world only adds to it; the game
+    /// reads it after each step and clears it. When nobody clears it, it fills up and new events are dropped,
+    /// which changes nothing in the fight.
+    ObjectPool<WorldEvent, kMaxWorldEvents> events;
 };
 
 /// The starting world: the boss in the middle of `arena`, the player `kStartingDistance` south of it and
@@ -77,7 +85,7 @@ struct World {
 /// aims and fires; hairballs chase and the boss stalks or attacks, spitting its strands into their pool
 /// or landing from a leap; bodies are pushed apart and held inside the arena; bullets fly and hit; dead
 /// hairballs are removed; bodies that touch the player hurt it; the boss's strands and shockwaves move and
-/// hit the player; and the camera follows.
+/// hit the player; and the camera follows. What happened along the way is added to `events`.
 ///
 /// @param commands What the player asks for in this step: movement, aim, fire and weapon switching.
 void StepWorld(World& world, const PlayerCommands& commands, float dt);
@@ -90,7 +98,7 @@ void StepWorld(World& world, const PlayerCommands& commands, float dt);
 [[nodiscard]] float Accuracy(const World& world);
 
 /// Takes all the boss's health at once, in its second phase. For the Debug shortcut that skips to the
-/// victory screen.
+/// victory screen. Like the shortcuts below, it records the event a real one would.
 void DefeatBoss(World& world);
 
 /// Breaks the boss's shield at once, staggering it as a real break would. For the Debug shortcut that skips

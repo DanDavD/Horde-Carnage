@@ -33,6 +33,15 @@ constexpr float kSummonShakeSeconds = 0.3f;
 constexpr float kBossFraming = 0.4f;
 constexpr float kMaxBossFramingOffset = 200.0f;
 
+void Record(World& world, WorldEventKind kind, Vec2 position, Vec2 direction = {}, int amount = 0) {
+    world.events.Spawn(WorldEvent{.kind = kind, .position = position, .direction = direction, .amount = amount});
+}
+
+// The way a projectile was flying, for the events it leaves.
+Vec2 Heading(const Projectile& projectile) {
+    return LengthSquared(projectile.motion.velocity) > 0.0f ? Normalized(projectile.motion.velocity) : Vec2{};
+}
+
 // Every source of damage to the player goes through here, so a dash protects from all of them, a hit that
 // lands spoils any drink in progress, and the world remembers what landed it.
 //
@@ -42,6 +51,8 @@ bool HurtPlayer(World& world, int damage, DamageSource source) {
     if (!IsDashInvulnerable(player.dash) && ApplyDamage(player.health, damage)) {
         InterruptDrinking(player.flasks);
         world.lastHitBy = source;
+        Record(world, IsDead(player.health) ? WorldEventKind::PlayerKilled : WorldEventKind::PlayerHurt,
+               player.motion.position, {}, damage);
         return true;
     }
     return false;
@@ -118,6 +129,7 @@ void HandleWeapons(World& world, const PlayerCommands& commands, float dt) {
         const Vec2 muzzle = MuzzlePoint(player.motion.position, player.facing, player.radius, weapon.stats);
         world.bullets.Spawn(MakeBullet(muzzle, player.facing, weapon.stats));
         ++world.shotsFired;
+        Record(world, WorldEventKind::ShotFired, muzzle, player.facing, weapon.stats.damage);
     }
 }
 
@@ -263,23 +275,32 @@ void HitBoss(World& world, const Projectile& bullet) {
     if (IsTransforming(boss)) {
         return;
     }
+    const Vec2 at = bullet.motion.position;
+    const Vec2 along = Heading(bullet);
     switch (HitShield(boss.shield, bullet.damage)) {
     case ShieldHit::Exposed:
         ApplyDamage(boss.health, bullet.damage);
         boss.hitFlashSeconds = kHitFlashSeconds;
+        Record(world, WorldEventKind::BossHurt, at, along, bullet.damage);
         if (IsDead(boss.health) && boss.phase == BossPhase::One) {
             StartTransformation(boss);
+            Record(world, WorldEventKind::FirstPhaseEnded, boss.motion.position);
+        } else if (IsBossDefeated(world)) {
+            Record(world, WorldEventKind::BossDefeated, boss.motion.position);
         }
         if (ShouldFrenzy(boss)) {
             EnterFrenzy(boss);
             world.shockwaves.Spawn(MakeShockwave(boss.motion.position, boss.radius, boss.frenzy.roar));
+            Record(world, WorldEventKind::BossRoared, boss.motion.position);
         }
         break;
     case ShieldHit::Broken:
         StaggerBoss(boss);
+        Record(world, WorldEventKind::ShieldBroken, at, along);
         break;
     case ShieldHit::Bounced:
     case ShieldHit::Absorbed:
+        Record(world, WorldEventKind::ShieldStruck, at, along);
         break;
     }
 }
@@ -372,6 +393,9 @@ void StepBullets(World& world, float dt) {
         if (hit.enemy) {
             HitEnemy(*hit.enemy, bullet);
             ++world.shotsHit;
+            if (IsDead(hit.enemy->health)) {
+                Record(world, WorldEventKind::HairballKilled, hit.enemy->motion.position, Heading(bullet));
+            }
             return true;
         }
         if (hit.boss) {
@@ -452,6 +476,7 @@ void LandLeap(World& world) {
         player.motion.velocity += out * leap.impactKnockback;
     }
     world.shockwaves.Spawn(MakeShockwave(center, boss.radius, leap.shockwave));
+    Record(world, WorldEventKind::BossLanded, center);
     // In a frenzy, a ring of strands with no gap leaves with the wave, one of them at the player: the wave
     // is dashed through, and the strands are slipped between.
     const Vec2 toPlayer = LengthSquared(away) > 1.0f ? Normalized(away) : Vec2{0.0f, 1.0f};
@@ -539,11 +564,15 @@ void StepWorld(World& world, const PlayerCommands& commands, float dt) {
     if (actions.summon) {
         PlaceSummon(world);
     }
+    if (actions.hitWall) {
+        Record(world, WorldEventKind::BossHitWall, world.boss.motion.position, world.boss.attack->direction);
+    }
     // Before the collisions, so a hairball that comes out is pushed apart and held inside the walls at once.
     StepSpawnMarkers(world, dt);
     if (actions.roared) {
         const Boss& boss = world.boss;
         world.shockwaves.Spawn(MakeShockwave(boss.motion.position, boss.radius, boss.phaseTwo.roar));
+        Record(world, WorldEventKind::BossRoared, boss.motion.position);
     }
 
     // Collisions run after everyone has moved, so the order in which bodies moved does not decide who
@@ -582,10 +611,15 @@ void DefeatBoss(World& world) {
     world.boss.attack.reset();
     world.boss.phase = BossPhase::Two;
     world.boss.health.current = 0;
+    Record(world, WorldEventKind::BossDefeated, world.boss.motion.position);
 }
 
 void TransformBoss(World& world) {
+    if (world.boss.phase != BossPhase::One) {
+        return;
+    }
     StartTransformation(world.boss);
+    Record(world, WorldEventKind::FirstPhaseEnded, world.boss.motion.position);
 }
 
 void FrenzyBoss(World& world) {
@@ -597,11 +631,13 @@ void FrenzyBoss(World& world) {
     boss.health.current = std::min(boss.health.current, static_cast<int>(half));
     EnterFrenzy(boss);
     world.shockwaves.Spawn(MakeShockwave(boss.motion.position, boss.radius, boss.frenzy.roar));
+    Record(world, WorldEventKind::BossRoared, boss.motion.position);
 }
 
 void BreakBossShield(World& world) {
     BreakShield(world.boss.shield);
     StaggerBoss(world.boss);
+    Record(world, WorldEventKind::ShieldBroken, world.boss.motion.position);
 }
 
 } // namespace horde

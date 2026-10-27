@@ -19,6 +19,8 @@ add_executable(horde_tests
     core/FollowCameraTests.cpp
     core/FrenzyTests.cpp
     core/HealthTests.cpp
+    core/HitStopTests.cpp
+    core/ImpactFeelTests.cpp
     core/LoadoutTests.cpp
     core/MovementTests.cpp
     core/ObjectPoolTests.cpp
@@ -26,6 +28,7 @@ add_executable(horde_tests
     core/ProjectileTests.cpp
     core/RandomTests.cpp
     core/ScreenFitTests.cpp
+    core/ScreenShakeTests.cpp
     core/SessionTests.cpp
     core/SummonTests.cpp
     core/ShieldTests.cpp
@@ -33,6 +36,7 @@ add_executable(horde_tests
     core/StoneFloorTests.cpp
     core/Vec2Tests.cpp
     core/WeaponTests.cpp
+    core/WorldEventTests.cpp
     core/WorldTests.cpp)
 target_link_libraries(horde_tests PRIVATE horde_core doctest::doctest)
 horde_set_warnings(horde_tests)

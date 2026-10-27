@@ -3,6 +3,8 @@
 #include "app/PlayerInput.h"
 #include "app/render/Art.h"
 #include "core/FixedTimestep.h"
+#include "core/HitStop.h"
+#include "core/ScreenShake.h"
 #include "core/Session.h"
 
 namespace horde {
@@ -27,12 +29,18 @@ private:
     /// One frame: the presses since the last one, the fixed steps that are due, and one render.
     void Frame();
     void Update(float dt);
+    /// Turns what happened in the last step into a hit stop and a screen shake, and clears the events.
+    void FeelEvents();
     void Draw(float alpha) const;
 
     FixedTimestep _timestep;
     Session _session;
     ButtonPresses _pendingPresses; ///< Presses since the last fixed step, used by the next one.
     Art _art; ///< Loaded once the window is open, unloaded before it closes.
+    // Both live here, not in the World: they change how the fight is shown and when it steps, never what
+    // happens in it.
+    HitStop _hitStop;
+    ScreenShake _shake;
 
 #ifndef NDEBUG
     bool _showDebugOverlay = false;

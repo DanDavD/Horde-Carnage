@@ -4,6 +4,7 @@
 
 #include "core/FollowCamera.h"
 #include "core/ScreenFit.h"
+#include "core/ScreenShake.h"
 #include "core/Vec2.h"
 
 namespace horde {
@@ -31,7 +32,9 @@ inline constexpr Vec2 kViewSize{static_cast<float>(kScreenWidth), static_cast<fl
 /// point through it.
 [[nodiscard]] Camera2D ToRaylibCamera(const FollowCamera& camera, float alpha);
 
-/// The follow camera moved and scaled onto the real screen, for drawing the world.
-[[nodiscard]] Camera2D WorldCamera(const FollowCamera& camera, float alpha, const ScreenFit& fit);
+/// The follow camera moved and scaled onto the real screen, and moved and turned by `shake`, for drawing the
+/// world. The aim goes through `ToRaylibCamera`, without the shake, so a shake never moves the shot.
+[[nodiscard]] Camera2D WorldCamera(const FollowCamera& camera, float alpha, const ScreenFit& fit,
+                                   const ShakeOffset& shake = {});
 
 } // namespace horde

@@ -11,11 +11,14 @@ add_library(horde_core STATIC
     core/Flasks.cpp
     core/FollowCamera.cpp
     core/Health.cpp
+    core/HitStop.cpp
+    core/ImpactFeel.cpp
     core/Loadout.cpp
     core/Movement.cpp
     core/Projectile.cpp
     core/Random.cpp
     core/ScreenFit.cpp
+    core/ScreenShake.cpp
     core/Session.cpp
     core/Shield.cpp
     core/Shockwave.cpp

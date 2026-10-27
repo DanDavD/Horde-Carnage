@@ -30,9 +30,11 @@ Camera2D ToRaylibCamera(const FollowCamera& camera, float alpha) {
                     .zoom = 1.0f};
 }
 
-Camera2D WorldCamera(const FollowCamera& camera, float alpha, const ScreenFit& fit) {
+Camera2D WorldCamera(const FollowCamera& camera, float alpha, const ScreenFit& fit, const ShakeOffset& shake) {
     Camera2D world = ToRaylibCamera(camera, alpha);
     world.offset = ToRaylib(GameToScreen(fit, kViewSize * 0.5f));
+    world.target = ToRaylib(FromRaylib(world.target) + shake.offset);
+    world.rotation = shake.turnDegrees;
     world.zoom = fit.scale;
     return world;
 }

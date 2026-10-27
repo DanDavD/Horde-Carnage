@@ -48,10 +48,11 @@ This is day 7 of 15, and the boss fight is in progress. Progress is tracked in t
 - Unit tests for the pure logic, and a GitHub Actions workflow that builds and tests every push and pull request on Windows, and builds the web version.
 - A web build: the same game compiled to WebAssembly, playable in a browser tab. See [The web build](docs/WEB_BUILD.md).
 - A dark look drawn entirely in code: a crypt of cracked stone slabs and black walls, lit only by the torch you carry, with shadows that lean away from it; a hunter in a tricorn hat and a torn cape, both hands on the gun, the other gun slung or holstered; the Matriarch as a matted mass of breathing hair with glowing slit eyes, who grows a mouth full of teeth in her second phase; and a HUD of thin bars in the Cinzel typeface. See [Art direction](docs/ART.md).
+- Hits you can feel. A heavy hit drops the fight into slow motion for a moment, easing back to full speed, and the screen shakes with the hit, the boss's landings, its crashes into the walls and its roars, harder for the bigger moments. The HUD and your aim never shake. See [Game feel](docs/GAME_FEEL.md).
 - Always fullscreen, at the monitor's own resolution and refresh rate, drawn sharp at that resolution, with black bars on screens that are not 16:9 so everyone sees the same arena. `--windowed` opens a window instead. See [Screen and fullscreen](docs/SCREEN.md).
 - Warnings are errors for the project's own code (`/W4 /WX` on MSVC).
 
-**Still to do:** game feel, sound and menus, and maybe the numbers in JSON. See the [roadmap](docs/ROADMAP.md) for the order, and for the difficulty I am aiming for.
+**Still to do:** particles and health bars that drain, sound and menus, and maybe the numbers in JSON. See the [roadmap](docs/ROADMAP.md) for the order, and for the difficulty I am aiming for.
 
 ## Tech stack
 
