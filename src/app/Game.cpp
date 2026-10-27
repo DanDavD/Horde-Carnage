@@ -1,5 +1,6 @@
 #include "app/Game.h"
 
+#include <algorithm>
 #include <random>
 
 #include <raylib.h>
@@ -23,7 +24,9 @@
 namespace horde {
 
 // Every launch starts from a seed the system picks, so no two runs of the game repeat the same fights.
-Game::Game(bool windowed) : _session{StartSession(kBossArena, kViewSize, std::random_device{}())} {
+Game::Game(bool windowed)
+    : _session{StartSession(kBossArena, kViewSize, std::random_device{}())},
+      _particles{SeedParticleEmitter(std::random_device{}())} {
     // Vsync caps how often we render, at the monitor's own rate. How often the game simulates comes from
     // FixedTimestep.
 #ifdef __EMSCRIPTEN__
@@ -68,8 +71,8 @@ void Game::Run() {
 
 void Game::Frame() {
     // Key presses are read once per frame, not per fixed step: a frame with no step would miss them.
-    if (ReadRestartPressed()) {
-        TryRestart(_session);
+    if (ReadRestartPressed() && TryRestart(_session)) {
+        ClearParticles(_particles);
     }
     CollectButtonPresses(_pendingPresses);
 
@@ -99,13 +102,22 @@ void Game::Frame() {
     // A hit stop slows the fight's clock, so the world takes fewer of its fixed steps. Every step is still the
     // same length, so the rules play out exactly as at full speed, only slower to watch.
     const float frameSeconds = GetFrameTime();
-    const int steps = _timestep.Advance(frameSeconds * TimeScale(_hitStop));
+    const float timeScale = TimeScale(_hitStop);
+    // Existing particles advance first, scaled by the hit stop so shards and casings hang in slow motion with
+    // the fight, while any burst spawned in this frame's steps is drawn once right where it started.
+    StepParticles(_particles.particles, _session.world.arena, std::min(frameSeconds, 0.25f) * timeScale);
+    const int steps = _timestep.Advance(frameSeconds * timeScale);
     StepHitStop(_hitStop, frameSeconds);
     const auto dt = static_cast<float>(_timestep.StepSeconds());
     for (int i = 0; i < steps; ++i) {
+        const bool wasPlaying = _session.state == SessionState::Playing;
         Update(dt);
+        if (wasPlaying) {
+            EmitContinuousParticles(_particles, _session.world, dt);
+        }
         FeelEvents();
     }
+    FeelEvents();
     // The shake is only a view of the fight, so it moves on with the frames at full speed, which keeps it
     // smooth on a fast monitor and keeps it shaking through a hit stop.
     StepScreenShake(_shake, frameSeconds);
@@ -143,6 +155,7 @@ void Game::FeelEvents() {
         const ImpactFeel feel = FeelOf(event);
         StartHitStop(_hitStop, feel.slowSeconds);
         AddTrauma(_shake, feel.trauma);
+        EmitEventParticles(_particles, event, _session.world);
     }
     events.Clear();
 }
@@ -171,7 +184,7 @@ void Game::Draw(float alpha) const {
     // The world camera, scaled and moved onto the screen with the rest of the game, and shaken. The HUD
     // below is not shaken, so the bars stay readable through the hardest hit.
     BeginMode2D(WorldCamera(world.camera, alpha, fit, CurrentShake(_shake)));
-    DrawWorld(world, alpha, _art);
+    DrawWorld(world, _particles.particles, alpha, _art);
 #ifndef NDEBUG
     if (_showDebugOverlay) {
         DrawDebugWorld(world.player, world.camera, alpha);
@@ -184,7 +197,7 @@ void Game::Draw(float alpha) const {
     DrawVignette(_art);
 #ifndef NDEBUG
     if (_showDebugOverlay) {
-        DrawDebugHud(world, _lastMoveInput);
+        DrawDebugHud(world, _lastMoveInput, _particles.particles.Size());
     }
 #endif
     DrawHud(world, _session.attempt, playing, AimInGame(fit), _art);

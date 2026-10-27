@@ -24,6 +24,8 @@ add_executable(horde_tests
     core/LoadoutTests.cpp
     core/MovementTests.cpp
     core/ObjectPoolTests.cpp
+    core/ParticleEmitterTests.cpp
+    core/ParticleTests.cpp
     core/PhaseTwoTests.cpp
     core/ProjectileTests.cpp
     core/RandomTests.cpp

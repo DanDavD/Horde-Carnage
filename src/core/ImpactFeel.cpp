@@ -4,8 +4,9 @@ namespace horde {
 
 ImpactFeel FeelOf(const WorldEvent& event) {
     switch (event.kind) {
-    // Many times a second: the hit flash and, later, the particles and sounds carry these.
+    // Many times a second, or the player's own dash: the particles and sounds carry these.
     case WorldEventKind::ShotFired:
+    case WorldEventKind::DashStarted:
     case WorldEventKind::BossHurt:
     case WorldEventKind::ShieldStruck:
         return {};

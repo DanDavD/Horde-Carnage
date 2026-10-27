@@ -99,7 +99,21 @@ TEST_CASE("a hit on the player records the damage, and the hit that empties the 
     CHECK(Count(world, WorldEventKind::PlayerHurt) == 0);
 }
 
-TEST_CASE("a dash through a strand records nothing, because nothing landed") {
+TEST_CASE("starting a dash records where it left from and which way it went, once per dash") {
+    World world = NewFight();
+    const Vec2 start = world.player.motion.position;
+    Step(world, PlayerCommands{.move = Vec2{1.0f, 0.0f}, .dashPressed = true}, 1);
+    const WorldEvent* dash = Find(world, WorldEventKind::DashStarted);
+    REQUIRE(dash);
+    CHECK(dash->position == start);
+    CHECK(dash->direction == Vec2{1.0f, 0.0f});
+
+    world.events.Clear();
+    Step(world, PlayerCommands{.move = Vec2{1.0f, 0.0f}, .dashPressed = true}, 1);
+    CHECK(Count(world, WorldEventKind::DashStarted) == 0);
+}
+
+TEST_CASE("a dash through a strand records nothing on the player, because nothing landed") {
     World world = NewFight();
     world.boss.health.current = 0;
     horde::Projectile strand = horde::LaunchProjectile(world.player.motion.position + Vec2{-60.0f, 0.0f},
@@ -113,11 +127,22 @@ TEST_CASE("a dash through a strand records nothing, because nothing landed") {
 
 TEST_CASE("bullets on the shield record a strike, the one that breaks it a break, and the next ones a hurt boss") {
     World world = NewFight();
-    // A Barrier soaks up a pistol bullet without breaking.
+    // An SMG bullet bounces off the Shell and records 0 damage.
+    Step(world, PlayerCommands{.selectSlot = 1}, 1);
+    ShootBossOnce(world);
+    const WorldEvent* bounced = Find(world, WorldEventKind::ShieldStruck);
+    REQUIRE(bounced);
+    CHECK(bounced->amount == 0);
+
+    // A Barrier soaks up a pistol bullet without breaking, recording the bullet's damage.
+    world.events.Clear();
+    Step(world, PlayerCommands{.selectSlot = 0}, 1);
     world.boss.shield.kind = horde::ShieldKind::Barrier;
     world.boss.shield.strength = world.boss.shield.stats.barrierStrength;
     ShootBossOnce(world);
-    CHECK(Count(world, WorldEventKind::ShieldStruck) == 1);
+    const WorldEvent* absorbed = Find(world, WorldEventKind::ShieldStruck);
+    REQUIRE(absorbed);
+    CHECK(absorbed->amount == horde::kPistol.damage);
     CHECK(Count(world, WorldEventKind::ShieldBroken) == 0);
 
     // A Shell one bullet from breaking.

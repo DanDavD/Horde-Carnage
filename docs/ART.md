@@ -16,6 +16,7 @@ Where it lives:
 - `src/app/render/PlayerDraw.cpp`: the hunter.
 - `src/app/render/HairBody.h`, `src/app/render/HairBody.cpp`: `DrawHairBody`, the body of matted hair the boss and the hairballs share, and `DrawHairball`.
 - `src/app/render/BossDraw.cpp`: the boss's styles for each phase, and its pose in each attack: where it looks, how it is squashed or stretched, how wide its mouth is open.
+- `src/app/render/ParticleDraw.h`, `src/app/render/ParticleDraw.cpp`: casings, blood splats, torn hair locks, shield shards, stone dust, gunsmoke and sparks.
 - `src/app/render/Shapes.h`, `src/app/render/Shapes.cpp`: shapes raylib does not have, shared by the hunter and the hair: a closed shape from a radius at each angle, a rotated ellipse, a triangle of either winding.
 - `src/app/render/Hud.cpp`, `src/app/render/EndScreen.cpp`: the HUD and the end screens, in Cinzel.
 - `src/app/render/Text.h`, `src/app/render/Text.cpp`: text in the game's fonts, with letter spacing, centred or aligned to the right.
@@ -38,7 +39,7 @@ Where it lives:
 
 **The torchlight.** `DrawTorchLight` darkens the whole view with the distance from the player. The falloff texture covers a square 470 units out from the player in every direction, tinted near-black at 74%: clear for the first 18% of the reach, then fading in. Up to four rectangles fill the rest of the view with the same darkness, meeting the square's edges exactly. Then a warm glow 260 units wide is added on top. Both breathe by a few percent with two sine waves on the fight's clock, like a flame, and freeze with the world when the fight ends.
 
-**The order.** `DrawWorld` draws the floor, the walls, the shadows and the dark first. The boss's warnings, the shockwaves, the Summon's marks, every body and every projectile come after the dark, at full brightness. Over the world, before the HUD, `DrawVignette` darkens the corners of the screen by up to 60%.
+**The order.** `DrawWorld` draws the floor, the walls, the shadows and the dark first. Settled floor debris (spent casings, blood splats, fallen locks of hair and shield chips) goes right over the dark so it keeps its colour, followed by the boss's warnings, the shockwaves and the Summon's marks, then stone dust under the bodies, every body and projectile, and finally sparks, gunsmoke and airborne debris on top. Over the world, before the HUD, `DrawVignette` darkens the corners of the screen by up to 60%.
 
 **The hunter.** The player is a monster hunter: a tricorn hat, a long coat, a torn cape, a bandolier of brass cartridges, and a gun held in both hands. `DrawPlayer` draws it from above, in layers, with every size a fraction of the body radius:
 

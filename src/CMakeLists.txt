@@ -15,6 +15,8 @@ add_library(horde_core STATIC
     core/ImpactFeel.cpp
     core/Loadout.cpp
     core/Movement.cpp
+    core/Particle.cpp
+    core/ParticleEmitter.cpp
     core/Projectile.cpp
     core/Random.cpp
     core/ScreenFit.cpp
@@ -41,6 +43,7 @@ add_executable(HordeCarnage
     app/render/EndScreen.cpp
     app/render/HairBody.cpp
     app/render/Hud.cpp
+    app/render/ParticleDraw.cpp
     app/render/PlayerDraw.cpp
     app/render/Shapes.cpp
     app/render/Text.cpp

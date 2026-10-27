@@ -76,7 +76,8 @@ void DrinkFlasks(Player& player, float dt) {
 // A dash goes where the player is pushing. Standing still, it goes toward the aim point of this step, not
 // the facing: the facing is only updated after moving, so it is a step old, and a flick of the mouse
 // followed by a dash in the same frame would go the wrong way.
-void StartDashIfAsked(Player& player, const PlayerCommands& commands) {
+void StartDashIfAsked(World& world, const PlayerCommands& commands) {
+    Player& player = world.player;
     if (!commands.dashPressed || IsDashing(player.dash) || IsDrinking(player.flasks)) {
         return;
     }
@@ -88,7 +89,9 @@ void StartDashIfAsked(Player& player, const PlayerCommands& commands) {
     } else if (commands.aimAt && LengthSquared(*commands.aimAt - player.motion.position) > 1.0f) {
         direction = *commands.aimAt - player.motion.position;
     }
-    TryStartDash(player.dash, player.motion.position, direction);
+    if (TryStartDash(player.dash, player.motion.position, direction)) {
+        Record(world, WorldEventKind::DashStarted, player.motion.position, player.dash.direction);
+    }
 }
 
 void MovePlayer(Player& player, Vec2 move, float dt) {
@@ -299,8 +302,10 @@ void HitBoss(World& world, const Projectile& bullet) {
         Record(world, WorldEventKind::ShieldBroken, at, along);
         break;
     case ShieldHit::Bounced:
+        Record(world, WorldEventKind::ShieldStruck, at, along, 0);
+        break;
     case ShieldHit::Absorbed:
-        Record(world, WorldEventKind::ShieldStruck, at, along);
+        Record(world, WorldEventKind::ShieldStruck, at, along, bullet.damage);
         break;
     }
 }
@@ -534,7 +539,7 @@ void StepWorld(World& world, const PlayerCommands& commands, float dt) {
     Player& player = world.player;
     TickHealth(player.health, dt);
     TickDashCooldown(player.dash, dt);
-    StartDashIfAsked(player, commands);
+    StartDashIfAsked(world, commands);
     StartDrinkIfAsked(player, commands);
     DrinkFlasks(player, dt);
     MovePlayer(player, commands.move, dt);

@@ -14,18 +14,19 @@ ImpactFeel Feel(WorldEventKind kind, int amount = 0) {
     return horde::FeelOf(WorldEvent{.kind = kind, .amount = amount});
 }
 
-constexpr std::array kAllKinds{WorldEventKind::ShotFired,      WorldEventKind::PlayerHurt,
-                               WorldEventKind::PlayerKilled,   WorldEventKind::BossHurt,
-                               WorldEventKind::ShieldStruck,   WorldEventKind::ShieldBroken,
-                               WorldEventKind::HairballKilled, WorldEventKind::BossLanded,
-                               WorldEventKind::BossHitWall,    WorldEventKind::FirstPhaseEnded,
-                               WorldEventKind::BossRoared,     WorldEventKind::BossDefeated};
+constexpr std::array kAllKinds{WorldEventKind::ShotFired,      WorldEventKind::DashStarted,
+                               WorldEventKind::PlayerHurt,     WorldEventKind::PlayerKilled,
+                               WorldEventKind::BossHurt,       WorldEventKind::ShieldStruck,
+                               WorldEventKind::ShieldBroken,   WorldEventKind::HairballKilled,
+                               WorldEventKind::BossLanded,     WorldEventKind::BossHitWall,
+                               WorldEventKind::FirstPhaseEnded, WorldEventKind::BossRoared,
+                               WorldEventKind::BossDefeated};
 
 } // namespace
 
-TEST_CASE("what happens many times a second neither slows nor shakes") {
-    for (const WorldEventKind kind : {WorldEventKind::ShotFired, WorldEventKind::BossHurt,
-                                      WorldEventKind::ShieldStruck}) {
+TEST_CASE("what happens many times a second or starts a dash neither slows nor shakes") {
+    for (const WorldEventKind kind : {WorldEventKind::ShotFired, WorldEventKind::DashStarted,
+                                      WorldEventKind::BossHurt, WorldEventKind::ShieldStruck}) {
         const ImpactFeel feel = Feel(kind, 10);
         CHECK(feel.slowSeconds == 0.0f);
         CHECK(feel.trauma == 0.0f);

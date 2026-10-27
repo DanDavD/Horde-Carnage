@@ -79,5 +79,8 @@ inline constexpr Color kCrosshair{236, 228, 210, 255};
 inline constexpr Color kBullet{255, 230, 140, 255};
 inline constexpr Color kFlask{245, 150, 45, 255};
 inline constexpr Color kHitFlash{255, 255, 255, 255};
+inline constexpr Color kDust{142, 138, 132, 255};
+inline constexpr Color kGunSmoke{168, 172, 180, 255};
+inline constexpr Color kDarkBlood{108, 18, 24, 255};
 
 } // namespace horde

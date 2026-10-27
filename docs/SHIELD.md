@@ -52,7 +52,7 @@ The bullet is spent in every case: a bounce does not fly on. Every bullet that r
 - **A broken shield staggers the boss.** A break is the player's reward, and a bar that empties is easy to miss in the middle of a dodge. Cutting the attack off and holding the boss still for a second makes the break felt, and it is the one moment a bullet can interrupt the boss. Bullets alone still never stagger it (see [The boss](BOSS.md#design-decisions)).
 - **Exposed for 5 s, then the other kind.** Long enough for about 300 damage with either gun, a quarter of the boss's health, so a fight is a few shield cycles. Coming back as the other kind is what forces the switch; coming back as the same kind would let the player keep one gun for the whole fight.
 - **The shield is a component of the boss, stepped by `StepBoss`.** It has its own data and rules and its own tests, but it only exists on the boss, so it lives in the `Boss` struct like the attack stats, not in the `World`.
-- **Bounced bullets are spent.** A bullet that flies back off the shield would look good, but it would need a new side (a bullet that can hit the player, or nothing) and more drawing for little gain. The thicker flash of the band says "bounced" well enough until the game feel pass adds sparks.
+- **Bounced bullets are spent.** A bullet that flies back off the shield would look good, but it would need a new side (a bullet that can hit the player, or nothing) and more drawing for little gain. The thicker flash of the band and a tight spray of blue ricochet sparks say "bounced" clearly without a new projectile rule.
 
 ## How to tune it
 
@@ -87,6 +87,6 @@ The drawing is not unit tested, because it needs a window. I checked it with cap
 
 ## Limitations
 
-- **A bounce has no sparks and no sound.** Only the band's flash shows it. Both come with the game feel pass.
+- **A bounce has no sound yet.** The band's flash and the blue ricochet sparks show it; sound comes with the audio pass.
 - **The shield ignores the hairballs.** It only stands between the player's bullets and the boss. Nothing else hurts the boss today.
 - **Only the opening changes in the second phase.** It drops from 5 s to 4 s (`PhaseTwoStats::exposedSeconds`), and the second phase starts with a fresh Shell. The strengths stay the same.

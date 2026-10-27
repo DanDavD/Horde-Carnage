@@ -45,7 +45,7 @@ The simulation never reads a key or the mouse. Every step, `Game::Update` turns 
 
 `Session` (`src/core/Session.h`) wraps the world in a small state machine: `Playing` steps the world, `Victory` freezes it once the boss is defeated, and `Dead` freezes it once the player's health reaches 0. `TryRestart` replaces the world with a fresh one from `CreateWorld`, with the next seed, and the session keeps the attempt count across it. See [Game flow](GAME_FLOW.md).
 
-`Game` owns one `Session`. It reads the input, calls `StepSession`, and draws the result. It never changes the world itself. After each step it reads the world's events and turns them into a hit stop, which slows the world's clock for a moment, and a screen shake, which moves the world's camera. Both are `horde_core` components that `Game` owns, because they change how the fight is shown, never what happens in it. See [Game feel](GAME_FEEL.md).
+`Game` owns one `Session`. It reads the input, calls `StepSession`, and draws the result. It never changes the world itself. After each step it reads the world's events and turns them into a hit stop (which slows the world's clock for a moment), a screen shake (which moves the world's camera), and particles (`ParticleEmitter`, with its own random generator so the fight's seed stays untouched). All three are `horde_core` components that `Game` owns, because they change how the fight is shown, never what happens in it. See [Game feel](GAME_FEEL.md).
 
 ### Drawing
 
@@ -57,8 +57,9 @@ src/app/render/
   Palette.h     Every colour the game draws with
   Art           The fonts, the textures made in code and the floor's layout, loaded once at the start
   Text          Text in the game's fonts: spaced, centred or aligned to the right
-  WorldDraw     DrawWorld: the arena, the warnings on the floor, the bodies and projectiles, in draw order
+  WorldDraw     DrawWorld: the arena, floor litter, warnings, dust, bodies, projectiles and sparks, in draw order
   ArenaDraw     The stone floor, the walls, the shadows under bodies, the torchlight and the vignette
+  ParticleDraw  Floor litter, dust and shadows under bodies, sparks and airborne debris over them
   HairBody      The body of matted hair that hairballs and the boss share (DrawHairBody), and DrawHairball
   Shapes        Shapes raylib does not have: a radius at each angle, a rotated ellipse
   BossDraw      The boss in each pose, its shield, and the warnings of its attacks
@@ -103,7 +104,7 @@ Game objects are plain structs (components) that hold data, and free functions (
 - `tests/core/ChaseTests.cpp` and `WorldTests.cpp`: see [Enemies](ENEMIES.md#tests).
 - `tests/core/AttackChoiceTests.cpp`, `BossTests.cpp`, `BossChargeTests.cpp`, `BossComboTests.cpp`, `BossHairRingTests.cpp`, `BossLeapTests.cpp`, `BossVolleyTests.cpp`, `FrenzyTests.cpp`, `PhaseTwoTests.cpp`, `ShockwaveTests.cpp` and `SummonTests.cpp`: see [The boss](BOSS.md#tests). The boss tests share `PredictableBoss.h`, a boss without its chance.
 - `tests/core/RandomTests.cpp`: see [Random numbers](RANDOM.md#tests).
-- `tests/core/WorldEventTests.cpp`, `HitStopTests.cpp`, `ScreenShakeTests.cpp` and `ImpactFeelTests.cpp`: see [Game feel](GAME_FEEL.md#tests).
+- `tests/core/WorldEventTests.cpp`, `HitStopTests.cpp`, `ScreenShakeTests.cpp`, `ImpactFeelTests.cpp`, `ParticleTests.cpp` and `ParticleEmitterTests.cpp`: see [Game feel](GAME_FEEL.md#tests).
 - `tests/core/ScreenFitTests.cpp`: see [Screen and fullscreen](SCREEN.md#tests).
 - `tests/core/StoneFloorTests.cpp`: see [Art direction](ART.md#tests).
 - `tests/core/ShieldTests.cpp`: see [The boss's shield](SHIELD.md#tests).
