@@ -43,7 +43,7 @@ The simulation never reads a key or the mouse. Every step, `Game::Update` turns 
 
 ### The session
 
-`Session` (`src/core/Session.h`) wraps the world in a small state machine: `Playing` steps the world, `Victory` freezes it once the boss is defeated, and `Dead` freezes it once the player's health reaches 0. `TryRestart` replaces the world with a fresh one from `CreateWorld`, with the next seed, and the session keeps the attempt count across it. See [Game flow](GAME_FLOW.md).
+`Session` (`src/core/Session.h`) wraps the world in a small state machine: `Title` waits over a fresh world, `Playing` steps the world, `Paused` holds it, `Victory` freezes it once the boss is defeated, and `Dead` freezes it once the player's health reaches 0. `TryRestart` replaces the world with a fresh one from `CreateWorld`, with the next seed, and the session keeps the attempt count across it. See [Game flow](GAME_FLOW.md).
 
 `Game` owns one `Session`. It reads the input, calls `StepSession`, and draws the result. It never changes the world itself. After each step it reads the world's events and turns them into a hit stop (which slows the world's clock for a moment), a screen shake (which moves the world's camera), and particles (`ParticleEmitter`, with its own random generator so the fight's seed stays untouched). All three are `horde_core` components that `Game` owns, because they change how the fight is shown, never what happens in it. So are the trails behind the two health bars (`TrailingBar`), which `Game` steps after the world and the HUD draws. See [Game feel](GAME_FEEL.md).
 
@@ -65,7 +65,9 @@ src/app/render/
   BossDraw      The boss in each pose, its shield, and the warnings of its attacks
   PlayerDraw    The player, the gun, the dash trail and the drink ring
   Hud           The bars, the flasks, the weapon panel, the crosshair, the attempt and the controls line
-  EndScreen     YOU DIED and VICTORY
+  EndScreen     YOU DIED and VICTORY, with their row of choices
+  MenuDraw      The items of each menu, where they sit, the title and the pause screens
+  Backdrop      The blurred still of the fight behind the pause menu
   DebugOverlay  The F1 overlay, compiled into Debug builds only
 ```
 
@@ -112,6 +114,7 @@ Game objects are plain structs (components) that hold data, and free functions (
 - `tests/core/CollisionTests.cpp` and the crowd cases in `WorldTests.cpp`: see [Collisions](COLLISIONS.md#tests).
 - `tests/core/HealthTests.cpp` and the contact damage cases in `WorldTests.cpp`: see [Health](HEALTH.md#tests).
 - `tests/core/SessionTests.cpp`: see [Game flow](GAME_FLOW.md#tests).
+- `tests/core/MenuTests.cpp`: see [Menus](MENUS.md#tests).
 - `tests/core/WeaponTests.cpp`, `LoadoutTests.cpp` and the aim and fire cases in `FacingTests.cpp` and `WorldTests.cpp`: see [Aiming and weapons](WEAPONS.md#tests).
 - `tests/core/ObjectPoolTests.cpp`: see [Object pool](OBJECT_POOL.md#tests).
 - `tests/core/DashTests.cpp`, `FlasksTests.cpp` and the dash and flask cases in `WorldTests.cpp`: see [Player abilities](ABILITIES.md#tests).

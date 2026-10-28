@@ -22,6 +22,7 @@ add_executable(horde_tests
     core/HitStopTests.cpp
     core/ImpactFeelTests.cpp
     core/LoadoutTests.cpp
+    core/MenuTests.cpp
     core/MovementTests.cpp
     core/ObjectPoolTests.cpp
     core/ParticleEmitterTests.cpp

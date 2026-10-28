@@ -51,10 +51,11 @@ This is day 7 of 15, and the boss fight is in progress. Progress is tracked in t
 - Hits you can feel. A heavy hit drops the fight into slow motion for a moment, easing back to full speed, and the screen shakes with the hit, the boss's landings, its crashes into the walls and its roars, harder for the bigger moments. The HUD and your aim never shake. Every shot throws muzzle sparks, smoke and a brass casing that bounces on the stone; bullets spark blue or orange off the shield, shatter it into spinning shards when it breaks, and tear dark blood and locks of hair from the exposed boss; dashes kick up dust, leap landings roll out a ring of dust, killed hairballs burst into hair, and the Matriarch sheds locks onto the floor throughout Phase 2 and Frenzy, all from a 512-slot pool with its own random stream so the fight's seed never changes. See [Game feel](docs/GAME_FEEL.md).
 - Health bars in the manner of Dark Souls: a hit leaves a pale trail where the bar was, which waits while the hits keep coming and then drains, and the boss's bar shows the damage of your last run of hits. The edges of the screen go red when you are hit and beat like a heart when your health is low. The boss dies on screen, convulsing, screaming and turning grey, before VICTORY fades in. See [Game feel](docs/GAME_FEEL.md).
 - Sound, all of it synthesized in code like the art: the two guns, the shield's ping, knock and shatter, blows, the dash and the flask, the boss's landings, crashes, roar and death, and a warning sound for each of her attacks, so you can hear what is coming. Sounds lean toward the side of the screen they come from. See [Audio](docs/AUDIO.md).
+- A title screen, a pause menu and choices on the end screens, in the manner of Dark Souls and Hollow Knight: a few words in capitals on the dark, the selected one between a thin line and a diamond on each side. Pausing holds the fight and shows it behind the menu, blurred and stepping back. Keys, mouse or gamepad. See [Menus](docs/MENUS.md).
 - Always fullscreen, at the monitor's own resolution and refresh rate, drawn sharp at that resolution, with black bars on screens that are not 16:9 so everyone sees the same arena. `--windowed` opens a window instead. See [Screen and fullscreen](docs/SCREEN.md).
 - Warnings are errors for the project's own code (`/W4 /WX` on MSVC).
 
-**Still to do:** an ambience and music, menus and settings, and maybe the numbers in JSON. See the [roadmap](docs/ROADMAP.md) for the order, and for the difficulty I am aiming for.
+**Still to do:** settings, an ambience and music, gamepad aiming, and maybe the numbers in JSON. See the [roadmap](docs/ROADMAP.md) for the order, and for the difficulty I am aiming for.
 
 ## Tech stack
 
@@ -95,8 +96,12 @@ You can also open the folder in Visual Studio (*File > Open > Folder*). It reads
 | Switch gun | `Q`, `1`, `2` or the mouse wheel | Not yet |
 | Dash | `Space` or left `Shift` | Not yet |
 | Drink a flask | `E` | Not yet |
-| Try again after "YOU DIED" or "VICTORY" | `Enter` or `R` | `A` or `Start` |
-| Quit | `Esc` | |
+| Move through a menu | `W`, `S` or the arrows, or the mouse | d-pad |
+| Choose | `Enter`, `Space` or a click | `A` |
+| Back, or resume from the pause | `Esc` or `Backspace` | `B` |
+| Pause | `Esc` | `Start` |
+| Try again at once after "YOU DIED" or "VICTORY" | `R` | |
+| Quit | Quit on the title | |
 | Play in a window instead of fullscreen | Start it with `--windowed` | |
 | Debug overlay (Debug builds only) | `F1` | |
 | Break the boss's shield (Debug builds only) | `F2` | |

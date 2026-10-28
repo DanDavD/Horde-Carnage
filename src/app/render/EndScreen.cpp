@@ -8,6 +8,7 @@
 #include <raylib.h>
 
 #include "app/render/Hud.h"
+#include "app/render/MenuDraw.h"
 #include "app/render/Palette.h"
 #include "app/render/Text.h"
 #include "app/render/View.h"
@@ -61,9 +62,9 @@ int HealthPercent(const Health& health) {
 } // namespace
 
 // The end of a fight, in the style of the games it borrows from: the world dims and a dark band across
-// the middle carries one big word. It all fades in over the restart delay, so the moment the prompt lights
+// the middle carries one big word. It all fades in over the restart delay, so the moment the choices light
 // up is the moment a press works. After a victory it waits for the boss to finish dying first.
-void DrawEndScreen(const Session& session, const Art& art) {
+void DrawEndScreen(const Session& session, const Menu& menu, float sinceMoved, const Art& art) {
     const float shown = std::clamp(EndScreenSeconds(session) / kRestartDelaySeconds, 0.0f, 1.0f);
     if (shown <= 0.0f) {
         return;
@@ -99,12 +100,10 @@ void DrawEndScreen(const Session& session, const Art& art) {
     DrawGameTextCentered(art.titleFont, summary.c_str(), kMiddle, kTop + 122.0f, 26.0f, Fade(kText, shown));
     DrawGameTextCentered(art.titleFont, detail.c_str(), kMiddle, kTop + 154.0f, 20.0f, Fade(kSoftText, shown));
 
-    // Dimmed until the restart delay has passed, so it is clear why an early press did nothing.
-    const Color prompt = CanRestart(session) ? kText : Fade(kSoftText, 0.4f * shown);
-    const char* again = won ? "Press Enter or R (A or Start on a gamepad) to fight her again"
-                            : "Press Enter or R (A or Start on a gamepad) to try again";
-    // Inside the band, so it never lands on top of the player, who stands in the middle of the screen.
-    DrawGameTextCentered(art.uiFont, again, kMiddle, kTop + 190.0f, 16.0f, prompt);
+    // Inside the band, so they never land on top of the player, who stands in the middle of the screen, and
+    // dimmed until the restart delay has passed, so it is clear why an early press did nothing.
+    const float ready = CanRestart(session) ? 1.0f : 0.35f * shown;
+    DrawMenu(MenuLayoutFor(session.state), MenuLabelsFor(session.state), menu, sinceMoved, ready, art);
 }
 
 } // namespace horde

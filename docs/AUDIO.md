@@ -4,7 +4,7 @@
 
 Every sound in the fight is made in code, like the art: a small synthesizer builds each one from a recipe when the game starts. Nothing is recorded or downloaded, so there are no sound files to ship and no licenses to track. The sounds come from the same events as the hit stop, the shake and the particles (see [Game feel](GAME_FEEL.md)), so the rules never play a sound themselves.
 
-The fight has 23 sounds: the two guns, the shield (a ping when a bullet bounces off the Shell, a knock when the shield soaks one up, and glass when it breaks), the boss's flesh, a hairball bursting, the dash, the flask, three hits on the player (a hit, a heavy hit and the death), the boss's landing, her crash into a wall, her roar, her collapse when the first bar runs out and her death, a strand being spat, and a warning for each of her five attacks.
+There are 25 sounds: two for the menus (a dry tick to move, a low knock to choose), and 23 for the fight: the two guns, the shield (a ping when a bullet bounces off the Shell, a knock when the shield soaks one up, and glass when it breaks), the boss's flesh, a hairball bursting, the dash, the flask, three hits on the player (a hit, a heavy hit and the death), the boss's landing, her crash into a wall, her roar, her collapse when the first bar runs out and her death, a strand being spat, and a warning for each of her five attacks.
 
 The code:
 

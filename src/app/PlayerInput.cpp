@@ -13,6 +13,22 @@ namespace horde {
 namespace {
 
 constexpr int kGamepad = 0;
+
+#ifdef __EMSCRIPTEN__
+// The page locks the pointer on the next click only while the game wants it hidden (see web/shell.html).
+EM_JS(void, SetPageWantsLock, (int wants), {
+    Module.hordeWantsLock = wants != 0;
+    if (!wants && document.pointerLockElement) {
+        document.exitPointerLock();
+    }
+});
+
+EM_JS(int, TakePageLockLost, (), {
+    const lost = Module.hordeLockLost ? 1 : 0;
+    Module.hordeLockLost = false;
+    return lost;
+});
+#endif
 constexpr float kStickDeadzone = 0.2f;
 
 float KeyAxis(int negativeKey, int negativeAltKey, int positiveKey, int positiveAltKey) {
@@ -71,7 +87,7 @@ Vec2 ReadAimPoint() {
 
 void SetCursorHidden(bool hidden) {
 #ifdef __EMSCRIPTEN__
-    (void)hidden;
+    SetPageWantsLock(hidden ? 1 : 0);
 #else
     if (hidden && !IsCursorHidden()) {
         HideCursor();
@@ -99,12 +115,39 @@ void CollectButtonPresses(ButtonPresses& presses) {
     presses.heal = presses.heal || IsKeyPressed(KEY_E);
 }
 
-bool ReadRestartPressed() {
-    if (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_R)) {
-        return true;
+MenuInput ReadMenuKeys() {
+    const bool pad = IsGamepadAvailable(kGamepad);
+    const auto padPressed = [pad](int button) { return pad && IsGamepadButtonPressed(kGamepad, button); };
+    MenuInput input;
+    if (IsKeyPressed(KEY_W) || IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_A) || IsKeyPressed(KEY_LEFT) ||
+        padPressed(GAMEPAD_BUTTON_LEFT_FACE_UP) || padPressed(GAMEPAD_BUTTON_LEFT_FACE_LEFT)) {
+        input.move = -1;
     }
-    return IsGamepadAvailable(kGamepad) && (IsGamepadButtonPressed(kGamepad, GAMEPAD_BUTTON_RIGHT_FACE_DOWN) ||
-                                           IsGamepadButtonPressed(kGamepad, GAMEPAD_BUTTON_MIDDLE_RIGHT));
+    if (IsKeyPressed(KEY_S) || IsKeyPressed(KEY_DOWN) || IsKeyPressed(KEY_D) || IsKeyPressed(KEY_RIGHT) ||
+        padPressed(GAMEPAD_BUTTON_LEFT_FACE_DOWN) || padPressed(GAMEPAD_BUTTON_LEFT_FACE_RIGHT)) {
+        input.move = 1;
+    }
+    input.confirm = IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_KP_ENTER) || IsKeyPressed(KEY_SPACE) ||
+                    padPressed(GAMEPAD_BUTTON_RIGHT_FACE_DOWN);
+    input.back = IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_BACKSPACE) || padPressed(GAMEPAD_BUTTON_RIGHT_FACE_RIGHT);
+    return input;
+}
+
+bool ReadPausePressed() {
+    return IsKeyPressed(KEY_ESCAPE) ||
+           (IsGamepadAvailable(kGamepad) && IsGamepadButtonPressed(kGamepad, GAMEPAD_BUTTON_MIDDLE_RIGHT));
+}
+
+bool ReadQuickRetryPressed() {
+    return IsKeyPressed(KEY_R);
+}
+
+bool TakePointerLockLost() {
+#ifdef __EMSCRIPTEN__
+    return TakePageLockLost() != 0;
+#else
+    return false;
+#endif
 }
 
 } // namespace horde

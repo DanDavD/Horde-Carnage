@@ -209,6 +209,22 @@ std::array<SoundRecipe, kSoundCount> MakeRecipes() {
                  .lowPassToHz = 1400.0f},
                 {.waveform = Sine, .fromHz = 900.0f, .toHz = 280.0f, .gain = 0.2f, .decay = 0.04f}},
                23));
+    // The menus: a dry, quiet tick to move, and a low knock to choose, like a stone set down.
+    set(SoundId::MenuMove,
+        Recipe(0.08f, 1.0f,
+               {{.waveform = Sine, .fromHz = 1500.0f, .toHz = 1100.0f, .gain = 0.6f, .attack = 0.001f,
+                 .decay = 0.012f},
+                {.waveform = Noise, .gain = 0.5f, .attack = 0.0005f, .decay = 0.004f, .lowPassFromHz = 5000.0f,
+                 .lowPassToHz = 5000.0f}},
+               24));
+    set(SoundId::MenuConfirm,
+        Recipe(0.35f, 1.4f,
+               {{.waveform = Sine, .fromHz = 420.0f, .toHz = 210.0f, .gain = 0.9f, .attack = 0.002f, .decay = 0.07f},
+                {.waveform = Triangle, .fromHz = 210.0f, .toHz = 200.0f, .gain = 0.4f, .attack = 0.004f,
+                 .decay = 0.12f},
+                {.waveform = Noise, .gain = 0.4f, .attack = 0.001f, .decay = 0.01f, .lowPassFromHz = 3000.0f,
+                 .lowPassToHz = 800.0f}},
+               25));
     return r;
 }
 

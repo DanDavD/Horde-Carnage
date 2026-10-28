@@ -3,10 +3,13 @@
 #include "app/PlayerInput.h"
 #include "app/audio/SoundBank.h"
 #include "app/render/Art.h"
+#include "app/render/Backdrop.h"
 #include "app/render/Hud.h"
 #include "core/FixedTimestep.h"
 #include "core/HitStop.h"
+#include "core/Menu.h"
 #include "core/ParticleEmitter.h"
+#include "core/ScreenFit.h"
 #include "core/ScreenShake.h"
 #include "core/Session.h"
 
@@ -29,8 +32,18 @@ public:
     void Run();
 
 private:
-    /// One frame: the presses since the last one, the fixed steps that are due, and one render.
+    /// One frame: the menus, the presses since the last one, the fixed steps that are due, and one render.
     void Frame();
+    /// Reads the menu shown in the current state, if any, and acts on a choice. While playing, pauses on Esc
+    /// or Start.
+    void HandleMenus();
+    /// Does what the chosen item of the current state's menu says.
+    void Choose(int item);
+    /// Clears what belongs to the last fight: particles, the trails behind the bars, the slow-down and the
+    /// shake, and presses made in a menu.
+    void ForgetLastFight();
+    /// Draws the world and, if asked, the HUD, for the screen fit `fit`. `alpha` blends the last two steps.
+    void DrawScene(const ScreenFit& fit, float alpha, bool withHud) const;
     void Update(float dt);
     /// Turns what happened in the last step into hit stops, screen shakes and particles, and clears the events.
     void FeelEvents();
@@ -52,6 +65,12 @@ private:
     SoundBank _sounds; ///< Loaded once the audio device is open, unloaded before it closes.
     Random _soundRandom; ///< For the sounds' small changes of pitch and volume, apart from the fight's.
     HealthTrails _trails; ///< Behind the health bars. Kept here because only the HUD reads them.
+    Menu _menu;            ///< The menu of the current state; rebuilt whenever the state changes.
+    SessionState _menuState = SessionState::Playing; ///< The state `_menu` was built for.
+    float _menuSinceMoved = 0.0f; ///< Real seconds since the selection last moved, for the marks to slide.
+    Vec2 _lastMouse;       ///< The mouse last frame: only a mouse that moves takes the selection.
+    Backdrop _backdrop;    ///< The blurred still behind the pause menu.
+    bool _quit = false;    ///< Set by the title's Quit.
 
 #ifndef NDEBUG
     bool _showDebugOverlay = false;

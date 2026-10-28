@@ -44,15 +44,13 @@ constexpr float kSlotBoxWidth = 150.0f;
 constexpr float kSlotBoxHeight = 48.0f;
 constexpr float kSlotBoxGap = 8.0f;
 
+// Esc pauses everywhere. In a browser the first Esc frees the mouse, which pauses all the same.
 #ifndef NDEBUG
 constexpr const char* kControlsHint =
-    "WASD move  Mouse aim  Click fire  Space dash  E heal  Q/1/2 swap gun  Esc quit  Debug: F1 F2 F3 F4";
-#elif defined(__EMSCRIPTEN__)
-// In a browser the tab is closed, not the game: Esc only gives the mouse back to the page.
-constexpr const char* kControlsHint = "WASD move  Mouse aim  Click fire  Space dash  E heal  Q/1/2/wheel swap gun";
+    "WASD move  Mouse aim  Click fire  Space dash  E heal  Q/1/2 swap gun  Esc pause  Debug: F1 F2 F3 F4";
 #else
 constexpr const char* kControlsHint =
-    "WASD move  Mouse aim  Click fire  Space dash  E heal  Q/1/2/wheel swap gun  Esc quit";
+    "WASD move  Mouse aim  Click fire  Space dash  E heal  Q/1/2/wheel swap gun  Esc pause";
 #endif
 
 const char* FireModeLabel(FireMode mode) {

@@ -2,6 +2,7 @@
 
 #include <optional>
 
+#include "core/Menu.h"
 #include "core/Vec2.h"
 
 namespace horde {
@@ -10,10 +11,21 @@ namespace horde {
 /// left stick and d-pad of the first gamepad. The result can be longer than 1; `StepMovement` clamps it.
 [[nodiscard]] Vec2 ReadMoveInput();
 
-/// Whether a restart button went down this frame: Enter or R on the keyboard, A or Start on the first
-/// gamepad. Call it once per frame, not once per fixed step: a press is an event, and a frame that runs
-/// no step would lose it.
-[[nodiscard]] bool ReadRestartPressed();
+/// This frame's menu keys: W, S and the arrows (or the d-pad) move, Enter or Space (or A) confirm, Esc or
+/// Backspace (or B) go back. Up and left both mean the previous item, so a row and a column read the same.
+/// The mouse is left to the caller, which knows where the items are. Read once per frame.
+[[nodiscard]] MenuInput ReadMenuKeys();
+
+/// Whether the pause button went down this frame: Esc, or Start on the first gamepad.
+[[nodiscard]] bool ReadPausePressed();
+
+/// Whether R went down this frame: a retry without going through the menu, for the next attempt at once.
+[[nodiscard]] bool ReadQuickRetryPressed();
+
+/// In a browser, whether the page let go of the pointer while the game held it since the last call: Esc
+/// there is taken by the browser to free the mouse and never reaches the game, so this is how it pauses.
+/// Always false on the desktop.
+[[nodiscard]] bool TakePointerLockLost();
 
 /// Where the mouse points, in screen pixels (1280x720, whatever size the window is shown at).
 ///
@@ -23,7 +35,8 @@ namespace horde {
 [[nodiscard]] Vec2 ReadAimPoint();
 
 /// Shows or hides the system cursor over the game. The game draws its own crosshair while playing. In a
-/// browser the page hides the cursor itself, by locking the pointer on a click, so this does nothing.
+/// browser the page hides the cursor itself, by locking the pointer on a click while this asks for it, and
+/// lets it go at once when it does not, so the menus can be used with the mouse.
 void SetCursorHidden(bool hidden);
 
 /// Whether the fire button (the left mouse button) is down right now. A held state, so reading it once
