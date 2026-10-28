@@ -1,6 +1,7 @@
 #pragma once
 
 #include "app/PlayerInput.h"
+#include "app/audio/SoundBank.h"
 #include "app/render/Art.h"
 #include "app/render/Hud.h"
 #include "core/FixedTimestep.h"
@@ -48,6 +49,8 @@ private:
     HitStop _hitStop;
     ScreenShake _shake;
     ParticleEmitter _particles;
+    SoundBank _sounds; ///< Loaded once the audio device is open, unloaded before it closes.
+    Random _soundRandom; ///< For the sounds' small changes of pitch and volume, apart from the fight's.
     HealthTrails _trails; ///< Behind the health bars. Kept here because only the HUD reads them.
 
 #ifndef NDEBUG

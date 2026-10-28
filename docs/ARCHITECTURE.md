@@ -69,7 +69,7 @@ src/app/render/
   DebugOverlay  The F1 overlay, compiled into Debug builds only
 ```
 
-Each file keeps its own sizes and helpers in an anonymous namespace; only what another file needs is in its header (for example `ShieldColor`, which the boss and the HUD share). `Draw` calls `DrawWorld` inside the world camera, and `DrawVignette`, `DrawHud` and `DrawEndScreen` inside the screen camera. `Game` owns the one `Art`, loaded after the window opens and unloaded before it closes, and hands it to the drawing. How the game looks, and why, is in [Art direction](ART.md).
+Each file keeps its own sizes and helpers in an anonymous namespace; only what another file needs is in its header (for example `ShieldColor`, which the boss and the HUD share). `Draw` calls `DrawWorld` inside the world camera, and `DrawVignette`, `DrawHud` and `DrawEndScreen` inside the screen camera. Sound lives next to it, in `src/app/audio/SoundBank`: every sound is synthesized once at start-up and played from the world's events (see [Audio](AUDIO.md)). `Game` owns the one `Art`, loaded after the window opens and unloaded before it closes, and hands it to the drawing. How the game looks, and why, is in [Art direction](ART.md).
 
 ### Components and systems
 
@@ -105,6 +105,7 @@ Game objects are plain structs (components) that hold data, and free functions (
 - `tests/core/AttackChoiceTests.cpp`, `BossTests.cpp`, `BossChargeTests.cpp`, `BossComboTests.cpp`, `BossHairRingTests.cpp`, `BossLeapTests.cpp`, `BossVolleyTests.cpp`, `FrenzyTests.cpp`, `PhaseTwoTests.cpp`, `ShockwaveTests.cpp` and `SummonTests.cpp`: see [The boss](BOSS.md#tests). The boss tests share `PredictableBoss.h`, a boss without its chance.
 - `tests/core/RandomTests.cpp`: see [Random numbers](RANDOM.md#tests).
 - `tests/core/WorldEventTests.cpp`, `HitStopTests.cpp`, `ScreenShakeTests.cpp`, `ImpactFeelTests.cpp`, `ParticleTests.cpp`, `ParticleEmitterTests.cpp` and `TrailingBarTests.cpp`: see [Game feel](GAME_FEEL.md#tests).
+- `tests/core/SynthTests.cpp` and `SoundCueTests.cpp`: see [Audio](AUDIO.md#tests).
 - `tests/core/ScreenFitTests.cpp`: see [Screen and fullscreen](SCREEN.md#tests).
 - `tests/core/StoneFloorTests.cpp`: see [Art direction](ART.md#tests).
 - `tests/core/ShieldTests.cpp`: see [The boss's shield](SHIELD.md#tests).

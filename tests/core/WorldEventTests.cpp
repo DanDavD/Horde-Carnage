@@ -248,3 +248,37 @@ TEST_CASE("events pile up until the game clears them, and a full list drops new 
     Step(world, PlayerCommands{.aimAt = away, .fireHeld = true}, 6);
     CHECK_FALSE(world.events.Empty());
 }
+
+TEST_CASE("the boss starting an attack records which one, once, at the start of its warning") {
+    World world = NewFight();
+    world.boss.nextAttack = horde::AttackKind::Leap;
+    world.boss.secondsUntilAttack = 0.0f;
+    const WorldEvent* started = StepUntil(world, WorldEventKind::AttackStarted, 10);
+    REQUIRE(started);
+    CHECK(started->amount == static_cast<int>(horde::AttackKind::Leap));
+    REQUIRE(world.boss.attack);
+    CHECK(world.boss.attack->stage == horde::AttackStage::Warning);
+    world.events.Clear();
+    Step(world, PlayerCommands{}, 20); // Still inside the same warning.
+    CHECK(Count(world, WorldEventKind::AttackStarted) == 0);
+}
+
+TEST_CASE("a hair ring records how many strands it spat") {
+    World world = NewFight();
+    world.boss.nextAttack = horde::AttackKind::HairRing;
+    world.boss.secondsUntilAttack = 0.0f;
+    const WorldEvent* spat = StepUntil(world, WorldEventKind::StrandsSpat, 120);
+    REQUIRE(spat);
+    CHECK(spat->amount == static_cast<int>(world.hostileProjectiles.Size()));
+    CHECK(spat->amount > 1);
+}
+
+TEST_CASE("a finished drink records the health it gave back") {
+    World world = NewFight();
+    world.boss.health.current = 0;
+    world.player.health.current = 50;
+    Step(world, PlayerCommands{.healPressed = true}, 1);
+    const WorldEvent* drunk = StepUntil(world, WorldEventKind::FlaskDrunk, 120);
+    REQUIRE(drunk);
+    CHECK(drunk->amount == world.player.flasks.stats.heal);
+}

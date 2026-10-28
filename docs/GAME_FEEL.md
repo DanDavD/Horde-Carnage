@@ -41,8 +41,11 @@ The code:
 | `FirstPhaseEnded` | The first bar runs out and the transformation starts | The boss |
 | `BossRoared` | The roar at the end of the transformation, or at the start of the frenzy | The boss |
 | `BossDefeated` | The second bar runs out | The boss |
+| `AttackStarted` | The boss begins an attack's warning | The boss, along the attack; `amount` is the `AttackKind` |
+| `StrandsSpat` | The boss or a hairball spits strands | The spitter, along the spit; `amount` is how many |
+| `FlaskDrunk` | A drink finishes and heals | The player; `amount` is the health given back |
 
-Every hit on the player already went through one function (`HurtPlayer`), so one line there covers every source of damage. The boss reports a crash into a wall the way it reports its other actions, with a flag in `BossActions`. The Debug shortcuts (F2, F3, F4) record the same events the real thing would, so they can be used to tune the feel.
+Every hit on the player already went through one function (`HurtPlayer`), so one line there covers every source of damage. The boss reports a crash into a wall the way it reports its other actions, with a flag in `BossActions`. The Debug shortcuts (F2, F3, F4) record the same events the real thing would, so they can be used to tune the feel. The last three events exist for the sounds (see [Audio](AUDIO.md)); they neither slow the fight nor throw particles.
 
 **Reading them.** After each step that runs, `Game::FeelEvents` looks each event up in `FeelOf` (`ImpactFeel.cpp`), starts the hit stop, adds the trauma, hands the event to `EmitEventParticles` (`ParticleEmitter.cpp`), and clears the list. While playing, each step also calls `EmitContinuousParticles` for the steady trails that do not come from one instant: dust under an active dash, and hair falling from the boss after her first phase.
 

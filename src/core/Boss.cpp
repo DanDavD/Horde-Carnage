@@ -81,7 +81,9 @@ void FinishAttack(Boss& boss, Random& random) {
 
 // Walks at the player, like a big, slow hairball, until it is time to attack. The attack is picked only
 // then, from where the player stands at that moment.
-void Stalk(Boss& boss, Vec2 playerPosition, float playerRadius, const Arena& arena, Random& random, float dt) {
+//
+// @return Whether an attack started.
+bool Stalk(Boss& boss, Vec2 playerPosition, float playerRadius, const Arena& arena, Random& random, float dt) {
     const float stopDistance = boss.radius + playerRadius + kContactSlack;
     StepMovement(boss.motion, ChaseInput(boss.motion.position, playerPosition, stopDistance), boss.stats, dt);
 
@@ -92,7 +94,9 @@ void Stalk(Boss& boss, Vec2 playerPosition, float playerRadius, const Arena& are
             boss.nextAttack ? *boss.nextAttack : ChooseAttack(boss.choice, distance, boss.lastAttack, random);
         boss.nextAttack.reset();
         StartAttack(boss, kind, false, playerPosition, arena, random);
+        return true;
     }
+    return false;
 }
 
 BossActions StepCharge(Boss& boss, BossAttack& charge, Vec2 playerPosition, const Arena& arena, Random& random,
@@ -387,14 +391,14 @@ BossActions StepBoss(Boss& boss, const Motion& player, float playerRadius, const
         return {};
     }
     if (!boss.attack) {
-        Stalk(boss, playerPosition, playerRadius, arena, random, dt);
-        return {};
+        return BossActions{.attackStarted = Stalk(boss, playerPosition, playerRadius, arena, random, dt)};
     }
-    const BossActions actions = StepAttack(boss, player, arena, random, dt);
+    BossActions actions = StepAttack(boss, player, arena, random, dt);
     // A combo skips its opener's recovery: the follow-up starts in the step the opener would begin to rest,
     // so there is no opening between the two. A Charge stunned by a wall shakes it off for the follow-up.
     if (boss.attack && boss.attack->stage == AttackStage::Recovery && boss.attack->followUp) {
         StartAttack(boss, *boss.attack->followUp, true, playerPosition, arena, random);
+        actions.attackStarted = true;
     }
     return actions;
 }

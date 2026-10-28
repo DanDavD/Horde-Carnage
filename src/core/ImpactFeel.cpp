@@ -9,6 +9,10 @@ ImpactFeel FeelOf(const WorldEvent& event) {
     case WorldEventKind::DashStarted:
     case WorldEventKind::BossHurt:
     case WorldEventKind::ShieldStruck:
+    // Warnings, spitting and drinking are heard, and the warnings are already seen on the boss.
+    case WorldEventKind::AttackStarted:
+    case WorldEventKind::StrandsSpat:
+    case WorldEventKind::FlaskDrunk:
         return {};
     // The player's own hits. Slowing on them is what makes a hit read as a hit and not as a number going
     // down, and it gives a beat to see what landed.

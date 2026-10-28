@@ -238,6 +238,7 @@ struct BossActions {
     bool summon = false;       ///< Put the Summon's marks on the floor around the player.
     bool roared = false;       ///< The transformation is over: a shockwave from its body.
     bool hitWall = false;      ///< A Charge just ended against a wall, and the boss is stunned.
+    bool attackStarted = false; ///< An attack began its warning in this step, `BossAttack::kind` says which.
 };
 
 /// Where a charge would end: after its full distance, or earlier, where the body meets a wall.

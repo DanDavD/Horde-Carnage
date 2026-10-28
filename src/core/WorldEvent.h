@@ -19,13 +19,15 @@ enum class WorldEventKind {
     FirstPhaseEnded, ///< The first phase's bar ran out, and the transformation began.
     BossRoared,      ///< The roar that ends the transformation, or the one that starts the frenzy.
     BossDefeated,    ///< The second phase's bar ran out: the fight is won.
+    AttackStarted,   ///< The boss began an attack's warning. `amount` is the `AttackKind`, as a number.
+    StrandsSpat,     ///< The boss or a hairball spat strands. `amount` is how many.
+    FlaskDrunk,      ///< A drink finished and healed the player. `amount` is the health it gave back.
 };
 
 /// One thing that happened, where it happened and, when it has one, which way it went.
 ///
 /// The simulation writes these and never reads them. The game reads them after each step and turns them
-/// into a hit stop, a screen shake and particles, and later into sounds, so none of that has to live in
-/// the rules.
+/// into a hit stop, a screen shake, particles and sounds, so none of that has to live in the rules.
 struct WorldEvent {
     WorldEventKind kind = WorldEventKind::ShotFired;
     Vec2 position;

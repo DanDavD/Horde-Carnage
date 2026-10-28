@@ -24,8 +24,11 @@ add_library(horde_core STATIC
     core/Session.cpp
     core/Shield.cpp
     core/Shockwave.cpp
+    core/SoundCue.cpp
+    core/SoundLibrary.cpp
     core/SpawnMarker.cpp
     core/StoneFloor.cpp
+    core/Synth.cpp
     core/TrailingBar.cpp
     core/Weapon.cpp
     core/World.cpp)
@@ -36,6 +39,7 @@ horde_set_warnings(horde_core)
 add_executable(HordeCarnage
     main.cpp
     app/Game.cpp
+    app/audio/SoundBank.cpp
     app/PlayerInput.cpp
     app/render/ArenaDraw.cpp
     app/render/Art.cpp
@@ -64,11 +68,14 @@ add_custom_command(TARGET HordeCarnage POST_BUILD
 
 # The browser build: index.html (from our page in web/), index.js and index.wasm, ready for itch.io.
 # The memory grows if it has to, and GLFW comes from Emscripten's own port, which raylib's web platform needs.
+# The stack is 1 MB instead of Emscripten's 64 KB: a restart builds a fresh World of about 20 KB on it, and a
+# stack that overflows in WebAssembly does not crash at once but overwrites the program's globals.
 if(EMSCRIPTEN)
     set_target_properties(HordeCarnage PROPERTIES OUTPUT_NAME "index" SUFFIX ".html")
     target_link_options(HordeCarnage PRIVATE
         -sUSE_GLFW=3
         -sALLOW_MEMORY_GROWTH=1
+        -sSTACK_SIZE=1MB
         --shell-file ${PROJECT_SOURCE_DIR}/web/shell.html)
     set_property(TARGET HordeCarnage APPEND PROPERTY LINK_DEPENDS ${PROJECT_SOURCE_DIR}/web/shell.html)
 endif()

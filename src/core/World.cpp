@@ -67,9 +67,11 @@ void StartDrinkIfAsked(Player& player, const PlayerCommands& commands) {
     }
 }
 
-void DrinkFlasks(Player& player, float dt) {
+void DrinkFlasks(World& world, float dt) {
+    Player& player = world.player;
     if (const int healed = StepFlasks(player.flasks, dt); healed > 0) {
         Heal(player.health, healed);
+        Record(world, WorldEventKind::FlaskDrunk, player.motion.position, {}, healed);
     }
 }
 
@@ -150,6 +152,7 @@ void HairballSpit(World& world, const Enemy& hairball) {
     strand.damage = stats.spitDamage;
     strand.source = DamageSource::Hairball;
     world.hostileProjectiles.Spawn(strand);
+    Record(world, WorldEventKind::StrandsSpat, hairball.motion.position, direction, 1);
 }
 
 void StepEnemies(World& world, float dt) {
@@ -318,6 +321,7 @@ void SpitHairRing(World& world) {
     for (int i = 0; i < HairRingStrands(boss.hairRing); ++i) {
         world.hostileProjectiles.Spawn(MakeHairStrand(boss, HairStrandDirection(gap, i, boss.hairRing)));
     }
+    Record(world, WorldEventKind::StrandsSpat, boss.motion.position, gap, HairRingStrands(boss.hairRing));
 }
 
 // A strand of the boss's hair thrown in a frenzy: as fast as a Volley's, and named for the frenzy on the
@@ -342,6 +346,7 @@ void ThrowBolts(World& world) {
     if (LengthSquared(ahead - from) > 1.0f) {
         ThrowFrenzyStrand(world, Normalized(ahead - from));
     }
+    Record(world, WorldEventKind::StrandsSpat, from, Normalized(player - from), 2);
 }
 
 // The Summon's marks, around the player, turned by a random angle so no two summons look the same.
@@ -387,6 +392,7 @@ void SpitVolley(World& world) {
         const Vec2 direction = Rotated(boss.attack->direction, degrees * kRadiansPerDegree);
         world.hostileProjectiles.Spawn(MakeVolleyStrand(boss, direction));
     }
+    Record(world, WorldEventKind::StrandsSpat, boss.motion.position, boss.attack->direction, stats.strandsPerBurst);
 }
 
 // One pass moves every bullet, resolves its hit and removes the ones that are done, so a bullet is never
@@ -541,7 +547,7 @@ void StepWorld(World& world, const PlayerCommands& commands, float dt) {
     TickDashCooldown(player.dash, dt);
     StartDashIfAsked(world, commands);
     StartDrinkIfAsked(player, commands);
-    DrinkFlasks(player, dt);
+    DrinkFlasks(world, dt);
     MovePlayer(player, commands.move, dt);
 
     // Aim after moving, so the gun points from where the player is now, not from a step ago.
@@ -554,6 +560,11 @@ void StepWorld(World& world, const PlayerCommands& commands, float dt) {
     StepEnemies(world, dt);
     const BossActions actions =
         StepBoss(world.boss, player.motion, player.radius, world.arena, world.random, dt);
+    if (actions.attackStarted) {
+        const BossAttack& attack = *world.boss.attack;
+        Record(world, WorldEventKind::AttackStarted, world.boss.motion.position, attack.direction,
+               static_cast<int>(attack.kind));
+    }
     if (actions.spitHairRing) {
         SpitHairRing(world);
     }
