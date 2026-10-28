@@ -13,6 +13,7 @@
 #include "app/render/Text.h"
 #include "app/render/View.h"
 #include "core/Loadout.h"
+#include "core/TrailingBar.h"
 
 namespace horde {
 
@@ -58,21 +59,34 @@ const char* FireModeLabel(FireMode mode) {
     return mode == FireMode::Auto ? "AUTO" : "SEMI-AUTO";
 }
 
+// How far right of the end of the boss's bar the damage tally sits.
+constexpr float kTallyX = 12.0f;
+
 // A dark trough in a thin frame, filled from the left by `fraction` with a colour a little lighter along
-// its top edge, so the bar reads as a bar of glass rather than a flat stripe.
-void DrawBar(Rectangle box, float fraction, Color fill) {
+// its top edge, so the bar reads as a bar of glass rather than a flat stripe. A pale trail runs on from the
+// fill to `trailFraction`: what the last run of hits took.
+void DrawBar(Rectangle box, float fraction, Color fill, float trailFraction = 0.0f) {
     DrawRectangleRec(Rectangle{box.x - 1.0f, box.y - 1.0f, box.width + 2.0f, box.height + 2.0f}, kHudFrame);
     DrawRectangleRec(box, kBarBack);
     const float width = box.width * std::clamp(fraction, 0.0f, 1.0f);
+    const float trailWidth = box.width * std::clamp(trailFraction, 0.0f, 1.0f);
+    if (trailWidth > width) {
+        DrawRectangleRec(Rectangle{box.x + width, box.y, trailWidth - width, box.height}, kBarTrail);
+    }
     DrawRectangleGradientV(static_cast<int>(box.x), static_cast<int>(box.y), static_cast<int>(width),
                            static_cast<int>(box.height), Mix(fill, WHITE, 0.2f), Mix(fill, BLACK, 0.2f));
 }
 
-void DrawHealthBar(const Health& health) {
+// The share of `health` the trail reaches to.
+float TrailFraction(const TrailingBar& trail, const Health& health) {
+    return trail.trail / static_cast<float>(health.max);
+}
+
+void DrawHealthBar(const Health& health, const TrailingBar& trail) {
     const float fraction = static_cast<float>(health.current) / static_cast<float>(health.max);
     // The fill turns pale while the player is invulnerable, so a hit reads on the bar as well as on the body.
     DrawBar(Rectangle{kHudMargin, kHudMargin, kHealthBarWidth, kHealthBarHeight}, fraction,
-            IsInvulnerable(health) ? kBarHurt : kHealth);
+            IsInvulnerable(health) ? kBarHurt : kHealth, TrailFraction(trail, health));
 }
 
 // Fills up as the dash recharges, and lights up when it is ready.
@@ -120,18 +134,36 @@ void DrawShieldBar(const Shield& shield, float x, const Art& art) {
     DrawGameTextRight(art.uiFont, label, x + kBossBarWidth, kBossBarY - 24.0f, 16.0f, color);
 }
 
+// The damage of the current run of hits, just right of the bar, as Dark Souls shows it. It stays while the
+// hits keep coming and fades out as the trail drains.
+void DrawDamageTally(const TrailingBar& trail, const Health& health, float x, const Art& art) {
+    if (trail.tally <= 0 || !IsTrailing(trail, health.current)) {
+        return;
+    }
+    const float left = trail.trail - static_cast<float>(health.current);
+    const float draining = std::clamp(left / static_cast<float>(trail.tally), 0.0f, 1.0f);
+    const float shown = trail.holdSecondsLeft > 0.0f ? 1.0f : draining;
+    DrawGameText(art.uiFont, TextFormat("%d", trail.tally), Vec2{x + kBossBarWidth + kTallyX, kBossBarY - 4.0f},
+                 16.0f, Fade(kText, shown));
+}
+
 // Wide and thin along the bottom of the screen, with the name above it, so it reads as the one fight that
 // matters and stays out of the way of the arena.
-void DrawBossBar(const Boss& boss, const Art& art) {
+void DrawBossBar(const Boss& boss, const TrailingBar& trail, const Art& art) {
     constexpr float kX = (kScreenWidth - kBossBarWidth) / 2.0f;
+    const bool transforming = IsTransforming(boss);
     float fraction = static_cast<float>(boss.health.current) / static_cast<float>(boss.health.max);
-    // While it transforms, the bar fills back up over the transformation.
-    if (IsTransforming(boss)) {
+    // While it transforms, the bar fills back up over the transformation, and the old trail has no meaning.
+    if (transforming) {
         fraction = 1.0f - boss.transformSecondsLeft / boss.phaseTwo.transformSeconds;
     }
     DrawGameText(art.titleFont, kBossName, Vec2{kX, kBossBarY - 30.0f}, 24.0f, kText);
-    DrawBar(Rectangle{kX, kBossBarY, kBossBarWidth, kBossBarHeight}, fraction, kBossBar);
-    if (!IsDead(boss.health) && !IsTransforming(boss)) {
+    DrawBar(Rectangle{kX, kBossBarY, kBossBarWidth, kBossBarHeight}, fraction, kBossBar,
+            transforming ? 0.0f : TrailFraction(trail, boss.health));
+    if (!transforming) {
+        DrawDamageTally(trail, boss.health, kX, art);
+    }
+    if (!IsDead(boss.health) && !transforming) {
         DrawShieldBar(boss.shield, kX, art);
     }
 }
@@ -178,13 +210,13 @@ void DrawCrosshair(Vector2 at) {
 
 } // namespace
 
-void DrawHud(const World& world, int attempt, bool playing, Vec2 aim, const Art& art) {
+void DrawHud(const World& world, const HealthTrails& trails, int attempt, bool playing, Vec2 aim, const Art& art) {
     const Player& player = world.player;
-    DrawHealthBar(player.health);
+    DrawHealthBar(player.health, trails.player);
     DrawDashBar(player.dash);
     DrawFlaskIcons(player.flasks);
     DrawWeaponPanel(player.loadout, art);
-    DrawBossBar(world.boss, art);
+    DrawBossBar(world.boss, trails.boss, art);
 
     // The version and the attempt in the top right corner, so the count of tries is always in sight.
     constexpr float kRight = kScreenWidth - kHudMargin;

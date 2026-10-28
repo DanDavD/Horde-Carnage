@@ -11,16 +11,22 @@ add_library(horde_core STATIC
     core/Flasks.cpp
     core/FollowCamera.cpp
     core/Health.cpp
+    core/HitStop.cpp
+    core/ImpactFeel.cpp
     core/Loadout.cpp
     core/Movement.cpp
+    core/Particle.cpp
+    core/ParticleEmitter.cpp
     core/Projectile.cpp
     core/Random.cpp
     core/ScreenFit.cpp
+    core/ScreenShake.cpp
     core/Session.cpp
     core/Shield.cpp
     core/Shockwave.cpp
     core/SpawnMarker.cpp
     core/StoneFloor.cpp
+    core/TrailingBar.cpp
     core/Weapon.cpp
     core/World.cpp)
 target_include_directories(horde_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
@@ -38,6 +44,7 @@ add_executable(HordeCarnage
     app/render/EndScreen.cpp
     app/render/HairBody.cpp
     app/render/Hud.cpp
+    app/render/ParticleDraw.cpp
     app/render/PlayerDraw.cpp
     app/render/Shapes.cpp
     app/render/Text.cpp

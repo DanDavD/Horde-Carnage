@@ -49,6 +49,12 @@ constexpr float kWarmthReach = 260.0f;
 constexpr float kWarmth = 0.17f;
 constexpr float kFlicker = 0.025f;
 constexpr float kVignetteStrength = 0.6f;
+// The blood at the edges: how strong right after a hit, and how strong the heartbeat is below a third of the
+// player's health, beating a little faster than once a second.
+constexpr float kHurtFlash = 0.4f;
+constexpr float kLowHealth = 0.3f;
+constexpr float kHeartbeat = 0.25f;
+constexpr float kHeartbeatsPerSecond = 1.1f;
 
 Color Shade(Color color, float amount) {
     const auto channel = [amount](unsigned char value) {
@@ -209,6 +215,28 @@ void DrawVignette(const Art& art) {
                            static_cast<float>(art.vignette.height)};
     const Rectangle dest{0.0f, 0.0f, static_cast<float>(kScreenWidth), static_cast<float>(kScreenHeight)};
     DrawTexturePro(art.vignette, source, dest, Vector2{0.0f, 0.0f}, 0.0f, Fade(BLACK, kVignetteStrength));
+}
+
+void DrawPainVignette(const Art& art, const Health& health, float seconds) {
+    // The flash fades with the window that protects the player after a hit, squared, so it leaves quickly.
+    const float hit = health.invulnerabilityAfterHit > 0.0f
+                          ? std::clamp(health.invulnerableSeconds / health.invulnerabilityAfterHit, 0.0f, 1.0f)
+                          : 0.0f;
+    float strength = kHurtFlash * hit * hit;
+    const float left = static_cast<float>(health.current) / static_cast<float>(health.max);
+    if (left > 0.0f && left <= kLowHealth) {
+        // A sharp beat and a long rest, stronger the lower the health.
+        const float phase = std::sin(seconds * kHeartbeatsPerSecond * 2.0f * std::numbers::pi_v<float>);
+        const float beat = std::pow(0.5f + 0.5f * phase, 3.0f);
+        strength = std::max(strength, kHeartbeat * (1.0f - 0.5f * left / kLowHealth) * beat);
+    }
+    if (strength <= 0.0f) {
+        return;
+    }
+    const Rectangle source{0.0f, 0.0f, static_cast<float>(art.vignette.width),
+                           static_cast<float>(art.vignette.height)};
+    const Rectangle dest{0.0f, 0.0f, static_cast<float>(kScreenWidth), static_cast<float>(kScreenHeight)};
+    DrawTexturePro(art.vignette, source, dest, Vector2{0.0f, 0.0f}, 0.0f, Fade(kBlood, strength));
 }
 
 } // namespace horde

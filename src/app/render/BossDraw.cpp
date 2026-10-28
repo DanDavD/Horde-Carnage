@@ -87,6 +87,14 @@ constexpr float kFrenzyGlow = 0.7f;
 // A dead boss turns grey like a dead player, its hair falls flat and its eyes shut.
 constexpr HairStyle kDeadBossStyle{kPlayerDeadFill, kPlayerDeadEdge, kPlayerDeadFill, kPlayerDeadEdge, 24, 0.26f,
                                    0.0f, 0.0f, 1.0f};
+// The death: it shakes and swells for the first part, screaming, while the colour drains out of it; then it
+// sinks, a little wider than long, and its eyes shut.
+constexpr float kDeathConvulsionSeconds = 0.6f;
+constexpr float kDeathShake = 5.0f;
+constexpr float kDeathSwell = 0.12f;
+constexpr float kDeathGreyStart = 0.2f; // As a share of the whole death.
+constexpr float kDeathSag = 0.86f;
+constexpr float kDeathEyesShut = 0.75f;
 
 bool InAttack(const Boss& boss, AttackKind kind, AttackStage stage) {
     return boss.attack && boss.attack->kind == kind && boss.attack->stage == stage;
@@ -225,16 +233,21 @@ void OpenMouth(const Boss& boss, HairPose& pose, float open) {
     }
 }
 
+// The style of the phase the boss is in.
+const HairStyle& LivingStyle(const Boss& boss) {
+    if (boss.frenzied) {
+        return kFrenziedBossStyle;
+    }
+    return boss.phase == BossPhase::Two ? kEnragedBossStyle : kBossStyle;
+}
+
 // Every pose of the boss ends here: the glow of its eyes on the floor, the body, its shield around it, and
 // stars while its broken shield staggers it.
 void DrawBossBody(const Boss& boss, Vec2 position, float radius, const HairPose& pose, const Art& art) {
-    const HairStyle* style = &kBossStyle;
+    const HairStyle* style = &LivingStyle(boss);
     if (boss.frenzied) {
-        style = &kFrenziedBossStyle;
         const float pulse = 0.5f + 0.5f * std::sin(pose.seconds * 8.0f);
         DrawCircleV(ToRaylib(position), radius * (1.0f + kFrenzyGlow), Fade(kBlood, 0.08f + 0.1f * pulse));
-    } else if (boss.phase == BossPhase::Two) {
-        style = &kEnragedBossStyle;
     }
     BeginBlendMode(BLEND_ADDITIVE);
     DrawGlow(art, position, radius * kEyeLightReach, Fade(style->eye, kEyeLight));
@@ -377,6 +390,45 @@ void DrawTransformingBoss(const Boss& boss, Vec2 position, HairPose pose, const 
     DrawHairBody(position, radius, red ? kEnragedBossStyle : kBossStyle, pose, art);
 }
 
+// The style of a living boss turned toward a dead one by `amount`, keeping its own number of locks, so the
+// hair does not jump as it dies.
+HairStyle Dying(const HairStyle& living, float amount) {
+    return HairStyle{.fill = Mix(living.fill, kDeadBossStyle.fill, amount),
+                     .edge = Mix(living.edge, kDeadBossStyle.edge, amount),
+                     .sheen = Mix(living.sheen, kDeadBossStyle.sheen, amount),
+                     .eye = Mix(living.eye, kDeadBossStyle.eye, amount),
+                     .locks = living.locks,
+                     .lockLength = living.lockLength + (kDeadBossStyle.lockLength - living.lockLength) * amount,
+                     .bristle = living.bristle * (1.0f - amount),
+                     .flash = living.flash,
+                     .eyeSize = living.eyeSize};
+}
+
+// The death, `sinceDied` seconds in: the killing blow flashes it white, it convulses and swells with its
+// mouth wide, and the colour drains out of it; then it sinks and its eyes shut. Past `kBossDeathSeconds` it
+// lies still. Its children's hair bursts from it at the same moment (see the particles).
+void DrawDyingBoss(const Boss& boss, Vec2 position, HairPose pose, float sinceDied, const Art& art) {
+    const float progress = std::clamp(sinceDied / kBossDeathSeconds, 0.0f, 1.0f);
+    const float convulsion = std::clamp(sinceDied / kDeathConvulsionSeconds, 0.0f, 1.0f);
+    const float shaking = 1.0f - convulsion;
+    position += Vec2{std::sin(sinceDied * 53.0f), std::cos(sinceDied * 47.0f)} * (kDeathShake * shaking);
+    const float radius = boss.radius * (1.0f + kDeathSwell * std::sin(std::numbers::pi_v<float> * convulsion));
+
+    const float grey = std::clamp((progress - kDeathGreyStart) / (1.0f - kDeathGreyStart), 0.0f, 1.0f);
+    const float eased = grey * grey * (3.0f - 2.0f * grey);
+    const HairStyle style = Dying(LivingStyle(boss), eased);
+    pose.flashing = sinceDied < kDeathConvulsionSeconds * 0.2f;
+    pose.mouth = eased < kDeathEyesShut ? 1.0f - eased / kDeathEyesShut : -1.0f;
+    pose.dead = eased >= kDeathEyesShut;
+    pose.stretchAlong = Vec2{0.0f, 1.0f};
+    pose.stretch = 1.0f + (kDeathSag - 1.0f) * eased;
+
+    BeginBlendMode(BLEND_ADDITIVE);
+    DrawGlow(art, position, radius * kEyeLightReach, Fade(style.eye, kEyeLight * (1.0f - eased)));
+    EndBlendMode();
+    DrawHairBody(position, radius, style, pose, art);
+}
+
 } // namespace
 
 void DrawBossTelegraphs(const Boss& boss, const Arena& arena) {
@@ -390,7 +442,7 @@ Color ShieldColor(ShieldKind kind) {
     return kind == ShieldKind::Shell ? kShell : kBarrier;
 }
 
-void DrawBoss(const Boss& boss, Vec2 playerPosition, float seconds, float alpha, const Art& art) {
+void DrawBoss(const Boss& boss, Vec2 playerPosition, float seconds, float alpha, const Art& art, float sinceDied) {
     const Vec2 position = Lerp(boss.motion.previousPosition, boss.motion.position, alpha);
     const HairPose pose{.lookAt = playerPosition,
                         .light = playerPosition,
@@ -398,9 +450,7 @@ void DrawBoss(const Boss& boss, Vec2 playerPosition, float seconds, float alpha,
                         .mouth = RestingMouth(boss),
                         .flashing = boss.hitFlashSeconds > 0.0f};
     if (IsDead(boss.health)) {
-        HairPose dead = pose;
-        dead.dead = true;
-        DrawHairBody(position, boss.radius, kDeadBossStyle, dead, art);
+        DrawDyingBoss(boss, position, pose, sinceDied, art);
         return;
     }
     if (IsTransforming(boss)) {

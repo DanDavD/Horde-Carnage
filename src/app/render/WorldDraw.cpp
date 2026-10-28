@@ -8,6 +8,7 @@
 #include "app/render/BossDraw.h"
 #include "app/render/HairBody.h"
 #include "app/render/Palette.h"
+#include "app/render/ParticleDraw.h"
 #include "app/render/PlayerDraw.h"
 #include "app/render/Shapes.h"
 #include "app/render/View.h"
@@ -80,7 +81,8 @@ void DrawHairStrand(const Projectile& strand, float alpha) {
 
 } // namespace
 
-void DrawWorld(const World& world, float alpha, const Art& art) {
+void DrawWorld(const World& world, const ParticlePool& particles, float alpha, const Art& art,
+               float bossSinceDied) {
     const Player& player = world.player;
     const Vec2 playerPosition = Lerp(player.motion.previousPosition, player.motion.position, alpha);
     const bool bossAirborne = IsAirborne(world.boss);
@@ -101,6 +103,7 @@ void DrawWorld(const World& world, float alpha, const Art& art) {
     const Vec2 viewCenter = Lerp(world.camera.previousCenter, world.camera.center, alpha);
     DrawTorchLight(playerPosition, viewCenter - kViewSize * 0.5f, viewCenter + kViewSize * 0.5f,
                    world.elapsedSeconds, art);
+    DrawFloorParticles(particles);
 
     // On the floor, under every body, and over the dark, so a warning reads wherever it is.
     DrawBossTelegraphs(world.boss, world.arena);
@@ -110,11 +113,12 @@ void DrawWorld(const World& world, float alpha, const Art& art) {
     for (const SpawnMarker& marker : world.spawnMarkers) {
         DrawSpawnMarker(marker);
     }
+    DrawUnderbodyParticles(particles, art);
 
     // The boss goes under its children, so a dead boss lies on the floor. In the air it goes over
     // everything, the player included.
     if (!bossAirborne) {
-        DrawBoss(world.boss, playerPosition, world.elapsedSeconds, alpha, art);
+        DrawBoss(world.boss, playerPosition, world.elapsedSeconds, alpha, art, bossSinceDied);
     }
     for (const Enemy& enemy : world.enemies) {
         DrawHairball(enemy, playerPosition, world.boss.summon.spitWarningSeconds, world.elapsedSeconds, alpha,
@@ -128,8 +132,9 @@ void DrawWorld(const World& world, float alpha, const Art& art) {
     }
     // The player is drawn after every body on the floor, so it is never hidden under a crowd.
     DrawPlayer(player, world.elapsedSeconds, alpha);
+    DrawOverbodyParticles(particles, art);
     if (bossAirborne) {
-        DrawBoss(world.boss, playerPosition, world.elapsedSeconds, alpha, art);
+        DrawBoss(world.boss, playerPosition, world.elapsedSeconds, alpha, art, bossSinceDied);
     }
 }
 

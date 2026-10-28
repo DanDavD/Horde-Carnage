@@ -137,6 +137,7 @@ BossActions StepCharge(Boss& boss, BossAttack& charge, Vec2 playerPosition, cons
             motion.position = path.end;
             motion.velocity = Vec2{};
             charge.stunned = path.endsAtWall;
+            actions.hitWall = path.endsAtWall;
             EnterStage(charge, AttackStage::Recovery);
         } else {
             motion.position += charge.direction * step;

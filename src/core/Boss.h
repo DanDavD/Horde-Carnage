@@ -237,6 +237,7 @@ struct BossActions {
     bool throwBolts = false;   ///< In a frenzy, while it charges: a strand at the player and one ahead.
     bool summon = false;       ///< Put the Summon's marks on the floor around the player.
     bool roared = false;       ///< The transformation is over: a shockwave from its body.
+    bool hitWall = false;      ///< A Charge just ended against a wall, and the boss is stunned.
 };
 
 /// Where a charge would end: after its full distance, or earlier, where the body meets a wall.

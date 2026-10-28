@@ -32,7 +32,7 @@ The game executable connects it to the screen and the buttons:
 
 - **Playing:** `StepSession` calls `StepWorld` every fixed step. After the step it checks the boss first: if `IsBossDefeated`, the session enters `Victory`. Otherwise, if the player's health is 0, it enters `Dead`.
 - **Dead and Victory:** the world is not stepped any more. It stays frozen on the moment the fight ended, so the player can see what got them, or the boss lying on the floor. The fight's clock (`World::elapsedSeconds`) stops with it.
-- **Restart:** `TryRestart` works in `Dead` and `Victory`, and only after `kRestartDelaySeconds` (1 s). It replaces the world with a brand new one from `CreateWorld` and goes back to `Playing`.
+- **Restart:** `TryRestart` works in `Dead` and `Victory`, and only once the end screen has shown for `kRestartDelaySeconds` (1 s). A death shows its screen at once; a victory first waits `kVictoryRevealSeconds` (1.5 s) while the boss dies on screen (`EndScreenSeconds` gives the time the screen has shown, below 0 until then). It replaces the world with a brand new one from `CreateWorld` and goes back to `Playing`.
 - **Attempts:** `Session::attempt` starts at 1. A retry after a death adds 1. A new fight after a victory starts again from 1. It lives in the `Session`, not in the `World`, so the fresh world of a restart does not reset it.
 - **Seeds:** every fresh world gets the next seed from `Session::seeds`, so each attempt plays out differently, and the session's one seed decides them all (see [Random numbers](RANDOM.md)).
 
@@ -60,6 +60,7 @@ Everything fades in over the restart delay, and the prompt to try again (or to f
 - **A victory starts the count again.** "Defeated on attempt 7" is the line worth showing. After that, the next fight is a new challenge, not attempt 8 of the old one.
 - **Restart is a brand new `World`, not a reset.** Resetting fields one by one means every new field needs a matching line in the reset, and the one that gets forgotten leaks from one run into the next. `CreateWorld` is already the single place that knows what a fresh world looks like.
 - **A one second delay before restart is accepted.** Someone mashing buttons in a fight would otherwise skip the end screen before reading it. The screen fades in over the same second, so the prompt lights up exactly when a press works.
+- **The victory waits for the boss's death.** The world is frozen in `Victory`, but the drawing plays the boss's death from the session's clock for 1.5 s before the band fades in, so nothing covers it (see [Game feel](GAME_FEEL.md)). A death does not wait: after one the player wants to try again.
 - **Restart buttons are read once per frame, not once per fixed step.** A press is an event. A frame that runs no fixed step (possible above 60 FPS) would lose it if it were read inside the step. Movement keys are held states, so reading them in the step is fine.
 - **A frozen world is drawn without interpolation.** Drawing blends the last two steps by `alpha`. When the world stops stepping, those two steps stay fixed while `alpha` keeps changing every frame, so everything would shake between them. In `Dead` and `Victory`, `Draw` uses `alpha = 1`, the last position.
 - **The prompt sits inside the band.** Below it, it landed on top of the player, who stands near the middle of the screen.
@@ -71,6 +72,7 @@ Everything fades in over the restart delay, and the prompt to try again (or to f
 | Value | Where | Default |
 |---|---|---|
 | Delay before restart is accepted (and the fade-in) | `kRestartDelaySeconds` (`src/core/Session.h`) | 1 s |
+| How long a victory shows the boss's death before its screen | `kVictoryRevealSeconds` (`src/core/Session.h`) | 1.5 s |
 | When the fight is won | `IsBossDefeated` (`src/core/World.cpp`) | the boss's health at 0 in its second phase |
 | Restart buttons | `ReadRestartPressed` (`src/app/PlayerInput.cpp`) | Enter, R; A, Start |
 | Band size and position | `kEndBandTop`, `kEndBandHeight`, `kEndBandFeather` (`src/app/render/EndScreen.cpp`) | 240, 220, 48 pixels |
@@ -87,6 +89,7 @@ Everything fades in over the restart delay, and the prompt to try again (or to f
   - the fight is won in the step the last bullet of the second phase lands, and the world is frozen from then on (no movement, no shots, no time);
   - when the boss and the player fall in the same step, the fight is won;
   - restart is refused while playing, and inside the delay after a death or a victory;
+  - a death shows its screen at once, a victory only after the boss's death, and restart waits for both the death and the delay;
   - after the delay a retry gives a fresh world (full health, time 0, the player and the boss back at the start);
   - every retry after a death is the next attempt;
   - every attempt gets its own seed, and the session's seed decides them all;
@@ -100,7 +103,6 @@ The end screens and the restart buttons are not unit tested, because they need a
 ## Limitations
 
 - **There is no title screen.** The game starts playing as soon as the window opens. The main menu comes on day 11.
-- **The victory comes the moment the second bar is empty.** There is no death animation for the boss yet. It comes with the game feel pass.
 - **There is no best time.** The end screens show only the last fight, and nothing is saved between launches. The attempt count is lost when the game closes.
 - **After `F4` the victory screen reads "0 of 0 shots on target (0%)".** The shortcut skips the shooting, so there is nothing to count. It only exists in Debug builds.
 - **Esc still quits at once, even in the middle of a fight.** Pause comes on day 11.

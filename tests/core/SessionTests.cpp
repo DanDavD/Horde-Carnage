@@ -164,6 +164,29 @@ TEST_CASE("restart is refused while playing and right after the fight ends") {
     CHECK(session.state == SessionState::Victory);
 }
 
+TEST_CASE("a death shows its screen at once, a victory only after the boss has died on screen") {
+    Session dead = OneHitFromDeath();
+    Step(dead, Vec2{}, 1);
+    CHECK(horde::EndScreenSeconds(dead) == doctest::Approx(0.0f));
+    Step(dead, Vec2{}, 61);
+    CHECK(horde::CanRestart(dead));
+
+    Session won = horde::StartSession(kArena, kView);
+    CHECK(horde::EndScreenSeconds(won) == 0.0f);
+    horde::DefeatBoss(won.world);
+    Step(won, Vec2{}, 1);
+    REQUIRE(won.state == SessionState::Victory);
+    CHECK(horde::EndScreenSeconds(won) < 0.0f);
+    // Past the restart delay, but the screen has not shown yet: the boss is still dying.
+    Step(won, Vec2{}, 61);
+    CHECK(horde::EndScreenSeconds(won) < 0.0f);
+    CHECK_FALSE(horde::CanRestart(won));
+    // The reveal and then the delay.
+    Step(won, Vec2{}, 90);
+    CHECK(horde::EndScreenSeconds(won) == doctest::Approx(1.0f).epsilon(0.02));
+    CHECK(horde::CanRestart(won));
+}
+
 TEST_CASE("after the delay a retry starts a fresh world") {
     Session session = OneHitFromDeath();
     Step(session, Vec2{}, 1);
@@ -201,7 +224,7 @@ TEST_CASE("a new fight after a victory starts the attempts over") {
     Step(session, Vec2{}, 1);
     REQUIRE(session.state == SessionState::Victory);
     CHECK(session.attempt == 3); // The victory screen still shows which attempt won.
-    Step(session, Vec2{}, 61);
+    Step(session, Vec2{}, 151); // The boss's death, then the restart delay.
     REQUIRE(horde::TryRestart(session));
     CHECK(session.attempt == 1);
     CHECK(session.state == SessionState::Playing);

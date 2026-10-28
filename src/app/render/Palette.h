@@ -74,10 +74,16 @@ inline constexpr Color kBossEyeEnraged{255, 60, 50, 255};
 inline constexpr Color kFrenzyFill{116, 32, 40, 255};
 inline constexpr Color kBarBack{22, 14, 14, 255};
 inline constexpr Color kBarHurt{228, 128, 112, 255};
+// What the last run of hits took, left behind the bars for a moment: pale old gold, so it reads against both
+// the player's red and the boss's.
+inline constexpr Color kBarTrail{214, 176, 112, 255};
 inline constexpr Color kMuzzleFlash{255, 220, 120, 255};
 inline constexpr Color kCrosshair{236, 228, 210, 255};
 inline constexpr Color kBullet{255, 230, 140, 255};
 inline constexpr Color kFlask{245, 150, 45, 255};
 inline constexpr Color kHitFlash{255, 255, 255, 255};
+inline constexpr Color kDust{142, 138, 132, 255};
+inline constexpr Color kGunSmoke{168, 172, 180, 255};
+inline constexpr Color kDarkBlood{108, 18, 24, 255};
 
 } // namespace horde

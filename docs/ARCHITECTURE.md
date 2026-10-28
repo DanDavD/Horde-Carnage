@@ -36,7 +36,7 @@ The simulation never reads a key or the mouse. Every step, `Game::Update` turns 
 
 ### The world
 
-`World` (`src/core/World.h`) holds everything the simulation needs as plain data: the arena, the player, the boss, the hairballs, the player's bullets, the boss's projectiles and shockwaves, the camera, a seeded random generator (see [Random numbers](RANDOM.md)), and what landed the last hit on the player (`lastHitBy`, for the death screen). Hairballs, projectiles and shockwaves live in fixed-size pools inside it (see [Object pool](OBJECT_POOL.md)), so a running game never allocates memory. Two functions work on it:
+`World` (`src/core/World.h`) holds everything the simulation needs as plain data: the arena, the player, the boss, the hairballs, the player's bullets, the boss's projectiles and shockwaves, the camera, a seeded random generator (see [Random numbers](RANDOM.md)), what landed the last hit on the player (`lastHitBy`, for the death screen), and the events of the last steps (`events`: hits, breaks, landings, for the game to react to; see [Game feel](GAME_FEEL.md)). Hairballs, projectiles and shockwaves live in fixed-size pools inside it (see [Object pool](OBJECT_POOL.md)), so a running game never allocates memory. Two functions work on it:
 
 - `CreateWorld` builds the starting state: the boss in the middle of the arena, the player south of it and facing it, the camera on both, and the random generator seeded with the seed it is given.
 - `StepWorld` advances it by one fixed step, in this order: the invulnerability window and the dash cooldown, the player (start a dash or a drink, the drink, the dash or normal movement, aim, weapons), every hairball (chase, movement) and then the boss (`StepBoss`: stalking and picking its next attack from the world's generator, or the stage of its attack and the start of a combo's second attack, the strands of a Hair Ring spawned into their pool when it spits, and the impact and shockwave of a Leap when it lands), collisions between bodies and the walls (four passes, see [Collisions](COLLISIONS.md)), bullets and their hits (see [Bullets and hits](BULLETS.md)), dead hairballs removed, contact damage (see [Health](HEALTH.md)), the boss's strands and shockwaves and their hits on the player (see [The boss](BOSS.md)), then the camera, which follows a point between the player and the boss (see [Camera](CAMERA.md)).
@@ -45,7 +45,7 @@ The simulation never reads a key or the mouse. Every step, `Game::Update` turns 
 
 `Session` (`src/core/Session.h`) wraps the world in a small state machine: `Playing` steps the world, `Victory` freezes it once the boss is defeated, and `Dead` freezes it once the player's health reaches 0. `TryRestart` replaces the world with a fresh one from `CreateWorld`, with the next seed, and the session keeps the attempt count across it. See [Game flow](GAME_FLOW.md).
 
-`Game` owns one `Session`. It reads the input, calls `StepSession`, and draws the result. It never changes the world itself.
+`Game` owns one `Session`. It reads the input, calls `StepSession`, and draws the result. It never changes the world itself. After each step it reads the world's events and turns them into a hit stop (which slows the world's clock for a moment), a screen shake (which moves the world's camera), and particles (`ParticleEmitter`, with its own random generator so the fight's seed stays untouched). All three are `horde_core` components that `Game` owns, because they change how the fight is shown, never what happens in it. So are the trails behind the two health bars (`TrailingBar`), which `Game` steps after the world and the HUD draws. See [Game feel](GAME_FEEL.md).
 
 ### Drawing
 
@@ -57,8 +57,9 @@ src/app/render/
   Palette.h     Every colour the game draws with
   Art           The fonts, the textures made in code and the floor's layout, loaded once at the start
   Text          Text in the game's fonts: spaced, centred or aligned to the right
-  WorldDraw     DrawWorld: the arena, the warnings on the floor, the bodies and projectiles, in draw order
+  WorldDraw     DrawWorld: the arena, floor litter, warnings, dust, bodies, projectiles and sparks, in draw order
   ArenaDraw     The stone floor, the walls, the shadows under bodies, the torchlight and the vignette
+  ParticleDraw  Floor litter, dust and shadows under bodies, sparks and airborne debris over them
   HairBody      The body of matted hair that hairballs and the boss share (DrawHairBody), and DrawHairball
   Shapes        Shapes raylib does not have: a radius at each angle, a rotated ellipse
   BossDraw      The boss in each pose, its shield, and the warnings of its attacks
@@ -103,6 +104,7 @@ Game objects are plain structs (components) that hold data, and free functions (
 - `tests/core/ChaseTests.cpp` and `WorldTests.cpp`: see [Enemies](ENEMIES.md#tests).
 - `tests/core/AttackChoiceTests.cpp`, `BossTests.cpp`, `BossChargeTests.cpp`, `BossComboTests.cpp`, `BossHairRingTests.cpp`, `BossLeapTests.cpp`, `BossVolleyTests.cpp`, `FrenzyTests.cpp`, `PhaseTwoTests.cpp`, `ShockwaveTests.cpp` and `SummonTests.cpp`: see [The boss](BOSS.md#tests). The boss tests share `PredictableBoss.h`, a boss without its chance.
 - `tests/core/RandomTests.cpp`: see [Random numbers](RANDOM.md#tests).
+- `tests/core/WorldEventTests.cpp`, `HitStopTests.cpp`, `ScreenShakeTests.cpp`, `ImpactFeelTests.cpp`, `ParticleTests.cpp`, `ParticleEmitterTests.cpp` and `TrailingBarTests.cpp`: see [Game feel](GAME_FEEL.md#tests).
 - `tests/core/ScreenFitTests.cpp`: see [Screen and fullscreen](SCREEN.md#tests).
 - `tests/core/StoneFloorTests.cpp`: see [Art direction](ART.md#tests).
 - `tests/core/ShieldTests.cpp`: see [The boss's shield](SHIELD.md#tests).

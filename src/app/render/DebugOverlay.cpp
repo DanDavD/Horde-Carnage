@@ -104,14 +104,14 @@ void DrawDebugWorld(const Player& player, const FollowCamera& camera, float alph
 // In screen space. The numbers I tune against: what the input asks for, what the
 // body does, where the camera is, how many enemies and projectiles there are, the player's health window,
 // and what the boss is doing.
-void DrawDebugHud(const World& world, Vec2 moveInput) {
+void DrawDebugHud(const World& world, Vec2 moveInput, std::size_t particleCount) {
     const Player& player = world.player;
     const FollowCamera& camera = world.camera;
     const Motion& motion = player.motion;
     constexpr int kX = 10;
     constexpr int kY = 80; // Below the health and dash bars.
     constexpr int kLine = 20;
-    DrawRectangle(kX - 4, kY - 4, 420, 17 * kLine + 8, Fade(BLACK, 0.6f));
+    DrawRectangle(kX - 4, kY - 4, 460, 17 * kLine + 8, Fade(BLACK, 0.6f));
     DrawText(TextFormat("input  %5.2f %5.2f  len %4.2f", moveInput.x, moveInput.y, Length(moveInput)), kX, kY,
              18, RAYWHITE);
     DrawText(TextFormat("speed  %5.0f / %.0f", Length(motion.velocity), player.stats.maxSpeed), kX, kY + kLine, 18,
@@ -141,8 +141,9 @@ void DrawDebugHud(const World& world, Vec2 moveInput) {
                         player.flasks.drinkingSeconds),
              kX, kY + 12 * kLine, 18, RAYWHITE);
     DrawText(TextFormat("boss   %s", BossStateLabel(world.boss)), kX, kY + 13 * kLine, 18, ORANGE);
-    DrawText(TextFormat("seed   %08X  waves %d  marks %d", static_cast<unsigned>(world.seed),
-                        static_cast<int>(world.shockwaves.Size()), static_cast<int>(world.spawnMarkers.Size())),
+    DrawText(TextFormat("seed   %08X  waves %d  marks %d  part %d", static_cast<unsigned>(world.seed),
+                        static_cast<int>(world.shockwaves.Size()), static_cast<int>(world.spawnMarkers.Size()),
+                        static_cast<int>(particleCount)),
              kX, kY + 14 * kLine, 18, RAYWHITE);
     DrawText(AttackPickLabel(world), kX, kY + 15 * kLine, 18, ORANGE);
     DrawText(ShieldLabel(world.boss), kX, kY + 16 * kLine, 18, ORANGE);

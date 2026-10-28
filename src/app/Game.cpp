@@ -1,5 +1,6 @@
 #include "app/Game.h"
 
+#include <algorithm>
 #include <random>
 
 #include <raylib.h>
@@ -11,18 +12,22 @@
 #include "app/PlayerInput.h"
 #include "app/RaylibConvert.h"
 #include "app/render/ArenaDraw.h"
+#include "app/render/BossDraw.h"
 #include "app/render/DebugOverlay.h"
 #include "app/render/EndScreen.h"
 #include "app/render/Hud.h"
 #include "app/render/Palette.h"
 #include "app/render/View.h"
 #include "app/render/WorldDraw.h"
+#include "core/ImpactFeel.h"
 #include "core/ScreenFit.h"
 
 namespace horde {
 
 // Every launch starts from a seed the system picks, so no two runs of the game repeat the same fights.
-Game::Game(bool windowed) : _session{StartSession(kBossArena, kViewSize, std::random_device{}())} {
+Game::Game(bool windowed)
+    : _session{StartSession(kBossArena, kViewSize, std::random_device{}())},
+      _particles{SeedParticleEmitter(std::random_device{}())} {
     // Vsync caps how often we render, at the monitor's own rate. How often the game simulates comes from
     // FixedTimestep.
 #ifdef __EMSCRIPTEN__
@@ -46,6 +51,7 @@ Game::Game(bool windowed) : _session{StartSession(kBossArena, kViewSize, std::ra
     // it scales evenly.
     SetTextureFilter(GetFontDefault().texture, TEXTURE_FILTER_BILINEAR);
     _art = LoadArt(kBossArena);
+    ResetHealthTrails();
 }
 
 Game::~Game() {
@@ -67,8 +73,9 @@ void Game::Run() {
 
 void Game::Frame() {
     // Key presses are read once per frame, not per fixed step: a frame with no step would miss them.
-    if (ReadRestartPressed()) {
-        TryRestart(_session);
+    if (ReadRestartPressed() && TryRestart(_session)) {
+        ClearParticles(_particles);
+        ResetHealthTrails();
     }
     CollectButtonPresses(_pendingPresses);
 
@@ -95,10 +102,29 @@ void Game::Frame() {
         DefeatBoss(_session.world);
     }
 #endif
-    const int steps = _timestep.Advance(GetFrameTime());
+    // A hit stop slows the fight's clock, so the world takes fewer of its fixed steps. Every step is still the
+    // same length, so the rules play out exactly as at full speed, only slower to watch.
+    const float frameSeconds = GetFrameTime();
+    const float timeScale = TimeScale(_hitStop);
+    // Existing particles advance first, scaled by the hit stop so shards and casings hang in slow motion with
+    // the fight, while any burst spawned in this frame's steps is drawn once right where it started.
+    StepParticles(_particles.particles, _session.world.arena, std::min(frameSeconds, 0.25f) * timeScale);
+    const int steps = _timestep.Advance(frameSeconds * timeScale);
+    StepHitStop(_hitStop, frameSeconds);
+    const auto dt = static_cast<float>(_timestep.StepSeconds());
     for (int i = 0; i < steps; ++i) {
-        Update(static_cast<float>(_timestep.StepSeconds()));
+        const bool wasPlaying = _session.state == SessionState::Playing;
+        Update(dt);
+        StepHealthTrails(dt);
+        if (wasPlaying) {
+            EmitContinuousParticles(_particles, _session.world, dt);
+        }
+        FeelEvents();
     }
+    FeelEvents();
+    // The shake is only a view of the fight, so it moves on with the frames at full speed, which keeps it
+    // smooth on a fast monitor and keeps it shaking through a hit stop.
+    StepScreenShake(_shake, frameSeconds);
     Draw(static_cast<float>(_timestep.Alpha()));
 }
 
@@ -127,6 +153,29 @@ void Game::Update(float dt) {
 #endif
 }
 
+void Game::StepHealthTrails(float dt) {
+    const World& world = _session.world;
+    StepTrailingBar(_trails.player, world.player.health.current, world.player.health.max, dt);
+    StepTrailingBar(_trails.boss, world.boss.health.current, world.boss.health.max, dt);
+}
+
+void Game::ResetHealthTrails() {
+    const World& world = _session.world;
+    _trails = HealthTrails{.player = TrailingBarAt(world.player.health.current),
+                           .boss = TrailingBarAt(world.boss.health.current)};
+}
+
+void Game::FeelEvents() {
+    auto& events = _session.world.events;
+    for (const WorldEvent& event : events) {
+        const ImpactFeel feel = FeelOf(event);
+        StartHitStop(_hitStop, feel.slowSeconds);
+        AddTrauma(_shake, feel.trauma);
+        EmitEventParticles(_particles, event, _session.world);
+    }
+    events.Clear();
+}
+
 void Game::Draw(float alpha) const {
     const ScreenFit fit = CurrentScreenFit();
     BeginDrawing();
@@ -143,13 +192,17 @@ void Game::Draw(float alpha) const {
     const bool playing = _session.state == SessionState::Playing;
     // A frozen world has no next step to blend toward. Interpolating it would make everything shake
     // between its last two positions as alpha changes from frame to frame, so it is drawn where it stopped.
+    // A world slowed by a hit stop is still moving, so it keeps its interpolation and stays smooth.
     if (!playing) {
         alpha = 1.0f;
     }
 
-    // The world camera, scaled and moved onto the screen with the rest of the game.
-    BeginMode2D(WorldCamera(world.camera, alpha, fit));
-    DrawWorld(world, alpha, _art);
+    // The world camera, scaled and moved onto the screen with the rest of the game, and shaken. The HUD
+    // below is not shaken, so the bars stay readable through the hardest hit.
+    BeginMode2D(WorldCamera(world.camera, alpha, fit, CurrentShake(_shake)));
+    // The boss's death plays out over the victory; a boss that is not dead ignores it.
+    const float bossSinceDied = _session.state == SessionState::Victory ? _session.stateSeconds : kBossDeathSeconds;
+    DrawWorld(world, _particles.particles, alpha, _art, bossSinceDied);
 #ifndef NDEBUG
     if (_showDebugOverlay) {
         DrawDebugWorld(world.player, world.camera, alpha);
@@ -160,12 +213,13 @@ void Game::Draw(float alpha) const {
     // Everything below is in game pixels on the screen and does not move with the camera.
     BeginMode2D(ScreenCamera(fit));
     DrawVignette(_art);
+    DrawPainVignette(_art, world.player.health, world.elapsedSeconds);
 #ifndef NDEBUG
     if (_showDebugOverlay) {
-        DrawDebugHud(world, _lastMoveInput);
+        DrawDebugHud(world, _lastMoveInput, _particles.particles.Size());
     }
 #endif
-    DrawHud(world, _session.attempt, playing, AimInGame(fit), _art);
+    DrawHud(world, _trails, _session.attempt, playing, AimInGame(fit), _art);
     if (!playing) {
         DrawEndScreen(_session, _art);
     }

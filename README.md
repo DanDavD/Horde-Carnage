@@ -48,10 +48,12 @@ This is day 7 of 15, and the boss fight is in progress. Progress is tracked in t
 - Unit tests for the pure logic, and a GitHub Actions workflow that builds and tests every push and pull request on Windows, and builds the web version.
 - A web build: the same game compiled to WebAssembly, playable in a browser tab. See [The web build](docs/WEB_BUILD.md).
 - A dark look drawn entirely in code: a crypt of cracked stone slabs and black walls, lit only by the torch you carry, with shadows that lean away from it; a hunter in a tricorn hat and a torn cape, both hands on the gun, the other gun slung or holstered; the Matriarch as a matted mass of breathing hair with glowing slit eyes, who grows a mouth full of teeth in her second phase; and a HUD of thin bars in the Cinzel typeface. See [Art direction](docs/ART.md).
+- Hits you can feel. A heavy hit drops the fight into slow motion for a moment, easing back to full speed, and the screen shakes with the hit, the boss's landings, its crashes into the walls and its roars, harder for the bigger moments. The HUD and your aim never shake. Every shot throws muzzle sparks, smoke and a brass casing that bounces on the stone; bullets spark blue or orange off the shield, shatter it into spinning shards when it breaks, and tear dark blood and locks of hair from the exposed boss; dashes kick up dust, leap landings roll out a ring of dust, killed hairballs burst into hair, and the Matriarch sheds locks onto the floor throughout Phase 2 and Frenzy, all from a 512-slot pool with its own random stream so the fight's seed never changes. See [Game feel](docs/GAME_FEEL.md).
+- Health bars in the manner of Dark Souls: a hit leaves a pale trail where the bar was, which waits while the hits keep coming and then drains, and the boss's bar shows the damage of your last run of hits. The edges of the screen go red when you are hit and beat like a heart when your health is low. The boss dies on screen, convulsing, screaming and turning grey, before VICTORY fades in. See [Game feel](docs/GAME_FEEL.md).
 - Always fullscreen, at the monitor's own resolution and refresh rate, drawn sharp at that resolution, with black bars on screens that are not 16:9 so everyone sees the same arena. `--windowed` opens a window instead. See [Screen and fullscreen](docs/SCREEN.md).
 - Warnings are errors for the project's own code (`/W4 /WX` on MSVC).
 
-**Still to do:** game feel, sound and menus, and maybe the numbers in JSON. See the [roadmap](docs/ROADMAP.md) for the order, and for the difficulty I am aiming for.
+**Still to do:** sound and menus, and maybe the numbers in JSON. See the [roadmap](docs/ROADMAP.md) for the order, and for the difficulty I am aiming for.
 
 ## Tech stack
 
