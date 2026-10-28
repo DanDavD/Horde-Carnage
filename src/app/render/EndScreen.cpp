@@ -103,7 +103,7 @@ void DrawEndScreen(const Session& session, const Menu& menu, float sinceMoved, c
     // Inside the band, so they never land on top of the player, who stands in the middle of the screen, and
     // dimmed until the restart delay has passed, so it is clear why an early press did nothing.
     const float ready = CanRestart(session) ? 1.0f : 0.35f * shown;
-    DrawMenu(MenuLayoutFor(session.state), MenuLabelsFor(session.state), menu, sinceMoved, ready, art);
+    DrawMenu(PageFor(session.state), menu, sinceMoved, ready, art);
 }
 
 } // namespace horde

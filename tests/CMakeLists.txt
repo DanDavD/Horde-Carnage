@@ -33,6 +33,7 @@ add_executable(horde_tests
     core/ScreenFitTests.cpp
     core/ScreenShakeTests.cpp
     core/SessionTests.cpp
+    core/SettingsTests.cpp
     core/SummonTests.cpp
     core/ShieldTests.cpp
     core/ShockwaveTests.cpp

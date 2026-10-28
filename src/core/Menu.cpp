@@ -22,6 +22,9 @@ MenuResult StepMenu(Menu& menu, const MenuInput& input) {
     if (input.confirm) {
         return MenuResult{MenuAction::Chosen, menu.selected};
     }
+    if (input.adjust != 0) {
+        return MenuResult{MenuAction::Adjusted, menu.selected, input.adjust < 0 ? -1 : 1};
+    }
     return MenuResult{menu.selected != before ? MenuAction::Moved : MenuAction::None, menu.selected};
 }
 

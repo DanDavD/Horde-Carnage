@@ -119,13 +119,20 @@ MenuInput ReadMenuKeys() {
     const bool pad = IsGamepadAvailable(kGamepad);
     const auto padPressed = [pad](int button) { return pad && IsGamepadButtonPressed(kGamepad, button); };
     MenuInput input;
-    if (IsKeyPressed(KEY_W) || IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_A) || IsKeyPressed(KEY_LEFT) ||
-        padPressed(GAMEPAD_BUTTON_LEFT_FACE_UP) || padPressed(GAMEPAD_BUTTON_LEFT_FACE_LEFT)) {
+    if (IsKeyPressed(KEY_W) || IsKeyPressed(KEY_UP) || padPressed(GAMEPAD_BUTTON_LEFT_FACE_UP)) {
         input.move = -1;
     }
-    if (IsKeyPressed(KEY_S) || IsKeyPressed(KEY_DOWN) || IsKeyPressed(KEY_D) || IsKeyPressed(KEY_RIGHT) ||
-        padPressed(GAMEPAD_BUTTON_LEFT_FACE_DOWN) || padPressed(GAMEPAD_BUTTON_LEFT_FACE_RIGHT)) {
+    if (IsKeyPressed(KEY_S) || IsKeyPressed(KEY_DOWN) || padPressed(GAMEPAD_BUTTON_LEFT_FACE_DOWN)) {
         input.move = 1;
+    }
+    // Repeated while held, so the volume can be run from one end to the other without tapping.
+    if (IsKeyPressed(KEY_A) || IsKeyPressedRepeat(KEY_A) || IsKeyPressed(KEY_LEFT) || IsKeyPressedRepeat(KEY_LEFT) ||
+        padPressed(GAMEPAD_BUTTON_LEFT_FACE_LEFT)) {
+        input.adjust = -1;
+    }
+    if (IsKeyPressed(KEY_D) || IsKeyPressedRepeat(KEY_D) || IsKeyPressed(KEY_RIGHT) || IsKeyPressedRepeat(KEY_RIGHT) ||
+        padPressed(GAMEPAD_BUTTON_LEFT_FACE_RIGHT)) {
+        input.adjust = 1;
     }
     input.confirm = IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_KP_ENTER) || IsKeyPressed(KEY_SPACE) ||
                     padPressed(GAMEPAD_BUTTON_RIGHT_FACE_DOWN);

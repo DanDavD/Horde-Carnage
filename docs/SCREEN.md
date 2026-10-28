@@ -10,11 +10,12 @@ The pieces:
 - `src/app/Game.cpp`: the window (`Game::Game`), and the bars and the two cameras around each frame (`Game::Draw`).
 - `src/app/render/View.cpp`: the fit of this frame (`CurrentScreenFit`), the two cameras (`WorldCamera`, `ScreenCamera`), and the mouse in game pixels (`AimInGame`).
 - `src/main.cpp`: the `--windowed` option.
+- `src/core/Settings.h`: the Display and Frame rate settings (see [Settings](SETTINGS.md)).
 - `web/shell.html`: in a browser, the canvas follows the page's size.
 
 ## How it works
 
-**The window.** On the desktop, `Game::Game` opens the window and makes it a borderless window over the whole monitor (`ToggleBorderlessWindowed`), at the monitor's resolution. With vsync on, it draws at the monitor's refresh rate: on a 165 Hz monitor, 165 frames a second. The simulation still steps at 60 Hz and the drawing interpolates between steps (see [Architecture](ARCHITECTURE.md)), so the game runs the same on every monitor. `--windowed` on the command line opens a 1280x720 window that can be resized instead.
+**The window.** On the desktop, `Game::Game` opens the window and makes it a borderless window over the whole monitor (`ToggleBorderlessWindowed`), at the monitor's resolution. With vsync on, it draws at the monitor's refresh rate: on a 165 Hz monitor, 165 frames a second; the Frame rate setting can cap it at 60, 120 or 144 instead, or lift the cap. The simulation still steps at 60 Hz and the drawing interpolates between steps (see [Architecture](ARCHITECTURE.md)), so the game runs the same at any frame rate. Settings > Display gives a 1280x720 window that can be resized instead, and `--windowed` on the command line does for one run.
 
 In a browser, the window is the canvas, and raylib resizes it with the page (`FLAG_WINDOW_RESIZABLE`). `SetWindowMinSize` right after opening makes raylib fit it to the page once at the start. When itch.io goes fullscreen, the page is the whole screen, and so is the canvas.
 
@@ -36,7 +37,7 @@ Both are drawn at the screen's real resolution. Almost everything is shapes, so 
 - **Drawn at the screen's resolution, not drawn small and stretched.** Drawing at 1280x720 into a texture and stretching it to the screen is simpler, but blurs every edge at 1.5x. Drawing through a scaled camera costs nothing more and stays sharp.
 - **Bars, not a stretched picture.** Stretching a 16:9 picture onto 16:10 or 21:9 squashes circles into ovals, and the boss's warnings are shapes the player reads.
 - **A borderless window, not exclusive fullscreen.** Exclusive fullscreen changes the monitor's mode, makes switching to another program slow and can leave the desktop at the wrong resolution after a crash. A borderless window over the monitor looks the same and has none of that.
-- **Always fullscreen, with `--windowed` for development.** The game is meant to be played fullscreen, so that is the default and there is no key to leave it. A window is still useful to record the game, to debug it next to an editor, or to capture it with tools that cannot see a fullscreen game.
+- **Fullscreen by default, with a window in the settings.** The game is meant to be played fullscreen, so that is the default. A window is still useful to play next to something else, to record the game, or to debug it next to an editor, so Settings > Display switches at once and remembers it, and `--windowed` opens one run in a window without changing the saved setting.
 - **The fit is pure math in `horde_core`.** It is the kind of code that is easy to get subtly wrong (an off-centre bar, a mouse that drifts on one side of an ultrawide), and as a function it can be tested on screens I do not have.
 
 ## How to tune it
@@ -44,7 +45,8 @@ Both are drawn at the screen's real resolution. Almost everything is shapes, so 
 | Value | Where | Default |
 |---|---|---|
 | The game's resolution | `kScreenWidth`, `kScreenHeight` (`src/app/render/View.h`) | 1280x720 |
-| Fullscreen or windowed | `--windowed` on the command line | Fullscreen |
+| Fullscreen or windowed | Settings > Display, or `--windowed` for one run | Fullscreen |
+| How often a frame is drawn | Settings > Frame rate | VSync |
 | Colour of the bars | `ClearBackground` in `Game::Draw` | Black |
 | How the Debug overlay's font scales | `SetTextureFilter` in `Game::Game` | Bilinear |
 | Size of the game's fonts before scaling | `kTitleFontPixels`, `kUiFontPixels` (`src/app/render/Art.cpp`) | 160 and 64 pixels |
@@ -57,7 +59,6 @@ The window and the drawing need a real screen. On my 1920x1080, 165 Hz monitor, 
 
 ## Limitations
 
-- **There is no key to leave fullscreen.** Esc still quits at once. A pause menu, where Esc will lead, comes with the menus.
 - **The titles soften above 1440p.** They are rasterised at 160 pixels and grow past that on a 4K screen. The Debug overlay's bitmap font looks soft at any scale.
 - **In a browser the canvas ignores the screen's pixel density.** On a laptop with a high-density screen, the canvas has as many pixels as the page has CSS pixels, so the picture is a little softer than the screen could show.
 - **Only the primary monitor.** The borderless window covers the monitor the window opens on.

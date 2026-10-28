@@ -66,12 +66,12 @@ src/app/render/
   PlayerDraw    The player, the gun, the dash trail and the drink ring
   Hud           The bars, the flasks, the weapon panel, the crosshair, the attempt and the controls line
   EndScreen     YOU DIED and VICTORY, with their row of choices
-  MenuDraw      The items of each menu, where they sit, the title and the pause screens
+  MenuDraw      The items of each menu, where they sit, the title, pause, settings and controls screens
   Backdrop      The blurred still of the fight behind the pause menu
   DebugOverlay  The F1 overlay, compiled into Debug builds only
 ```
 
-Each file keeps its own sizes and helpers in an anonymous namespace; only what another file needs is in its header (for example `ShieldColor`, which the boss and the HUD share). `Draw` calls `DrawWorld` inside the world camera, and `DrawVignette`, `DrawHud` and `DrawEndScreen` inside the screen camera. Sound lives next to it, in `src/app/audio/SoundBank`: every sound is synthesized once at start-up and played from the world's events (see [Audio](AUDIO.md)). `Game` owns the one `Art`, loaded after the window opens and unloaded before it closes, and hands it to the drawing. How the game looks, and why, is in [Art direction](ART.md).
+Each file keeps its own sizes and helpers in an anonymous namespace; only what another file needs is in its header (for example `ShieldColor`, which the boss and the HUD share). `Draw` calls `DrawWorld` inside the world camera, and `DrawVignette`, `DrawHud` and `DrawEndScreen` inside the screen camera. Sound lives next to it, in `src/app/audio/SoundBank`: every sound is synthesized once at start-up and played from the world's events (see [Audio](AUDIO.md)). The player's settings are read before the window opens and saved on every change by `src/app/SettingsStore` (see [Settings](SETTINGS.md)). `Game` owns the one `Art`, loaded after the window opens and unloaded before it closes, and hands it to the drawing. How the game looks, and why, is in [Art direction](ART.md).
 
 ### Components and systems
 
@@ -115,6 +115,7 @@ Game objects are plain structs (components) that hold data, and free functions (
 - `tests/core/HealthTests.cpp` and the contact damage cases in `WorldTests.cpp`: see [Health](HEALTH.md#tests).
 - `tests/core/SessionTests.cpp`: see [Game flow](GAME_FLOW.md#tests).
 - `tests/core/MenuTests.cpp`: see [Menus](MENUS.md#tests).
+- `tests/core/SettingsTests.cpp`: see [Settings](SETTINGS.md#tests).
 - `tests/core/WeaponTests.cpp`, `LoadoutTests.cpp` and the aim and fire cases in `FacingTests.cpp` and `WorldTests.cpp`: see [Aiming and weapons](WEAPONS.md#tests).
 - `tests/core/ObjectPoolTests.cpp`: see [Object pool](OBJECT_POOL.md#tests).
 - `tests/core/DashTests.cpp`, `FlasksTests.cpp` and the dash and flask cases in `WorldTests.cpp`: see [Player abilities](ABILITIES.md#tests).

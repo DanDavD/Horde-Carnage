@@ -14,6 +14,7 @@
 
 #include "app/PlayerInput.h"
 #include "app/RaylibConvert.h"
+#include "app/SettingsStore.h"
 #include "app/render/ArenaDraw.h"
 #include "app/render/BossDraw.h"
 #include "app/render/DebugOverlay.h"
@@ -32,8 +33,6 @@ namespace {
 
 // The sounds' own random stream, apart from the fight's and the particles'.
 constexpr std::uint64_t kSoundStream = 13;
-// Under full volume, so the fight's loudest moments, mixed together, do not clip.
-constexpr float kMasterVolume = 0.8f;
 constexpr float kMenuMoveVolume = 0.35f;
 constexpr float kMenuConfirmVolume = 0.5f;
 
@@ -43,9 +42,10 @@ constexpr float kMenuConfirmVolume = 0.5f;
 Game::Game(bool windowed)
     : _session{StartSession(kBossArena, kViewSize, std::random_device{}())},
       _particles{SeedParticleEmitter(std::random_device{}())},
-      _soundRandom{SeedRandom(std::random_device{}(), kSoundStream)} {
-    // Vsync caps how often we render, at the monitor's own rate. How often the game simulates comes from
-    // FixedTimestep.
+      _soundRandom{SeedRandom(std::random_device{}(), kSoundStream)},
+      _settings{LoadSettings()} {
+    // Vsync caps how often we render, at the monitor's own rate, unless the settings ask for another cap. How
+    // often the game simulates comes from FixedTimestep.
 #ifdef __EMSCRIPTEN__
     (void)windowed;
     // In a browser the canvas follows the page's size, so going fullscreen on itch.io fills the screen.
@@ -55,13 +55,17 @@ Game::Game(bool windowed)
     SetWindowMinSize(kScreenWidth / 4, kScreenHeight / 4);
 #else
     // Fullscreen, at the monitor's own resolution: a borderless window over the whole monitor, so switching
-    // to another program is instant and the resolution of the desktop is not changed. `--windowed` gives a
-    // window that can be resized instead, for recording and debugging.
-    SetConfigFlags(FLAG_VSYNC_HINT | FLAG_MSAA_4X_HINT | (windowed ? FLAG_WINDOW_RESIZABLE : 0));
-    InitWindow(kScreenWidth, kScreenHeight, "Horde Carnage");
-    if (!windowed) {
-        ToggleBorderlessWindowed();
+    // to another program is instant and the resolution of the desktop is not changed. The settings can ask
+    // for a window that can be resized instead, and `--windowed` does for this run only, for recording and
+    // debugging.
+    if (windowed) {
+        _savedFullscreen = _settings.fullscreen;
+        _settings.fullscreen = false;
     }
+    const unsigned int vsync = _settings.frameRate == FrameRateCap::VSync ? FLAG_VSYNC_HINT : 0;
+    SetConfigFlags(vsync | FLAG_MSAA_4X_HINT | FLAG_WINDOW_RESIZABLE);
+    InitWindow(kScreenWidth, kScreenHeight, "Horde Carnage");
+    ApplyDisplay();
 #endif
     // The default font, which the Debug overlay uses, is drawn scaled with the rest of the picture; smoothed,
     // it scales evenly.
@@ -70,7 +74,7 @@ Game::Game(bool windowed)
     // Every sound is synthesized here, once, in a few hundredths of a second. Without an audio device the
     // game still runs, silent.
     InitAudioDevice();
-    SetMasterVolume(kMasterVolume);
+    ApplySettings();
     _sounds = LoadSoundBank();
     _backdrop = LoadBackdrop();
     // Esc pauses the fight instead of closing the game; the title's Quit and the window's close button do.
@@ -176,7 +180,8 @@ void Game::HandleMenus() {
     const SessionState state = _session.state;
     if (state == SessionState::Playing) {
         // The next menu, whichever it is, opens fresh on its first item.
-        _menuState = SessionState::Playing;
+        _menuPage = MenuPage::None;
+        _openedPage = MenuPage::None;
         if (ReadPausePressed() || TakePointerLockLost()) {
             PauseFight(_session);
             _backdrop.ready = false;
@@ -184,12 +189,12 @@ void Game::HandleMenus() {
         }
         return;
     }
-    const std::span<const char* const> labels = MenuLabelsFor(state);
-    if (state != _menuState) {
-        _menu = MakeMenu(static_cast<int>(labels.size()));
-        _menuState = state;
-        _menuSinceMoved = 0.0f;
+    // A change of state (a death, a victory, a return to the title) closes whatever was opened over the last
+    // page.
+    if (PageFor(state) != _menuPage && _openedPage == MenuPage::None) {
+        OpenPage(PageFor(state), 0);
     }
+    const MenuPage page = CurrentPage();
     if ((state == SessionState::Dead || state == SessionState::Victory) && ReadQuickRetryPressed() &&
         TryRestart(_session)) {
         ForgetLastFight();
@@ -197,18 +202,26 @@ void Game::HandleMenus() {
     }
 
     MenuInput input = ReadMenuKeys();
-    // Start goes back from the pause menu, as it came in.
+    // In a row of choices, left and right move along it; elsewhere they change the selected value.
+    if (IsRowMenu(page)) {
+        input.move = input.move != 0 ? input.move : input.adjust;
+        input.adjust = 0;
+    }
+    // Start goes back from the pause menu, as it came in, and from the pages opened over it.
     input.back = input.back || (state == SessionState::Paused && ReadPausePressed());
-    const MenuLayout layout = MenuLayoutFor(state);
     const Vec2 mouse = AimInGame(CurrentScreenFit());
-    const std::optional<int> under = MenuItemAt(layout, labels, mouse, _art);
-    if (mouse != _lastMouse) {
-        input.hovered = under;
+    const std::optional<MenuTarget> under = MenuTargetAt(page, mouse, _art);
+    if (mouse != _lastMouse && under) {
+        input.hovered = under->item;
     }
     _lastMouse = mouse;
     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && under) {
-        input.hovered = under;
-        input.confirm = true;
+        input.hovered = under->item;
+        if (under->lowerArrow) {
+            input.adjust = -1;
+        } else {
+            input.confirm = true;
+        }
     }
     // The end screens' choices wait for the restart delay, like the restart itself.
     if ((state == SessionState::Dead || state == SessionState::Victory) && !CanRestart(_session)) {
@@ -224,38 +237,62 @@ void Game::HandleMenus() {
         PlayCue(_sounds, SoundCue{SoundId::MenuMove, kMenuMoveVolume});
         break;
     case MenuAction::Chosen:
-        PlayCue(_sounds, SoundCue{SoundId::MenuConfirm, kMenuConfirmVolume});
-        Choose(result.item);
+        Choose(page, result.item);
+        break;
+    case MenuAction::Adjusted:
+        if (page == MenuPage::Settings) {
+            const SettingsRow& row = SettingsRows()[static_cast<std::size_t>(result.item)];
+            if (row.kind == SettingsRowKind::Value) {
+                ChangeSetting(row.setting, result.adjust);
+            }
+        }
         break;
     case MenuAction::Back:
-        if (state == SessionState::Paused) {
-            PlayCue(_sounds, SoundCue{SoundId::MenuConfirm, kMenuConfirmVolume});
-            ResumeFight(_session);
-        }
+        GoBack(page);
         break;
     }
 }
 
-void Game::Choose(int item) {
-    switch (_session.state) {
-    case SessionState::Title:
-        if (item == 0) {
+MenuPage Game::CurrentPage() const {
+    return _openedPage != MenuPage::None ? _openedPage : PageFor(_session.state);
+}
+
+void Game::OpenPage(MenuPage page, int selected) {
+    _openedPage = page == PageFor(_session.state) ? MenuPage::None : page;
+    _menu = MakeMenu(MenuItemCount(page));
+    _menu.selected = selected;
+    _menuPage = page;
+    _menuSinceMoved = 0.0f;
+}
+
+void Game::Choose(MenuPage page, int item) {
+    // A value line changes its value instead, with its own sound.
+    if (page != MenuPage::Settings || SettingsRows()[static_cast<std::size_t>(item)].kind != SettingsRowKind::Value) {
+        PlayCue(_sounds, SoundCue{SoundId::MenuConfirm, kMenuConfirmVolume});
+    }
+    switch (page) {
+    case MenuPage::Title:
+        if (item == kTitleBeginItem) {
             BeginFight(_session);
             _pendingPresses = {};
+        } else if (item == kTitleSettingsItem) {
+            OpenPage(MenuPage::Settings, 0);
         } else {
             _quit = true;
         }
         break;
-    case SessionState::Paused:
-        if (item == 0) {
+    case MenuPage::Pause:
+        if (item == kPauseResumeItem) {
             ResumeFight(_session);
+        } else if (item == kPauseSettingsItem) {
+            OpenPage(MenuPage::Settings, 0);
         } else {
             ReturnToTitle(_session);
             ForgetLastFight();
         }
         break;
-    case SessionState::Dead:
-    case SessionState::Victory:
+    case MenuPage::Dead:
+    case MenuPage::Victory:
         if (item == 0) {
             TryRestart(_session);
         } else {
@@ -263,9 +300,95 @@ void Game::Choose(int item) {
         }
         ForgetLastFight();
         break;
-    case SessionState::Playing:
+    case MenuPage::Settings: {
+        const SettingsRow& row = SettingsRows()[static_cast<std::size_t>(item)];
+        if (row.kind == SettingsRowKind::Value) {
+            ChangeSetting(row.setting, 1);
+        } else if (row.kind == SettingsRowKind::Controls) {
+            OpenPage(MenuPage::Controls, 0);
+        } else {
+            GoBack(page);
+        }
         break;
     }
+    case MenuPage::Controls:
+        GoBack(page);
+        break;
+    case MenuPage::None:
+        break;
+    }
+}
+
+void Game::GoBack(MenuPage page) {
+    switch (page) {
+    case MenuPage::Pause:
+        PlayCue(_sounds, SoundCue{SoundId::MenuConfirm, kMenuConfirmVolume});
+        ResumeFight(_session);
+        break;
+    case MenuPage::Settings:
+        // Back on the item that opened it, as a player expects to find their place.
+        PlayCue(_sounds, SoundCue{SoundId::MenuConfirm, kMenuConfirmVolume});
+        OpenPage(PageFor(_session.state),
+                 _session.state == SessionState::Paused ? kPauseSettingsItem : kTitleSettingsItem);
+        break;
+    case MenuPage::Controls: {
+        PlayCue(_sounds, SoundCue{SoundId::MenuConfirm, kMenuConfirmVolume});
+        const std::span<const SettingsRow> rows = SettingsRows();
+        const auto controls = std::find_if(rows.begin(), rows.end(), [](const SettingsRow& row) {
+            return row.kind == SettingsRowKind::Controls;
+        });
+        OpenPage(MenuPage::Settings, static_cast<int>(controls - rows.begin()));
+        break;
+    }
+    case MenuPage::Title:
+    case MenuPage::Dead:
+    case MenuPage::Victory:
+    case MenuPage::None:
+        break;
+    }
+}
+
+void Game::ChangeSetting(Setting setting, int step) {
+    if (!AdjustSetting(_settings, setting, step)) {
+        return;
+    }
+    ApplySettings();
+    Settings saved = _settings;
+    if (setting == Setting::Display) {
+        ApplyDisplay();
+        _savedFullscreen.reset();
+    } else if (_savedFullscreen) {
+        saved.fullscreen = *_savedFullscreen;
+    }
+    SaveSettings(saved);
+    // After the volume has changed, so the tick is heard at the new volume.
+    PlayCue(_sounds, SoundCue{SoundId::MenuMove, kMenuMoveVolume});
+}
+
+void Game::ApplySettings() {
+    SetMasterVolume(MasterGain(_settings));
+#ifndef __EMSCRIPTEN__
+    // In a browser the page draws once per refresh of the screen, whatever is asked.
+    if (_settings.frameRate == FrameRateCap::VSync) {
+        SetWindowState(FLAG_VSYNC_HINT);
+    } else {
+        ClearWindowState(FLAG_VSYNC_HINT);
+    }
+    SetTargetFPS(TargetFramesPerSecond(_settings.frameRate));
+#endif
+}
+
+void Game::ApplyDisplay() {
+#ifndef __EMSCRIPTEN__
+    if (IsWindowState(FLAG_BORDERLESS_WINDOWED_MODE) != _settings.fullscreen) {
+        ToggleBorderlessWindowed();
+    }
+    // raylib keeps its borderless window above every other one, which leaves it covering the desktop after
+    // switching to another program; a window the size of the monitor already hides the taskbar.
+    if (IsWindowState(FLAG_WINDOW_TOPMOST)) {
+        ClearWindowState(FLAG_WINDOW_TOPMOST);
+    }
+#endif
 }
 
 void Game::ForgetLastFight() {
@@ -347,13 +470,22 @@ void Game::Draw(float alpha) const {
     case SessionState::Title:
         DrawScene(fit, alpha, false);
         BeginMode2D(ScreenCamera(fit));
-        DrawTitleScreen(_menu, _menuSinceMoved, _art);
+        if (_openedPage == MenuPage::None) {
+            DrawTitleScreen(_menu, _menuSinceMoved, _art);
+        } else {
+            DrawTitleShade();
+            DrawOpenedPage();
+        }
         EndMode2D();
         break;
     case SessionState::Paused:
         BeginMode2D(ScreenCamera(fit));
         DrawBackdrop(_backdrop, _session.stateSeconds);
-        DrawPauseScreen(_menu, _menuSinceMoved, _session.stateSeconds, _art);
+        if (_openedPage == MenuPage::None) {
+            DrawPauseScreen(_menu, _menuSinceMoved, _session.stateSeconds, _art);
+        } else {
+            DrawOpenedPage();
+        }
         EndMode2D();
         break;
     case SessionState::Playing:
@@ -371,6 +503,15 @@ void Game::Draw(float alpha) const {
     EndDrawing();
 }
 
+void Game::DrawOpenedPage() const {
+    DrawPageShade();
+    if (_openedPage == MenuPage::Settings) {
+        DrawSettingsScreen(_menu, _menuSinceMoved, _settings, _art);
+    } else if (_openedPage == MenuPage::Controls) {
+        DrawControlsScreen(_menu, _menuSinceMoved, _art);
+    }
+}
+
 void Game::DrawScene(const ScreenFit& fit, float alpha, bool withHud) const {
     BeginMode2D(ScreenCamera(fit));
     DrawRectangle(0, 0, kScreenWidth, kScreenHeight, kBackground);
@@ -381,7 +522,11 @@ void Game::DrawScene(const ScreenFit& fit, float alpha, bool withHud) const {
 
     // The world camera, scaled and moved onto the screen with the rest of the game, and shaken. The HUD
     // below is not shaken, so the bars stay readable through the hardest hit.
-    BeginMode2D(WorldCamera(world.camera, alpha, fit, CurrentShake(_shake)));
+    ShakeOffset shake = CurrentShake(_shake);
+    const float shakeAmount = ShakeAmount(_settings.shake);
+    shake.offset = shake.offset * shakeAmount;
+    shake.turnDegrees *= shakeAmount;
+    BeginMode2D(WorldCamera(world.camera, alpha, fit, shake));
     // The boss's death plays out over the victory; a boss that is not dead ignores it.
     const float bossSinceDied = _session.state == SessionState::Victory ? _session.stateSeconds : kBossDeathSeconds;
     DrawWorld(world, _particles.particles, alpha, _art, bossSinceDied);

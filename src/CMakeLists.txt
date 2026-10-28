@@ -23,6 +23,7 @@ add_library(horde_core STATIC
     core/ScreenFit.cpp
     core/ScreenShake.cpp
     core/Session.cpp
+    core/Settings.cpp
     core/Shield.cpp
     core/Shockwave.cpp
     core/SoundCue.cpp
@@ -42,6 +43,7 @@ add_executable(HordeCarnage
     app/Game.cpp
     app/audio/SoundBank.cpp
     app/PlayerInput.cpp
+    app/SettingsStore.cpp
     app/render/ArenaDraw.cpp
     app/render/Backdrop.cpp
     app/render/Art.cpp

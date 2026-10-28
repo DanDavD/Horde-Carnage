@@ -11,8 +11,8 @@ namespace horde {
 /// left stick and d-pad of the first gamepad. The result can be longer than 1; `StepMovement` clamps it.
 [[nodiscard]] Vec2 ReadMoveInput();
 
-/// This frame's menu keys: W, S and the arrows (or the d-pad) move, Enter or Space (or A) confirm, Esc or
-/// Backspace (or B) go back. Up and left both mean the previous item, so a row and a column read the same.
+/// This frame's menu keys: W, S, up and down (or the d-pad) move, A, D, left and right (or the d-pad)
+/// adjust, Enter or Space (or A) confirm, Esc or Backspace (or B) go back. Left and right repeat while held.
 /// The mouse is left to the caller, which knows where the items are. Read once per frame.
 [[nodiscard]] MenuInput ReadMenuKeys();
 

@@ -49,10 +49,28 @@ TEST_CASE("confirming chooses the selected item, and a click chooses the item un
     CHECK(result.item == 2);
 }
 
+TEST_CASE("an adjust asks to change the selected item's value, on the item the mouse points at") {
+    Menu menu = horde::MakeMenu(3);
+    MenuResult result = horde::StepMenu(menu, MenuInput{.adjust = -3});
+    CHECK(result.action == MenuAction::Adjusted);
+    CHECK(result.item == 0);
+    CHECK(result.adjust == -1);
+
+    result = horde::StepMenu(menu, MenuInput{.adjust = 1, .hovered = 2});
+    CHECK(result.action == MenuAction::Adjusted);
+    CHECK(result.item == 2);
+    CHECK(result.adjust == 1);
+    CHECK(menu.selected == 2);
+
+    // A confirm in the same frame wins: it is a choice, not a change of value.
+    CHECK(horde::StepMenu(menu, MenuInput{.adjust = 1, .confirm = true}).action == MenuAction::Chosen);
+}
+
 TEST_CASE("going back wins over everything else in the same frame, and keeps the selection") {
     Menu menu = horde::MakeMenu(3);
     horde::StepMenu(menu, MenuInput{.move = 1});
-    const MenuResult result = horde::StepMenu(menu, MenuInput{.move = 1, .hovered = 0, .confirm = true, .back = true});
+    const MenuResult result =
+        horde::StepMenu(menu, MenuInput{.move = 1, .adjust = 1, .hovered = 0, .confirm = true, .back = true});
     CHECK(result.action == MenuAction::Back);
     CHECK(menu.selected == 1);
 }
