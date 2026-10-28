@@ -22,6 +22,7 @@ add_executable(horde_tests
     core/HitStopTests.cpp
     core/ImpactFeelTests.cpp
     core/LoadoutTests.cpp
+    core/MenuTests.cpp
     core/MovementTests.cpp
     core/ObjectPoolTests.cpp
     core/ParticleEmitterTests.cpp
@@ -32,6 +33,7 @@ add_executable(horde_tests
     core/ScreenFitTests.cpp
     core/ScreenShakeTests.cpp
     core/SessionTests.cpp
+    core/SettingsTests.cpp
     core/SummonTests.cpp
     core/ShieldTests.cpp
     core/ShockwaveTests.cpp

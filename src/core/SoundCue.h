@@ -34,6 +34,8 @@ enum class SoundId {
     VolleyHiss,    ///< The warning of a Volley.
     SummonHowl,    ///< The warning of a Summon.
     Spit,          ///< Strands leaving the boss or a hairball.
+    MenuMove,      ///< The selection moving to another item.
+    MenuConfirm,   ///< An item chosen.
     Count,
 };
 

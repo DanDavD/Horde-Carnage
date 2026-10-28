@@ -55,6 +55,9 @@ inline constexpr Color kBossBar{150, 26, 32, 255};
 // Text and the frames of the HUD are the colour of old bone and parchment, not white.
 inline constexpr Color kText{226, 218, 198, 255};
 inline constexpr Color kSoftText{160, 154, 140, 255};
+// The menus: grey for the items not selected, and fainter grey for what only informs.
+inline constexpr Color kMenuIdle{122, 119, 112, 255};
+inline constexpr Color kMenuFaint{78, 76, 72, 255};
 inline constexpr Color kHudAccent{206, 192, 158, 255};
 inline constexpr Color kHudFrame{96, 88, 74, 255};
 inline constexpr Color kBlood{200, 40, 36, 255};

@@ -4,7 +4,7 @@
 
 Every sound in the fight is made in code, like the art: a small synthesizer builds each one from a recipe when the game starts. Nothing is recorded or downloaded, so there are no sound files to ship and no licenses to track. The sounds come from the same events as the hit stop, the shake and the particles (see [Game feel](GAME_FEEL.md)), so the rules never play a sound themselves.
 
-The fight has 23 sounds: the two guns, the shield (a ping when a bullet bounces off the Shell, a knock when the shield soaks one up, and glass when it breaks), the boss's flesh, a hairball bursting, the dash, the flask, three hits on the player (a hit, a heavy hit and the death), the boss's landing, her crash into a wall, her roar, her collapse when the first bar runs out and her death, a strand being spat, and a warning for each of her five attacks.
+There are 25 sounds: two for the menus (a dry tick to move, a low knock to choose), and 23 for the fight: the two guns, the shield (a ping when a bullet bounces off the Shell, a knock when the shield soaks one up, and glass when it breaks), the boss's flesh, a hairball bursting, the dash, the flask, three hits on the player (a hit, a heavy hit and the death), the boss's landing, her crash into a wall, her roar, her collapse when the first bar runs out and her death, a strand being spat, and a warning for each of her five attacks.
 
 The code:
 
@@ -40,7 +40,7 @@ Most sounds are a few of the same blocks:
 - **The cues are pure logic in `horde_core`.** Which sound an event makes, how loud and where, is tested without an audio device. Only loading and playing live in the app.
 - **Round-robin voices instead of one sound each.** One `Sound` per sound restarts itself on every play, so the SMG would cut its own shots off ten times a second. Aliases share the samples, so eight voices of a shot cost one copy of it.
 - **Their own random stream.** The pitch and volume wander comes from a generator of its own, so sound never takes a number from the fight's.
-- **Master volume at 0.8.** The loudest moments mix several sounds at once, a heavy hit, a landing and a roar, and the headroom keeps them from clipping.
+- **Full volume at 0.8.** The loudest moments mix several sounds at once, a heavy hit, a landing and a roar, and the headroom keeps them from clipping. The player turns it down from there in the settings (see [Settings](SETTINGS.md)).
 
 ## How to tune it
 
@@ -51,7 +51,7 @@ Most sounds are a few of the same blocks:
 | How much each play wanders | `kPitchWander`, `kVolumeWander` (`SoundCue.cpp`) | 6%, 10% |
 | How far a sound leans to one side | `kMaxPan` (`SoundCue.h`) | 0.7 |
 | Voices per sound | `VoicesFor` (`SoundBank.cpp`), `kMaxVoices` (`SoundBank.h`) | 8 for the guns, 5 for frequent sounds, 2 for the rest |
-| Overall volume | `kMasterVolume` (`Game.cpp`) | 0.8 |
+| Overall volume | `kFullGain` (`Settings.cpp`), times the player's setting squared | 0.8 at full |
 
 ## Tests
 
@@ -64,6 +64,5 @@ I checked the rest by running the game. A temporary build wrote all 23 sounds to
 ## Limitations
 
 - **The sounds are as good as their recipes.** Synthesis is clean but simple; the roar and the death are the furthest from a real creature.
-- **No volume setting yet.** The master volume is fixed until the settings menu.
 - **Nothing for the hairballs' spit warning, a drink starting, or casings landing.** They are quiet moments, and the events for them do not exist.
 - **The hit stop does not slow the sounds.** A sound plays at its own pitch through a slow-down. Pitching everything down with the time scale would make the hits heavier, but would also make the warnings harder to recognise.

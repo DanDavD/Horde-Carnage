@@ -263,3 +263,67 @@ TEST_CASE("standing still in front of the boss ends in death, whatever the seed"
         CHECK(session.world.lastHitBy.has_value());
     }
 }
+
+TEST_CASE("the title screen waits over a fresh world that does not move until the fight begins") {
+    Session session = horde::StartSession(kArena, kView);
+    horde::ReturnToTitle(session);
+    CHECK(session.state == SessionState::Title);
+    const Vec2 player = session.world.player.motion.position;
+    Step(session, Vec2{1.0f, 0.0f}, 60);
+    CHECK(session.world.player.motion.position == player);
+    CHECK(session.world.elapsedSeconds == 0.0f);
+
+    CHECK(horde::BeginFight(session));
+    CHECK(session.state == SessionState::Playing);
+    Step(session, Vec2{1.0f, 0.0f}, 10);
+    CHECK(session.world.player.motion.position.x > player.x);
+    CHECK_FALSE(horde::BeginFight(session)); // Only from the title.
+}
+
+TEST_CASE("a paused fight holds still, and resumes from where it stopped") {
+    Session session = horde::StartSession(kArena, kView);
+    Step(session, Vec2{1.0f, 0.0f}, 10);
+    REQUIRE(horde::PauseFight(session));
+    CHECK(session.state == SessionState::Paused);
+    const Vec2 player = session.world.player.motion.position;
+    const float clock = session.world.elapsedSeconds;
+    Step(session, PlayerCommands{.move = Vec2{1.0f, 0.0f}, .firePressed = true}, 120);
+    CHECK(session.world.player.motion.position == player);
+    CHECK(session.world.elapsedSeconds == clock);
+    CHECK(session.world.bullets.Empty());
+    CHECK_FALSE(horde::CanRestart(session));
+    CHECK_FALSE(horde::TryRestart(session));
+
+    CHECK(horde::ResumeFight(session));
+    CHECK(session.state == SessionState::Playing);
+    Step(session, Vec2{1.0f, 0.0f}, 1);
+    CHECK(session.world.elapsedSeconds > clock);
+    CHECK_FALSE(horde::ResumeFight(session)); // Only a paused fight.
+}
+
+TEST_CASE("only a fight in progress can pause") {
+    Session session = OneHitFromDeath();
+    Step(session, Vec2{}, 1);
+    REQUIRE(session.state == SessionState::Dead);
+    CHECK_FALSE(horde::PauseFight(session));
+    horde::ReturnToTitle(session);
+    CHECK_FALSE(horde::PauseFight(session));
+}
+
+TEST_CASE("going back to the title gives a fresh world and starts the attempts over") {
+    Session session = horde::StartSession(kArena, kView);
+    DieAndRetry(session);
+    DieAndRetry(session);
+    REQUIRE(session.attempt == 3);
+    const std::uint64_t seed = session.world.seed;
+    Step(session, Vec2{1.0f, 0.0f}, 30);
+    REQUIRE(horde::PauseFight(session));
+
+    horde::ReturnToTitle(session);
+    const horde::World fresh = horde::CreateWorld(kArena, kView);
+    CHECK(session.state == SessionState::Title);
+    CHECK(session.attempt == 1);
+    CHECK(session.world.seed != seed);
+    CHECK(session.world.elapsedSeconds == 0.0f);
+    CHECK(session.world.player.motion.position == fresh.player.motion.position);
+}

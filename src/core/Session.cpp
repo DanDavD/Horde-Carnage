@@ -40,13 +40,18 @@ void StepSession(Session& session, const PlayerCommands& commands, float dt) {
     case SessionState::Victory:
         // The world stays frozen on the moment the fight ended, so the player can see what got them, or
         // the boss lying on the floor. It also stops the fight's clock for the end screen.
+    case SessionState::Title:
+    case SessionState::Paused:
+        // Behind a menu the world does not move, and the fight's clock stands still.
         break;
     }
 }
 
 float EndScreenSeconds(const Session& session) {
     switch (session.state) {
+    case SessionState::Title:
     case SessionState::Playing:
+    case SessionState::Paused:
         return 0.0f;
     case SessionState::Dead:
         return session.stateSeconds;
@@ -57,7 +62,38 @@ float EndScreenSeconds(const Session& session) {
 }
 
 bool CanRestart(const Session& session) {
-    return session.state != SessionState::Playing && EndScreenSeconds(session) >= kRestartDelaySeconds;
+    const bool over = session.state == SessionState::Dead || session.state == SessionState::Victory;
+    return over && EndScreenSeconds(session) >= kRestartDelaySeconds;
+}
+
+void ReturnToTitle(Session& session) {
+    session.world = CreateWorld(session.world.arena, session.world.camera.viewSize, NextU32(session.seeds));
+    session.attempt = 1;
+    EnterState(session, SessionState::Title);
+}
+
+bool BeginFight(Session& session) {
+    if (session.state != SessionState::Title) {
+        return false;
+    }
+    EnterState(session, SessionState::Playing);
+    return true;
+}
+
+bool PauseFight(Session& session) {
+    if (session.state != SessionState::Playing) {
+        return false;
+    }
+    EnterState(session, SessionState::Paused);
+    return true;
+}
+
+bool ResumeFight(Session& session) {
+    if (session.state != SessionState::Paused) {
+        return false;
+    }
+    EnterState(session, SessionState::Playing);
+    return true;
 }
 
 bool TryRestart(Session& session) {

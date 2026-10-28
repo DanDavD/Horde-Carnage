@@ -14,6 +14,7 @@ add_library(horde_core STATIC
     core/HitStop.cpp
     core/ImpactFeel.cpp
     core/Loadout.cpp
+    core/Menu.cpp
     core/Movement.cpp
     core/Particle.cpp
     core/ParticleEmitter.cpp
@@ -22,6 +23,7 @@ add_library(horde_core STATIC
     core/ScreenFit.cpp
     core/ScreenShake.cpp
     core/Session.cpp
+    core/Settings.cpp
     core/Shield.cpp
     core/Shockwave.cpp
     core/SoundCue.cpp
@@ -41,13 +43,16 @@ add_executable(HordeCarnage
     app/Game.cpp
     app/audio/SoundBank.cpp
     app/PlayerInput.cpp
+    app/SettingsStore.cpp
     app/render/ArenaDraw.cpp
+    app/render/Backdrop.cpp
     app/render/Art.cpp
     app/render/BossDraw.cpp
     app/render/DebugOverlay.cpp
     app/render/EndScreen.cpp
     app/render/HairBody.cpp
     app/render/Hud.cpp
+    app/render/MenuDraw.cpp
     app/render/ParticleDraw.cpp
     app/render/PlayerDraw.cpp
     app/render/Shapes.cpp

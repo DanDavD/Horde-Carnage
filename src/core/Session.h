@@ -9,9 +9,11 @@
 
 namespace horde {
 
-/// Where the game is in a run. Day 11 adds the main menu and pause as more states.
+/// Where the game is in a run.
 enum class SessionState {
+    Title,   ///< The title screen, over a fresh world that waits for the fight to begin.
     Playing, ///< The world steps every fixed step.
+    Paused,  ///< The fight is held where it was until the player resumes it.
     Dead,    ///< The player died. The world is frozen until a retry.
     Victory, ///< The boss is defeated. The world is frozen until the player fights again.
 };
@@ -26,9 +28,11 @@ inline constexpr float kVictoryRevealSeconds = 1.5f;
 
 /// One run of the game: the world, the small state machine around it, and the attempt count.
 ///
-/// Transitions: Playing goes to Victory when the boss is defeated, or to Dead when the player's health
-/// reaches 0. Both go back to Playing through `TryRestart`, with a brand new World, once the end screen has
-/// shown for `kRestartDelaySeconds`.
+/// Transitions: Title goes to Playing through `BeginFight`. Playing goes to Victory when the boss is
+/// defeated, or to Dead when the player's health reaches 0, and to Paused and back through `PauseFight` and
+/// `ResumeFight`. Dead and Victory go back to Playing through `TryRestart`, with a brand new World, once the
+/// end screen has shown for `kRestartDelaySeconds`. Paused, Dead and Victory go back to the title through
+/// `ReturnToTitle`. A session starts playing; the game shows the title first with `ReturnToTitle`.
 struct Session {
     World world;
     SessionState state = SessionState::Playing;
@@ -56,6 +60,25 @@ void StepSession(Session& session, const PlayerCommands& commands, float dt);
 /// Whether `TryRestart` would restart now: the fight is over and the end screen has shown for the restart
 /// delay.
 [[nodiscard]] bool CanRestart(const Session& session);
+
+/// Leaves whatever the session is doing for the title screen, over a fresh world with the next seed, and
+/// starts the count of attempts again: going back to the title gives up the run of tries.
+void ReturnToTitle(Session& session);
+
+/// From the title screen, starts the fight in the world that waited behind it.
+///
+/// @return Whether the fight began: only from the title.
+bool BeginFight(Session& session);
+
+/// Holds the fight where it is.
+///
+/// @return Whether it paused: only a fight in progress can.
+bool PauseFight(Session& session);
+
+/// Lets a paused fight go on from where it stopped.
+///
+/// @return Whether it resumed: only a paused fight can.
+bool ResumeFight(Session& session);
 
 /// Starts a new fight in a fresh world, with the next seed, if `CanRestart` allows it. A retry after a
 /// death is the next attempt; a new fight after a victory starts the count again from 1.

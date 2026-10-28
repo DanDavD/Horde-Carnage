@@ -2,35 +2,38 @@
 
 ## What it is
 
-What happens around a fight: playing, dying or winning, and starting again. It is a small state machine with three states, `Playing`, `Dead` and `Victory`, plus a count of attempts. Day 11 adds the main menu and pause as more states.
+What happens around a fight: the title, playing, pausing, dying or winning, and starting again. It is a small state machine with five states, `Title`, `Playing`, `Paused`, `Dead` and `Victory`, plus a count of attempts. The menus that drive it are in [Menus](MENUS.md).
 
 The rules live in `horde_core`:
 
-- `src/core/Session.h`, `src/core/Session.cpp`: the `Session` (the `World`, the state machine and the attempt count), `StartSession`, `StepSession`, `CanRestart` and `TryRestart`.
+- `src/core/Session.h`, `src/core/Session.cpp`: the `Session` (the `World`, the state machine and the attempt count), `StartSession`, `StepSession`, `CanRestart`, `TryRestart`, `ReturnToTitle`, `BeginFight`, `PauseFight` and `ResumeFight`.
 - `src/core/World.h`, `src/core/World.cpp`: `IsBossDefeated`, which says when the fight is won; `shotsHit` and `Accuracy`, for the victory screen; `lastHitBy`, the `DamageSource` (`src/core/DamageSource.h`) of the last hit on the player, for the death screen; and `DefeatBoss`, for the Debug shortcut.
 
 The game executable connects it to the screen and the buttons:
 
-- `src/app/Game.cpp`: `Game` owns one `Session`. `Run` reads the restart buttons once per frame, `Update` calls `StepSession` every fixed step, and `Draw` shows the end screens (`DrawEndScreen`, `src/app/render/EndScreen.cpp`) and the attempt number (`DrawAttempt`, `src/app/render/Hud.cpp`).
-- `src/app/PlayerInput.cpp`: `ReadRestartPressed` reads Enter or R, and A or Start on the first gamepad.
+- `src/app/Game.cpp`: `Game` owns one `Session` and opens it on the title. `HandleMenus` reads the menus once per frame and changes state on a choice, `Update` calls `StepSession` every fixed step, and `Draw` shows the title, the pause, the end screens (`DrawEndScreen`, `src/app/render/EndScreen.cpp`) and the attempt number (`src/app/render/Hud.cpp`).
+- `src/app/PlayerInput.cpp`: `ReadMenuKeys`, `ReadPausePressed` (Esc, or Start on a gamepad) and `ReadQuickRetryPressed` (R).
 
 ## How it works
 
 ```
-                      the boss is defeated
-          +---------------------------------------->  Victory
-          |                                              |
-       Playing  -------------------------------->  Dead  |
-          ^      the player's health reaches 0      |    |
-          |                                         |    |
-          |  TryRestart after 1 s: attempt + 1      |    |
-          +-----------------------------------------+    |
-          |                                              |
-          |  TryRestart after 1 s: attempt back to 1     |
-          +----------------------------------------------+
+   Title  -- BeginFight -->  Playing  <-- PauseFight / ResumeFight -->  Paused
+     ^                       |     |                                     |
+     |   the boss is defeated|     |the player's health reaches 0        |
+     |                       v     v                                     |
+     |                  Victory   Dead                                   |
+     |                       |     |                                     |
+     |  TryRestart after the |     | TryRestart after 1 s: attempt + 1   |
+     |  death and 1 s:       +-----+--> Playing                          |
+     |  attempt back to 1                                                |
+     |                                                                   |
+     +---- ReturnToTitle (from Paused, Dead or Victory): attempt 1 ------+
 ```
 
+- **Title:** the game opens here, with `ReturnToTitle`, over a fresh world that does not move. `BeginFight` starts the fight in that world.
 - **Playing:** `StepSession` calls `StepWorld` every fixed step. After the step it checks the boss first: if `IsBossDefeated`, the session enters `Victory`. Otherwise, if the player's health is 0, it enters `Dead`.
+- **Paused:** `PauseFight` holds a fight in progress, and `ResumeFight` lets it go on. The world does not step and the fight's clock stands still.
+- **Return to title:** from `Paused`, `Dead` or `Victory`, `ReturnToTitle` replaces the world with a fresh one, with the next seed, and starts the attempts again from 1.
 - **Dead and Victory:** the world is not stepped any more. It stays frozen on the moment the fight ended, so the player can see what got them, or the boss lying on the floor. The fight's clock (`World::elapsedSeconds`) stops with it.
 - **Restart:** `TryRestart` works in `Dead` and `Victory`, and only once the end screen has shown for `kRestartDelaySeconds` (1 s). A death shows its screen at once; a victory first waits `kVictoryRevealSeconds` (1.5 s) while the boss dies on screen (`EndScreenSeconds` gives the time the screen has shown, below 0 until then). It replaces the world with a brand new one from `CreateWorld` and goes back to `Playing`.
 - **Attempts:** `Session::attempt` starts at 1. A retry after a death adds 1. A new fight after a victory starts again from 1. It lives in the `Session`, not in the `World`, so the fresh world of a restart does not reset it.
@@ -43,7 +46,7 @@ Every state change goes through one helper, `EnterState`, which also resets the 
 - **YOU DIED**, in blood red, with the attempt number, what killed the player and when ("Attempt 4. Slain by her Leap after 0:23.", or her Charge, her Hair Ring, her Volley, her shockwave, her frenzy, her touch), and how much of her health the boss kept, rounded up so a living boss never reads 0%.
 - **VICTORY**, in gold, with the attempt that won, the length of the fight, and the shots on target out of the shots fired.
 
-Everything fades in over the restart delay, and the prompt to try again (or to fight her again) lights up when a press starts working. The attempt number also stays in the top right corner while playing.
+Everything fades in over the restart delay, and the row of choices, "Try again" (or "Fight again") and "Return to title", lights up when a choice starts working. R retries at once. The attempt number also stays in the top right corner while playing.
 
 **Debug shortcuts.** In Debug builds `F3` starts the boss's transformation (`TransformBoss`), and `F4` calls `DefeatBoss`, so the next step ends the fight in `Victory` without emptying both bars.
 
@@ -59,6 +62,7 @@ Everything fades in over the restart delay, and the prompt to try again (or to f
 - **The attempt count lives in the `Session`.** The `World` is thrown away on every restart, which is what keeps runs from leaking into each other, so anything that must survive a restart cannot be in it.
 - **A victory starts the count again.** "Defeated on attempt 7" is the line worth showing. After that, the next fight is a new challenge, not attempt 8 of the old one.
 - **Restart is a brand new `World`, not a reset.** Resetting fields one by one means every new field needs a matching line in the reset, and the one that gets forgotten leaks from one run into the next. `CreateWorld` is already the single place that knows what a fresh world looks like.
+- **A session starts playing; the game shows the title first.** `StartSession` gives a fight in progress, which every test of the rules wants. The game calls `ReturnToTitle` right after, so only the game ever sees the title.
 - **A one second delay before restart is accepted.** Someone mashing buttons in a fight would otherwise skip the end screen before reading it. The screen fades in over the same second, so the prompt lights up exactly when a press works.
 - **The victory waits for the boss's death.** The world is frozen in `Victory`, but the drawing plays the boss's death from the session's clock for 1.5 s before the band fades in, so nothing covers it (see [Game feel](GAME_FEEL.md)). A death does not wait: after one the player wants to try again.
 - **Restart buttons are read once per frame, not once per fixed step.** A press is an event. A frame that runs no fixed step (possible above 60 FPS) would lose it if it were read inside the step. Movement keys are held states, so reading them in the step is fine.
@@ -74,7 +78,7 @@ Everything fades in over the restart delay, and the prompt to try again (or to f
 | Delay before restart is accepted (and the fade-in) | `kRestartDelaySeconds` (`src/core/Session.h`) | 1 s |
 | How long a victory shows the boss's death before its screen | `kVictoryRevealSeconds` (`src/core/Session.h`) | 1.5 s |
 | When the fight is won | `IsBossDefeated` (`src/core/World.cpp`) | the boss's health at 0 in its second phase |
-| Restart buttons | `ReadRestartPressed` (`src/app/PlayerInput.cpp`) | Enter, R; A, Start |
+| Menu and pause buttons | `ReadMenuKeys`, `ReadPausePressed`, `ReadQuickRetryPressed` (`src/app/PlayerInput.cpp`) | Enter, Space, A to choose; Esc, B to go back; Esc, Start to pause; R to retry |
 | Band size and position | `kEndBandTop`, `kEndBandHeight`, `kEndBandFeather` (`src/app/render/EndScreen.cpp`) | 240, 220, 48 pixels |
 | Colours of the two words | `kBlood`, `kVictoryGold` (`src/app/render/Palette.h`) | |
 | What the death screen calls each killer | `DeathCause` (`src/app/render/EndScreen.cpp`) | "Slain by her Charge" and so on |
@@ -102,7 +106,5 @@ The end screens and the restart buttons are not unit tested, because they need a
 
 ## Limitations
 
-- **There is no title screen.** The game starts playing as soon as the window opens. The main menu comes on day 11.
 - **There is no best time.** The end screens show only the last fight, and nothing is saved between launches. The attempt count is lost when the game closes.
 - **After `F4` the victory screen reads "0 of 0 shots on target (0%)".** The shortcut skips the shooting, so there is nothing to count. It only exists in Debug builds.
-- **Esc still quits at once, even in the middle of a fight.** Pause comes on day 11.

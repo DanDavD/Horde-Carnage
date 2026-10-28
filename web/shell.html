@@ -56,14 +56,26 @@
       aimAt(event);
     }
   });
-  // A click gives the game the keyboard and locks the pointer to it, so the mouse cannot wander out of
-  // the game mid-fight. Esc gives it back; the next click locks it again.
-  canvas.addEventListener('mousedown', function (event) {
-    canvas.focus();
-    if (!locked()) {
+  // While the game is playing (Module.hordeWantsLock, set by SetCursorHidden), a click gives it the
+  // keyboard and locks the pointer to it, so the mouse cannot wander out of the game mid-fight. In the
+  // menus the pointer stays free, to point at the choices. The lock is also asked for when the button
+  // comes up, so the click that resumes a fight locks it as well.
+  function lockIfWanted(event) {
+    if (Module.hordeWantsLock && !locked()) {
       aimAt(event);
       if (canvas.requestPointerLock) { canvas.requestPointerLock(); }
     }
+  }
+  // A click also says where the mouse is, so a menu can be clicked without the mouse having moved first.
+  canvas.addEventListener('mousedown', function (event) {
+    canvas.focus();
+    if (!locked()) { aimAt(event); }
+    lockIfWanted(event);
+  });
+  canvas.addEventListener('mouseup', lockIfWanted);
+  // Esc frees the pointer and never reaches the game, so a lock lost mid-fight is the game's cue to pause.
+  document.addEventListener('pointerlockchange', function () {
+    if (!locked() && Module.hordeWantsLock) { Module.hordeLockLost = true; }
   });
 </script>
 {{{ SCRIPT }}}
