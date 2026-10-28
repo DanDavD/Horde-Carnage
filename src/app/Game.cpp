@@ -1,6 +1,8 @@
 #include "app/Game.h"
 
 #include <algorithm>
+#include <cstdint>
+#include <optional>
 #include <random>
 
 #include <raylib.h>
@@ -24,10 +26,20 @@
 
 namespace horde {
 
+namespace {
+
+// The sounds' own random stream, apart from the fight's and the particles'.
+constexpr std::uint64_t kSoundStream = 13;
+// Under full volume, so the fight's loudest moments, mixed together, do not clip.
+constexpr float kMasterVolume = 0.8f;
+
+} // namespace
+
 // Every launch starts from a seed the system picks, so no two runs of the game repeat the same fights.
 Game::Game(bool windowed)
     : _session{StartSession(kBossArena, kViewSize, std::random_device{}())},
-      _particles{SeedParticleEmitter(std::random_device{}())} {
+      _particles{SeedParticleEmitter(std::random_device{}())},
+      _soundRandom{SeedRandom(std::random_device{}(), kSoundStream)} {
     // Vsync caps how often we render, at the monitor's own rate. How often the game simulates comes from
     // FixedTimestep.
 #ifdef __EMSCRIPTEN__
@@ -51,10 +63,17 @@ Game::Game(bool windowed)
     // it scales evenly.
     SetTextureFilter(GetFontDefault().texture, TEXTURE_FILTER_BILINEAR);
     _art = LoadArt(kBossArena);
+    // Every sound is synthesized here, once, in a few hundredths of a second. Without an audio device the
+    // game still runs, silent.
+    InitAudioDevice();
+    SetMasterVolume(kMasterVolume);
+    _sounds = LoadSoundBank();
     ResetHealthTrails();
 }
 
 Game::~Game() {
+    UnloadSoundBank(_sounds);
+    CloseAudioDevice();
     UnloadArt(_art);
     CloseWindow();
 }
@@ -172,6 +191,10 @@ void Game::FeelEvents() {
         StartHitStop(_hitStop, feel.slowSeconds);
         AddTrauma(_shake, feel.trauma);
         EmitEventParticles(_particles, event, _session.world);
+        if (const std::optional<SoundCue> cue = CueFor(event, _soundRandom)) {
+            const FollowCamera& camera = _session.world.camera;
+            PlayCue(_sounds, Placed(*cue, event.position, camera.center, camera.viewSize.x));
+        }
     }
     events.Clear();
 }

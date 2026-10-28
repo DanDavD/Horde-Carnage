@@ -36,6 +36,8 @@ The pieces:
 - **The page tracks the aim, not raylib.** raylib's web platform treats a hidden cursor as a locked one and stops updating the mouse position. Rather than patch raylib, the page, which already knows the canvas's scale, keeps the aim point, and the game asks for it.
   - Rejected: showing the system cursor while playing. It fixes the aim, but the cursor and the crosshair would both be drawn, and the mouse could still leave the game.
 - **The pointer is locked on a click.** A mouse that leaves the game while the player strafes with the mouse button held is lost aim, or a click on another tab. Browsers only lock the pointer after a click, which the first shot gives.
+- **The game lives on the heap, with a 1 MB stack.** A browser gives a program 64 KB of stack, and the `Game` holds the whole fight in fixed pools: the world, 512 particles and the voices of every sound, over 60 KB. Once the sounds were added it no longer fit, and in WebAssembly a stack that overflows does not crash at once: it ran into raylib's globals, and the game died in its first frame calling a function pointer that had been overwritten. `main` now creates the `Game` with `std::make_unique`, and the stack is 1 MB (`-sSTACK_SIZE=1MB`), so a restart's fresh `World` (about 20 KB) has room too.
+  - Rejected: only raising the stack. It would hide the problem until the next pool grows.
 - **One warning off for Clang.** Clang's `-Wextra` flags every designated initializer that names only some fields, which is how the code sets its numbers (`MovementStats{.maxSpeed = 120.0f}`). `-Wno-missing-field-initializers` turns that one off for GCC and Clang (`cmake/Warnings.cmake`); every other warning is still an error.
 
 ## How to build it
@@ -76,7 +78,7 @@ and open `http://localhost:8085`.
 | Value | Where | Default |
 |---|---|---|
 | Emscripten version | `.github/workflows/ci.yml` and the install commands above | 3.1.74 |
-| Link options | `target_link_options` in `src/CMakeLists.txt` | `-sUSE_GLFW=3 -sALLOW_MEMORY_GROWTH=1` |
+| Link options | `target_link_options` in `src/CMakeLists.txt` | `-sUSE_GLFW=3 -sALLOW_MEMORY_GROWTH=1 -sSTACK_SIZE=1MB` |
 | The page around the game | `web/shell.html` | Dark, the canvas over the whole page |
 
 ## Tests

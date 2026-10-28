@@ -421,6 +421,11 @@ void EmitEventParticles(ParticleEmitter& emitter, const WorldEvent& event, const
     case WorldEventKind::BossDefeated:
         EmitBossBurst(emitter, event.position, world.boss.radius, 36, 20, 16);
         break;
+    // Heard, not seen: the warnings, the spitting and the drink already show on the boss and the player.
+    case WorldEventKind::AttackStarted:
+    case WorldEventKind::StrandsSpat:
+    case WorldEventKind::FlaskDrunk:
+        break;
     }
 }
 
