@@ -45,7 +45,7 @@ The simulation never reads a key or the mouse. Every step, `Game::Update` turns 
 
 `Session` (`src/core/Session.h`) wraps the world in a small state machine: `Playing` steps the world, `Victory` freezes it once the boss is defeated, and `Dead` freezes it once the player's health reaches 0. `TryRestart` replaces the world with a fresh one from `CreateWorld`, with the next seed, and the session keeps the attempt count across it. See [Game flow](GAME_FLOW.md).
 
-`Game` owns one `Session`. It reads the input, calls `StepSession`, and draws the result. It never changes the world itself. After each step it reads the world's events and turns them into a hit stop (which slows the world's clock for a moment), a screen shake (which moves the world's camera), and particles (`ParticleEmitter`, with its own random generator so the fight's seed stays untouched). All three are `horde_core` components that `Game` owns, because they change how the fight is shown, never what happens in it. See [Game feel](GAME_FEEL.md).
+`Game` owns one `Session`. It reads the input, calls `StepSession`, and draws the result. It never changes the world itself. After each step it reads the world's events and turns them into a hit stop (which slows the world's clock for a moment), a screen shake (which moves the world's camera), and particles (`ParticleEmitter`, with its own random generator so the fight's seed stays untouched). All three are `horde_core` components that `Game` owns, because they change how the fight is shown, never what happens in it. So are the trails behind the two health bars (`TrailingBar`), which `Game` steps after the world and the HUD draws. See [Game feel](GAME_FEEL.md).
 
 ### Drawing
 
@@ -104,7 +104,7 @@ Game objects are plain structs (components) that hold data, and free functions (
 - `tests/core/ChaseTests.cpp` and `WorldTests.cpp`: see [Enemies](ENEMIES.md#tests).
 - `tests/core/AttackChoiceTests.cpp`, `BossTests.cpp`, `BossChargeTests.cpp`, `BossComboTests.cpp`, `BossHairRingTests.cpp`, `BossLeapTests.cpp`, `BossVolleyTests.cpp`, `FrenzyTests.cpp`, `PhaseTwoTests.cpp`, `ShockwaveTests.cpp` and `SummonTests.cpp`: see [The boss](BOSS.md#tests). The boss tests share `PredictableBoss.h`, a boss without its chance.
 - `tests/core/RandomTests.cpp`: see [Random numbers](RANDOM.md#tests).
-- `tests/core/WorldEventTests.cpp`, `HitStopTests.cpp`, `ScreenShakeTests.cpp`, `ImpactFeelTests.cpp`, `ParticleTests.cpp` and `ParticleEmitterTests.cpp`: see [Game feel](GAME_FEEL.md#tests).
+- `tests/core/WorldEventTests.cpp`, `HitStopTests.cpp`, `ScreenShakeTests.cpp`, `ImpactFeelTests.cpp`, `ParticleTests.cpp`, `ParticleEmitterTests.cpp` and `TrailingBarTests.cpp`: see [Game feel](GAME_FEEL.md#tests).
 - `tests/core/ScreenFitTests.cpp`: see [Screen and fullscreen](SCREEN.md#tests).
 - `tests/core/StoneFloorTests.cpp`: see [Art direction](ART.md#tests).
 - `tests/core/ShieldTests.cpp`: see [The boss's shield](SHIELD.md#tests).

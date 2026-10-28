@@ -2,6 +2,7 @@
 
 #include "app/render/Art.h"
 #include "core/Arena.h"
+#include "core/Health.h"
 #include "core/Vec2.h"
 
 namespace horde {
@@ -22,5 +23,9 @@ void DrawTorchLight(Vec2 torch, Vec2 viewMin, Vec2 viewMax, float seconds, const
 
 /// The screen's corners darkened, in game pixels, over the world and under the HUD.
 void DrawVignette(const Art& art);
+
+/// The screen's edges in blood, in game pixels: a flash that fades over the window after a hit on the
+/// player, and a slow pulse, like a heartbeat, while the player's health is low. It beats with `seconds`.
+void DrawPainVignette(const Art& art, const Health& health, float seconds);
 
 } // namespace horde

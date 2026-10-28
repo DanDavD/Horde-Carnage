@@ -2,7 +2,7 @@
 
 ## What it is
 
-The fight has to feel heavy. A Charge that lands should hurt to watch, a broken shield should feel like a reward, every bullet should leave a mark, and the boss coming down from a Leap should shake the room and throw dust across the stone. This doc covers the three tools in place so far: the hit stop, the screen shake, and the particles. All three react to events the simulation records, and the sounds that come next will react to the same events.
+The fight has to feel heavy. A Charge that lands should hurt to watch, a broken shield should feel like a reward, every bullet should leave a mark, and the boss coming down from a Leap should shake the room and throw dust across the stone. This doc covers what is in place so far: the hit stop, the screen shake and the particles, which react to events the simulation records (the sounds that come next will react to the same events); health bars that show what a hit took, red at the edges of the screen when the player is hurt; and a death for the boss.
 
 The code:
 
@@ -16,6 +16,11 @@ The code:
 - `src/app/Game.cpp`: reads the events after each step and runs the slow-down, the shake and the particles.
 - `src/app/render/View.cpp`: `WorldCamera` moves and turns the world's camera by the shake.
 - `src/app/render/ParticleDraw.h`, `src/app/render/ParticleDraw.cpp`, `src/app/render/WorldDraw.cpp`: draws settled floor litter, dust and airborne bursts in their layers.
+- `src/core/TrailingBar.h`, `src/core/TrailingBar.cpp`: the pale trail behind a health bar, and the tally of a run of hits.
+- `src/app/render/Hud.cpp`: draws the trails and the boss's tally.
+- `src/app/render/ArenaDraw.cpp`: `DrawPainVignette`, the blood at the edges of the screen.
+- `src/app/render/BossDraw.cpp`: `DrawDyingBoss`, the boss's death.
+- `src/core/Session.h`, `src/core/Session.cpp`: `kVictoryRevealSeconds` and `EndScreenSeconds`, which hold the VICTORY screen back while the boss dies.
 
 ## How it works
 
@@ -59,6 +64,12 @@ What each moment throws:
 - **Other moments:** `BossHitWall` throws dust, sparks and boss hair back off the wall; `PlayerHurt` and `PlayerKilled` spill bright crimson drops; `FirstPhaseEnded`, `BossRoared` and `BossDefeated` burst locks of hair and dust from the boss's body.
 - **Phase 2 and Frenzy (`EmitContinuousParticles`):** once the Matriarch leaves Phase 1, locks of her hair shed continuously onto the floor while she is alive and on the ground: 9 a second in Phase 2, 15 while transforming, and 22 in a frenzy, carrying a quarter of her velocity so a charge leaves fallen hair in her wake.
 
+**Health bars that show the hit.** As in Dark Souls, a hit takes the bar down at once, but a strip of pale old gold stays where the bar was. It waits 0.6 s, and every new hit in that time starts the wait again, then it drains at 60% of the whole bar per second until it meets the bar. A heal that passes the trail lifts it with the bar. `TrailingBar` follows a health value step by step and never changes one; `Game` keeps one for the player and one for the boss and steps them after the world. The boss's bar also shows the damage of the current run of hits right of its end, "124", which stays while the hits keep coming and fades as the trail drains. While the boss transforms, its trail is hidden, because the bar is refilling.
+
+**Blood at the edges.** A hit on the player turns the edges of the screen red, fading over the 0.8 s that the hit protects them, squared so it leaves fast. Below 30% health the edges beat red like a slow heartbeat, a sharp beat and a long rest, a little faster than once a second and stronger the lower the health. It is the vignette texture tinted with the blood colour, over the world and under the HUD.
+
+**The boss's death.** The killing blow flashes her white, and the victory's slow-down and the burst of hair start. She convulses and swells for 0.6 s with her mouth wide open, while the colour drains out of her; then she sags, a little wider than long, her eyes shut, and she lies grey on the floor. It lasts 1.4 s and is read from the session's clock in `Victory`, so it plays in slow motion with the slow-down. The VICTORY screen waits 1.5 s (`kVictoryRevealSeconds`) before it starts to fade in, so nothing covers the death, and the restart delay counts from then.
+
 `DrawWorld` draws particles in three passes so nothing hides what matters: settled floor litter (`DrawFloorParticles`) goes right after the torchlight and under every telegraph, shockwave and body; airborne shadows and dust (`DrawUnderbodyParticles`) go over telegraphs and under bodies; sparks, gunsmoke and airborne casings, blood, hair and shards (`DrawOverbodyParticles`) go over floor bodies so impacts pop on top of what they hit.
 
 ## Design decisions
@@ -79,6 +90,12 @@ What each moment throws:
 - **The boss's weight shakes but does not slow the fight.** A landing and a roar happen whether or not they hit the player, and the player has to keep moving through them, so they only shake. A crash into a wall gets a short slow-down, because it opens a window to punish. Hits on the player, breaks and kills slow the fight, because those are the moments to read.
 - **Trauma squared, with smooth noise.** This is the approach from Squirrel Eiserloh's talk on camera shake. Squaring gives small hits a small shake and big ones a big one, from one number. Noise makes the view sway instead of jumping between random offsets every frame, and it does not change with the frame rate.
   - Rejected: a random offset every frame. At 165 FPS it reads as the picture vibrating, not the room shaking.
+- **The trail is how much the hits took, not how long ago they landed.** The tally is the trail's own number: the damage since the trail last caught up with the bar. With the SMG it climbs for as long as the stream keeps landing, which is the number worth showing.
+  - Rejected: a number per bullet floating off the boss. Ten a second would be clutter, and the boss's bar is where the player already looks for her health.
+- **The blood at the edges never covers the middle.** The vignette is clear in the middle of the screen, where the player and the boss are, so the flash says "you were hit" without hiding the next attack.
+  - Rejected: a red flash over the whole screen. It hides the attack that comes after the hit, which is the one that kills.
+- **The boss dies on screen before VICTORY covers her.** The death is the reward for the whole fight. The screen waits for it; a death screen does not, because after a death the player wants to try again.
+  - Rejected: letting the world run during the death. The boss's death would then be part of the rules, and the fight's clock on the screen would keep counting.
 - **All three live in `Game`, not in `World`.** Hit stop, screen shake and particles change how the fight is shown and when it steps, never what happens in it. Their data and update math still live in `horde_core`, with unit tests.
 
 ## How to tune it
@@ -93,6 +110,10 @@ What each moment throws:
 | Particle pool capacity | `kMaxParticles` (`Particle.h`) | 512 |
 | Floor settle threshold, floor friction, wall bounce | `kMinBounceLift`, `kFloorDrag`, `kWallBounce` (`Particle.cpp`) | 20 units/s, 14/s, 0.4 |
 | Burst counts, speeds, lifetimes and shedding rates | `ParticleEmitter.cpp` | Dash dust every 0.02 s; boss hair 9/s in Phase 2, 15/s transforming, 22/s in Frenzy |
+| The trail's wait and drain | `TrailingBarStats` (`TrailingBar.h`) | 0.6 s, 60% of the bar per second |
+| Blood at the edges | `kHurtFlash`, `kLowHealth`, `kHeartbeat`, `kHeartbeatsPerSecond` (`ArenaDraw.cpp`) | 0.4 after a hit, below 30% health, 0.25, 1.1 beats a second |
+| The boss's death | `kBossDeathSeconds` (`BossDraw.h`), `kDeath...` (`BossDraw.cpp`) | 1.4 s; convulsion 0.6 s, shake 5 units, swell 12% |
+| How long VICTORY waits for the death | `kVictoryRevealSeconds` (`Session.h`) | 1.5 s |
 | Particle colours and shapes | `Palette.h`, `ParticleDraw.cpp` | `kDust`, `kGunSmoke`, `kDarkBlood`, `kBrass`, `kShell`, `kBarrier` |
 
 The F1 overlay in a Debug build shows the live particle count (`part`), and F2, F3 and F4 break the shield, transform or frenzy the boss, and defeat her at once.
@@ -103,6 +124,8 @@ The F1 overlay in a Debug build shows the live particle count (`part`), and F2, 
 - `tests/core/HitStopTests.cpp`: full speed without a hit; a hit drops the speed to the slowest scale, never to 0, and it climbs back to 1 without ever going down or jumping by more than 0.08 in a frame at 144 Hz; the fight loses about half the slow-down's length; a stronger hit takes over from the slowest point, and a weaker one changes nothing.
 - `tests/core/ScreenShakeTests.cpp`: no shake without trauma; trauma stops at 1; it wears off at its rate, and the clock starts over once it is gone; the shake grows with trauma squared and never passes its limits; it moves only a fraction of its range from one frame to the next; the same shake always moves the same way.
 - `tests/core/ImpactFeelTests.cpp`: shots, dashes and bullets on the boss neither slow nor shake; a heavy hit slows and shakes more than a light one, and the death more than both; the boss's landing and roar shake without slowing; the victory is the biggest moment, and no slow-down is longer than 1 s.
+- `tests/core/TrailingBarTests.cpp`: a fresh bar has no trail; a hit leaves the trail where the bar was, waits 0.6 s and drains at its rate down to the bar; hits that keep coming hold the trail and add up the tally, and a hit after it caught up starts a new tally; the drain never goes below the bar, even on a 5 s frame; a heal lifts the trail only once it passes it.
+- `tests/core/SessionTests.cpp`: a death shows its screen at once; a victory shows it only after the boss's death, and restart waits for that and the delay (see [Game flow](GAME_FLOW.md#tests)).
 - `tests/core/ParticleTests.cpp`: `LifeLeft` clamping; countdown and removal of expired particles; exact exponential drag matching across step sizes and never flipping velocity on a multi-second frame; floating smoke growth and spin; casing floor bounces, spin loss and floor friction once settled; zero-bounce blood sticking on first contact; wall ricochets inside an arena; and a full 512-slot pool dropping new particles cleanly without corrupting live ones.
 - `tests/core/ParticleEmitterTests.cpp`: 360 steps of fighting with and without particles leave `World::random` and every outcome identical; shots spawn sparks, smoke and a right-ejected casing that settles on the floor; shield strikes and breaks match the Shell or Barrier colour (bounced shots drop no chips); exposed hits spawn dark boss blood and hair; dashes, leap landings and killed hairballs each spawn their burst; the boss sheds no hair in Phase 1, sheds in Phase 2 and sheds more than twice as fast in Frenzy; and emitting into a full pool caps cleanly at 512.
 
@@ -112,4 +135,6 @@ The F1 overlay in a Debug build shows the live particle count (`part`), and F2, 
 - **No setting to turn the shake down.** Some players get sick from screen shake. A slider belongs in the options, which come with the menus.
 - **The shake has no direction.** A hit from the left shakes the screen the same way as one from the right. A kick away from the hit would read better; the events already carry the direction for it.
 - **Floor litter fades after a few seconds.** Casings, blood splats and shed hair fade out after 3 to 5.5 s so the 512-slot pool always has room for live bursts without heap allocation.
+- **The Debug F4 shortcut shows a tally of 1200.** It takes all of the boss's health at once, so the whole bar trails off as one hit. In a real fight the last run of hits is a few bullets.
+- **The blood at the edges cannot be turned down.** Like the shake, it belongs in the options that come with the menus.
 - **No sound yet.** Gunfire, bounces, breaks and landings are still silent until the audio pass.

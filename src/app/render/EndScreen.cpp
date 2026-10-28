@@ -62,9 +62,12 @@ int HealthPercent(const Health& health) {
 
 // The end of a fight, in the style of the games it borrows from: the world dims and a dark band across
 // the middle carries one big word. It all fades in over the restart delay, so the moment the prompt lights
-// up is the moment a press works.
+// up is the moment a press works. After a victory it waits for the boss to finish dying first.
 void DrawEndScreen(const Session& session, const Art& art) {
-    const float shown = std::min(session.stateSeconds / kRestartDelaySeconds, 1.0f);
+    const float shown = std::clamp(EndScreenSeconds(session) / kRestartDelaySeconds, 0.0f, 1.0f);
+    if (shown <= 0.0f) {
+        return;
+    }
     const bool won = session.state == SessionState::Victory;
     const World& world = session.world;
 

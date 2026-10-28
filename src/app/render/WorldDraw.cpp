@@ -81,7 +81,8 @@ void DrawHairStrand(const Projectile& strand, float alpha) {
 
 } // namespace
 
-void DrawWorld(const World& world, const ParticlePool& particles, float alpha, const Art& art) {
+void DrawWorld(const World& world, const ParticlePool& particles, float alpha, const Art& art,
+               float bossSinceDied) {
     const Player& player = world.player;
     const Vec2 playerPosition = Lerp(player.motion.previousPosition, player.motion.position, alpha);
     const bool bossAirborne = IsAirborne(world.boss);
@@ -117,7 +118,7 @@ void DrawWorld(const World& world, const ParticlePool& particles, float alpha, c
     // The boss goes under its children, so a dead boss lies on the floor. In the air it goes over
     // everything, the player included.
     if (!bossAirborne) {
-        DrawBoss(world.boss, playerPosition, world.elapsedSeconds, alpha, art);
+        DrawBoss(world.boss, playerPosition, world.elapsedSeconds, alpha, art, bossSinceDied);
     }
     for (const Enemy& enemy : world.enemies) {
         DrawHairball(enemy, playerPosition, world.boss.summon.spitWarningSeconds, world.elapsedSeconds, alpha,
@@ -133,7 +134,7 @@ void DrawWorld(const World& world, const ParticlePool& particles, float alpha, c
     DrawPlayer(player, world.elapsedSeconds, alpha);
     DrawOverbodyParticles(particles, art);
     if (bossAirborne) {
-        DrawBoss(world.boss, playerPosition, world.elapsedSeconds, alpha, art);
+        DrawBoss(world.boss, playerPosition, world.elapsedSeconds, alpha, art, bossSinceDied);
     }
 }
 

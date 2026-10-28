@@ -12,6 +12,7 @@
 #include "app/PlayerInput.h"
 #include "app/RaylibConvert.h"
 #include "app/render/ArenaDraw.h"
+#include "app/render/BossDraw.h"
 #include "app/render/DebugOverlay.h"
 #include "app/render/EndScreen.h"
 #include "app/render/Hud.h"
@@ -50,6 +51,7 @@ Game::Game(bool windowed)
     // it scales evenly.
     SetTextureFilter(GetFontDefault().texture, TEXTURE_FILTER_BILINEAR);
     _art = LoadArt(kBossArena);
+    ResetHealthTrails();
 }
 
 Game::~Game() {
@@ -73,6 +75,7 @@ void Game::Frame() {
     // Key presses are read once per frame, not per fixed step: a frame with no step would miss them.
     if (ReadRestartPressed() && TryRestart(_session)) {
         ClearParticles(_particles);
+        ResetHealthTrails();
     }
     CollectButtonPresses(_pendingPresses);
 
@@ -112,6 +115,7 @@ void Game::Frame() {
     for (int i = 0; i < steps; ++i) {
         const bool wasPlaying = _session.state == SessionState::Playing;
         Update(dt);
+        StepHealthTrails(dt);
         if (wasPlaying) {
             EmitContinuousParticles(_particles, _session.world, dt);
         }
@@ -149,6 +153,18 @@ void Game::Update(float dt) {
 #endif
 }
 
+void Game::StepHealthTrails(float dt) {
+    const World& world = _session.world;
+    StepTrailingBar(_trails.player, world.player.health.current, world.player.health.max, dt);
+    StepTrailingBar(_trails.boss, world.boss.health.current, world.boss.health.max, dt);
+}
+
+void Game::ResetHealthTrails() {
+    const World& world = _session.world;
+    _trails = HealthTrails{.player = TrailingBarAt(world.player.health.current),
+                           .boss = TrailingBarAt(world.boss.health.current)};
+}
+
 void Game::FeelEvents() {
     auto& events = _session.world.events;
     for (const WorldEvent& event : events) {
@@ -184,7 +200,9 @@ void Game::Draw(float alpha) const {
     // The world camera, scaled and moved onto the screen with the rest of the game, and shaken. The HUD
     // below is not shaken, so the bars stay readable through the hardest hit.
     BeginMode2D(WorldCamera(world.camera, alpha, fit, CurrentShake(_shake)));
-    DrawWorld(world, _particles.particles, alpha, _art);
+    // The boss's death plays out over the victory; a boss that is not dead ignores it.
+    const float bossSinceDied = _session.state == SessionState::Victory ? _session.stateSeconds : kBossDeathSeconds;
+    DrawWorld(world, _particles.particles, alpha, _art, bossSinceDied);
 #ifndef NDEBUG
     if (_showDebugOverlay) {
         DrawDebugWorld(world.player, world.camera, alpha);
@@ -195,12 +213,13 @@ void Game::Draw(float alpha) const {
     // Everything below is in game pixels on the screen and does not move with the camera.
     BeginMode2D(ScreenCamera(fit));
     DrawVignette(_art);
+    DrawPainVignette(_art, world.player.health, world.elapsedSeconds);
 #ifndef NDEBUG
     if (_showDebugOverlay) {
         DrawDebugHud(world, _lastMoveInput, _particles.particles.Size());
     }
 #endif
-    DrawHud(world, _session.attempt, playing, AimInGame(fit), _art);
+    DrawHud(world, _trails, _session.attempt, playing, AimInGame(fit), _art);
     if (!playing) {
         DrawEndScreen(_session, _art);
     }

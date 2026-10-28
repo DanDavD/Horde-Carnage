@@ -26,6 +26,7 @@ add_library(horde_core STATIC
     core/Shockwave.cpp
     core/SpawnMarker.cpp
     core/StoneFloor.cpp
+    core/TrailingBar.cpp
     core/Weapon.cpp
     core/World.cpp)
 target_include_directories(horde_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})

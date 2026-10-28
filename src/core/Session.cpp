@@ -44,8 +44,20 @@ void StepSession(Session& session, const PlayerCommands& commands, float dt) {
     }
 }
 
+float EndScreenSeconds(const Session& session) {
+    switch (session.state) {
+    case SessionState::Playing:
+        return 0.0f;
+    case SessionState::Dead:
+        return session.stateSeconds;
+    case SessionState::Victory:
+        return session.stateSeconds - kVictoryRevealSeconds;
+    }
+    return 0.0f;
+}
+
 bool CanRestart(const Session& session) {
-    return session.state != SessionState::Playing && session.stateSeconds >= kRestartDelaySeconds;
+    return session.state != SessionState::Playing && EndScreenSeconds(session) >= kRestartDelaySeconds;
 }
 
 bool TryRestart(Session& session) {
