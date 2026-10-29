@@ -41,4 +41,22 @@ enum class GamepadControl {
 /// and `"A"` vs `"B"` on Switch where the physical bottom and right letters are swapped).
 [[nodiscard]] const char* GamepadControlLabel(GamepadType type, GamepadControl control);
 
+/// Actions shown in controls menus and documentation.
+enum class GamepadAction {
+    Move,
+    Aim,
+    Fire,
+    SwitchGun,
+    Dash,
+    Flask,
+    Pause,
+    Retry,
+};
+
+/// Text description of how `action` is performed on `type` (for controls menus and documentation).
+[[nodiscard]] const char* GamepadActionBinding(GamepadType type, GamepadAction action);
+
+/// General multi-platform text description of how `action` is performed across all gamepads.
+[[nodiscard]] const char* GamepadActionBindingSummary(GamepadAction action);
+
 } // namespace horde

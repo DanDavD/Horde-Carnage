@@ -102,7 +102,7 @@ Game objects are plain structs (components) that hold data, and free functions (
 ## Tests
 
 - `tests/core/FixedTimestepTests.cpp`: exact steps, accumulation of short frames, the remainder of long frames (`Alpha`), the clamp on huge frames, negative frame times and the 60 Hz default.
-- `tests/core/Vec2Tests.cpp`, `MovementTests.cpp`, `FacingTests.cpp`, `ArenaTests.cpp`, `AnalogInputTests.cpp` and `GamepadAimTests.cpp`: see [Movement](MOVEMENT.md#tests) and gamepad aim assist tests.
+- `tests/core/Vec2Tests.cpp`, `MovementTests.cpp`, `FacingTests.cpp`, `ArenaTests.cpp`, `AnalogInputTests.cpp` and `GamepadAimTests.cpp`: see [Movement](MOVEMENT.md#tests) and [Controllers](CONTROLLERS.md#tests).
 - `tests/core/FollowCameraTests.cpp`: see [Camera](CAMERA.md#tests).
 - `tests/core/ChaseTests.cpp` and `WorldTests.cpp`: see [Enemies](ENEMIES.md#tests).
 - `tests/core/AttackChoiceTests.cpp`, `BossTests.cpp`, `BossChargeTests.cpp`, `BossComboTests.cpp`, `BossHairRingTests.cpp`, `BossLeapTests.cpp`, `BossVolleyTests.cpp`, `FrenzyTests.cpp`, `PhaseTwoTests.cpp`, `ShockwaveTests.cpp` and `SummonTests.cpp`: see [The boss](BOSS.md#tests). The boss tests share `PredictableBoss.h`, a boss without its chance.
@@ -115,7 +115,7 @@ Game objects are plain structs (components) that hold data, and free functions (
 - `tests/core/CollisionTests.cpp` and the crowd cases in `WorldTests.cpp`: see [Collisions](COLLISIONS.md#tests).
 - `tests/core/HealthTests.cpp` and the contact damage cases in `WorldTests.cpp`: see [Health](HEALTH.md#tests).
 - `tests/core/SessionTests.cpp`: see [Game flow](GAME_FLOW.md#tests).
-- `tests/core/MenuTests.cpp`, `MenuRepeatTests.cpp`, `GamepadConnectionTests.cpp` and `GamepadTypeTests.cpp`: see [Menus](MENUS.md#tests).
+- `tests/core/MenuTests.cpp`, `MenuRepeatTests.cpp`, `GamepadConnectionTests.cpp` and `GamepadTypeTests.cpp`: see [Menus](MENUS.md#tests) and [Controllers](CONTROLLERS.md#tests).
 - `tests/core/SettingsTests.cpp`: see [Settings](SETTINGS.md#tests).
 - `tests/core/WeaponTests.cpp`, `LoadoutTests.cpp` and the aim and fire cases in `FacingTests.cpp` and `WorldTests.cpp`: see [Aiming and weapons](WEAPONS.md#tests).
 - `tests/core/ObjectPoolTests.cpp`: see [Object pool](OBJECT_POOL.md#tests).

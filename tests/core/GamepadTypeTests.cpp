@@ -108,3 +108,67 @@ TEST_CASE("gamepad control labels reflect positional buttons across all four fam
     CHECK(std::string_view(horde::GamepadControlLabel(GamepadType::Xbox, GamepadControl::RightStick)) == "R");
     CHECK(std::string_view(horde::GamepadControlLabel(GamepadType::Xbox, GamepadControl::Dpad)) == "D-pad");
 }
+
+TEST_CASE("gamepad action bindings describe controls per family and as a summary") {
+    SUBCASE("summary bindings provide multi-platform notation") {
+        CHECK(std::string_view(horde::GamepadActionBindingSummary(horde::GamepadAction::Move)) ==
+              "Left stick or d-pad");
+        CHECK(std::string_view(horde::GamepadActionBindingSummary(horde::GamepadAction::Aim)) == "Right stick");
+        CHECK(std::string_view(horde::GamepadActionBindingSummary(horde::GamepadAction::Fire)) ==
+              "RT / R2 / ZR, hold with SMG");
+        CHECK(std::string_view(horde::GamepadActionBindingSummary(horde::GamepadAction::SwitchGun)) ==
+              "Y / Triangle");
+        CHECK(std::string_view(horde::GamepadActionBindingSummary(horde::GamepadAction::Dash)) ==
+              "LT or RB (L2 / R1)");
+        CHECK(std::string_view(horde::GamepadActionBindingSummary(horde::GamepadAction::Flask)) == "X / Square");
+        CHECK(std::string_view(horde::GamepadActionBindingSummary(horde::GamepadAction::Pause)) ==
+              "Start / Options / Menu");
+        CHECK(std::string_view(horde::GamepadActionBindingSummary(horde::GamepadAction::Retry)) ==
+              "- (A on end screen)");
+    }
+
+    SUBCASE("family-specific bindings adapt to each controller") {
+        // PlayStation uses PS button shapes and shoulders.
+        CHECK(std::string_view(horde::GamepadActionBinding(GamepadType::PlayStation, horde::GamepadAction::Fire)) ==
+              "R2, hold with the SMG");
+        CHECK(std::string_view(
+                  horde::GamepadActionBinding(GamepadType::PlayStation, horde::GamepadAction::SwitchGun)) ==
+              "Triangle");
+        CHECK(std::string_view(horde::GamepadActionBinding(GamepadType::PlayStation, horde::GamepadAction::Dash)) ==
+              "L2 or R1");
+        CHECK(std::string_view(horde::GamepadActionBinding(GamepadType::PlayStation, horde::GamepadAction::Flask)) ==
+              "Square");
+        CHECK(std::string_view(horde::GamepadActionBinding(GamepadType::PlayStation, horde::GamepadAction::Pause)) ==
+              "Options");
+        CHECK(std::string_view(horde::GamepadActionBinding(GamepadType::PlayStation, horde::GamepadAction::Retry)) ==
+              "- (Cross on end screen)");
+
+        // Switch uses Nintendo face lettering and ZL/ZR shoulders.
+        CHECK(std::string_view(horde::GamepadActionBinding(GamepadType::Switch, horde::GamepadAction::Fire)) ==
+              "ZR, hold with the SMG");
+        CHECK(std::string_view(horde::GamepadActionBinding(GamepadType::Switch, horde::GamepadAction::SwitchGun)) ==
+              "X");
+        CHECK(std::string_view(horde::GamepadActionBinding(GamepadType::Switch, horde::GamepadAction::Dash)) ==
+              "ZL or R");
+        CHECK(std::string_view(horde::GamepadActionBinding(GamepadType::Switch, horde::GamepadAction::Flask)) ==
+              "Y");
+        CHECK(std::string_view(horde::GamepadActionBinding(GamepadType::Switch, horde::GamepadAction::Pause)) ==
+              "+");
+        CHECK(std::string_view(horde::GamepadActionBinding(GamepadType::Switch, horde::GamepadAction::Retry)) ==
+              "- (B on end screen)");
+
+        // Xbox and Generic.
+        CHECK(std::string_view(horde::GamepadActionBinding(GamepadType::Xbox, horde::GamepadAction::Fire)) ==
+              "RT, hold with the SMG");
+        CHECK(std::string_view(horde::GamepadActionBinding(GamepadType::Xbox, horde::GamepadAction::SwitchGun)) ==
+              "Y");
+        CHECK(std::string_view(horde::GamepadActionBinding(GamepadType::Xbox, horde::GamepadAction::Dash)) ==
+              "LT or RB");
+        CHECK(std::string_view(horde::GamepadActionBinding(GamepadType::Xbox, horde::GamepadAction::Flask)) ==
+              "X");
+        CHECK(std::string_view(horde::GamepadActionBinding(GamepadType::Xbox, horde::GamepadAction::Pause)) ==
+              "Menu");
+        CHECK(std::string_view(horde::GamepadActionBinding(GamepadType::Generic, horde::GamepadAction::Pause)) ==
+              "Start");
+    }
+}

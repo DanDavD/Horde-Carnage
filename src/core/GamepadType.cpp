@@ -179,4 +179,61 @@ const char* GamepadControlLabel(GamepadType type, GamepadControl control) {
     return "";
 }
 
+const char* GamepadActionBinding(GamepadType type, GamepadAction action) {
+    switch (action) {
+    case GamepadAction::Move:
+        return "Left stick or d-pad";
+    case GamepadAction::Aim:
+        return "Right stick";
+    case GamepadAction::Fire:
+        if (type == GamepadType::PlayStation) return "R2, hold with the SMG";
+        if (type == GamepadType::Switch) return "ZR, hold with the SMG";
+        return "RT, hold with the SMG";
+    case GamepadAction::SwitchGun:
+        if (type == GamepadType::PlayStation) return "Triangle";
+        if (type == GamepadType::Switch) return "X";
+        return "Y";
+    case GamepadAction::Dash:
+        if (type == GamepadType::PlayStation) return "L2 or R1";
+        if (type == GamepadType::Switch) return "ZL or R";
+        return "LT or RB";
+    case GamepadAction::Flask:
+        if (type == GamepadType::PlayStation) return "Square";
+        if (type == GamepadType::Switch) return "Y";
+        return "X";
+    case GamepadAction::Pause:
+        if (type == GamepadType::Xbox) return "Menu";
+        if (type == GamepadType::PlayStation) return "Options";
+        if (type == GamepadType::Switch) return "+";
+        return "Start";
+    case GamepadAction::Retry:
+        if (type == GamepadType::PlayStation) return "- (Cross on end screen)";
+        if (type == GamepadType::Switch) return "- (B on end screen)";
+        return "- (A on end screen)";
+    }
+    return "-";
+}
+
+const char* GamepadActionBindingSummary(GamepadAction action) {
+    switch (action) {
+    case GamepadAction::Move:
+        return "Left stick or d-pad";
+    case GamepadAction::Aim:
+        return "Right stick";
+    case GamepadAction::Fire:
+        return "RT / R2 / ZR, hold with SMG";
+    case GamepadAction::SwitchGun:
+        return "Y / Triangle";
+    case GamepadAction::Dash:
+        return "LT or RB (L2 / R1)";
+    case GamepadAction::Flask:
+        return "X / Square";
+    case GamepadAction::Pause:
+        return "Start / Options / Menu";
+    case GamepadAction::Retry:
+        return "- (A on end screen)";
+    }
+    return "-";
+}
+
 } // namespace horde

@@ -91,4 +91,4 @@ In the browser build, the settings page showed only the volume and the shake. Af
 - **The keys cannot be changed.** See the design decisions.
 - **Display needs a real screen to judge.** Window captures of a fullscreen game are stale, so I checked the window's size and state, not its picture. I never found what minimized the window in those first runs, only that it stopped once the window was no longer kept on top, so it is worth watching for.
 - **A folder the game cannot write to.** If the game sits where it may not write, such as Program Files, the settings last for that run only. raylib logs a warning and nothing else happens.
-- **The gamepad's column is mostly empty.** The gamepad only moves and pauses for now; the rest comes with the gamepad support, and so does moving through the menus with the stick.
+- **The controls table adapts dynamically.** When a gamepad is connected, the Gamepad column adapts to the detected controller family (Xbox, PlayStation, Switch or generic); with keyboard and mouse it displays multi-platform notation.

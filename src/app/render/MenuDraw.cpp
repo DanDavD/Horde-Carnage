@@ -103,22 +103,22 @@ constexpr std::array<const char*, 2> kDeadItems{"TRY AGAIN", "RETURN TO TITLE"};
 constexpr std::array<const char*, 2> kVictoryItems{"FIGHT AGAIN", "RETURN TO TITLE"};
 constexpr std::array<const char*, 1> kControlsItems{"BACK"};
 
-// One line of the controls table: the action, then the keyboard and mouse, then the gamepad.
+// One line of the controls table: the action, keyboard/mouse keys, and gamepad logical action.
 struct ControlsLine {
     const char* action;
     const char* keys;
-    const char* pad;
+    GamepadAction gamepadAction;
 };
 
 constexpr std::array<ControlsLine, 8> kControlsLines{{
-    {"Move", "WASD or the arrows", "Left stick or d-pad"},
-    {"Aim", "Mouse", "-"},
-    {"Fire", "Left click, hold with the SMG", "-"},
-    {"Switch gun", "Q, 1, 2 or the mouse wheel", "-"},
-    {"Dash", "Space or left Shift", "-"},
-    {"Drink a flask", "E", "-"},
-    {"Pause", "Esc", "Start"},
-    {"Try again at once", "R, after the fight", "-"},
+    {"Move", "WASD or the arrows", GamepadAction::Move},
+    {"Aim", "Mouse", GamepadAction::Aim},
+    {"Fire", "Left click, hold with the SMG", GamepadAction::Fire},
+    {"Switch gun", "Q, 1, 2 or the mouse wheel", GamepadAction::SwitchGun},
+    {"Dash", "Space or left Shift", GamepadAction::Dash},
+    {"Drink a flask", "E", GamepadAction::Flask},
+    {"Pause", "Esc", GamepadAction::Pause},
+    {"Try again at once", "R, after the fight", GamepadAction::Retry},
 }};
 
 // Where the items of a page that is a plain list sit: the middle of the first one, and the step to each next
@@ -368,15 +368,19 @@ void DrawSettingsScreen(const Menu& menu, float sinceMoved, const Settings& sett
 
 void DrawControlsScreen(const Menu& menu, float sinceMoved, InputPromptStyle prompts, const Art& art) {
     DrawHeading("CONTROLS", art);
-    const auto drawLine = [&art](float y, const ControlsLine& line, float size, Color first, Color rest) {
-        DrawGameText(art.uiFont, line.action, Vec2{kControlsLeft, y}, size, first);
-        DrawGameText(art.uiFont, line.keys, Vec2{kControlsKeysX, y}, size, rest);
-        DrawGameText(art.uiFont, line.pad, Vec2{kControlsPadX, y}, size, rest);
+    const auto drawLine = [&art](float y, const char* action, const char* keys, const char* pad, float size, Color first,
+                                 Color rest) {
+        DrawGameText(art.uiFont, action, Vec2{kControlsLeft, y}, size, first);
+        DrawGameText(art.uiFont, keys, Vec2{kControlsKeysX, y}, size, rest);
+        DrawGameText(art.uiFont, pad, Vec2{kControlsPadX, y}, size, rest);
     };
-    drawLine(kControlsHeadY, ControlsLine{"ACTION", "KEYBOARD AND MOUSE", "GAMEPAD"}, 12.0f, kMenuFaint, kMenuFaint);
+    drawLine(kControlsHeadY, "ACTION", "KEYBOARD AND MOUSE", "GAMEPAD", 12.0f, kMenuFaint, kMenuFaint);
     for (std::size_t i = 0; i < kControlsLines.size(); ++i) {
-        drawLine(kControlsFirstY + kControlsSpacing * static_cast<float>(i), kControlsLines[i], kControlsSize, kText,
-                 kSoftText);
+        const char* padText = prompts.device == InputDevice::Gamepad
+                                  ? GamepadActionBinding(prompts.gamepad, kControlsLines[i].gamepadAction)
+                                  : GamepadActionBindingSummary(kControlsLines[i].gamepadAction);
+        drawLine(kControlsFirstY + kControlsSpacing * static_cast<float>(i), kControlsLines[i].action,
+                 kControlsLines[i].keys, padText, kControlsSize, kText, kSoftText);
     }
     DrawMenu(MenuPage::Controls, menu, sinceMoved, 1.0f, art);
     DrawMenuFooter(MenuFooterKind::Controls, prompts, 1.0f, art);
