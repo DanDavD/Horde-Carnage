@@ -55,7 +55,7 @@ Someone reviewing the game may only play it for a few minutes and never reach ph
 ## Releases
 
 - `v0.1.0` The fight: the boss with its five attacks, its shield, its second phase and its frenzy; the dash and the flasks; "YOU DIED" and "VICTORY". Released on October 25.
-- `v1.0.0` Vertical slice: art, game feel, sound, menus, balancing. This is the version I present, and the first one that is not a pre-release.
+- `v1.0.0` Vertical slice: art, game feel, sound, music, menus, settings, gamepads and a browser build. This is the version I present, and the first one that is not a pre-release. Released on October 29, two days before the plan.
 
 ## If I fall behind
 

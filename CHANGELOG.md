@@ -5,6 +5,10 @@ Versions follow [Semantic Versioning](https://semver.org/) while the game is a p
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-10-29
+
+The fight finished: drawn and scored in code, with menus, settings, gamepads, a laser sight and a browser build.
+
 ### Added
 - **Mouse and gamepad sensitivity** (`MouseAim.cpp`, `Settings.cpp`, `GamepadAim.cpp`, `MenuDraw.cpp`, `PlayerInput.cpp`, `Game.cpp`, `web/shell.html`): Settings has a Mouse sensitivity and a Gamepad sensitivity line under the volumes, ten marks from 1 to 10, saved as `mouse=` and `stick=`. While playing, the cursor is now locked to the game and the crosshair follows the mouse's movement times the sensitivity (1 at the middle level, about a third at 1, 4 at 10), stopping at the edges of the view; in the menus the cursor comes back where the crosshair was. The gamepad's sensitivity is how fast the aim turns toward the right stick, about 1440 degrees a second at the middle level. Covered by `MouseAimTests`, `GamepadAimTests` and `SettingsTests`, explained in `docs/SETTINGS.md`, `docs/WEAPONS.md` and `docs/CONTROLLERS.md`.
 - **Laser sight** (`LaserSight.cpp`, `WorldDraw.cpp`, `Palette.h`, `Game.cpp`): a thin crimson sight leaves the gun's barrel along the hunter's aim while alive and with hands free, stopping on the nearest living target or wall with a bright dot and spanning the exact reach of the equipped gun in the open (750 units on the pistol, 600 on the SMG) with a range pip at its tip, so the gun's line and reach show on the floor without looking at the panel. Covered by `LaserSightTests`, explained in `docs/WEAPONS.md` and `docs/ART.md`.

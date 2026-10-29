@@ -6,9 +6,9 @@ One arena, one very hard boss: the Matriarch, a giant hairball. You run with the
 
 ![C++20](https://img.shields.io/badge/C%2B%2B-20-blue?logo=cplusplus)
 ![raylib](https://img.shields.io/badge/raylib-5.5-black)
-![Status](https://img.shields.io/badge/status-in%20development-orange)
+![Status](https://img.shields.io/badge/status-v1.0.0-brightgreen)
 
-**Play it:** download the latest zip from [Releases](https://github.com/DanDavD/Horde-Carnage/releases), unzip it and run `HordeCarnage.exe` (Windows 10 or 11, nothing to install).
+**Play it:** download the latest zip from [Releases](https://github.com/DanDavD/Horde-Carnage/releases), unzip it and run `HordeCarnage.exe` (Windows 10 or 11, nothing to install), or play it in the browser on itch.io.
 
 ---
 
@@ -20,7 +20,7 @@ I chose plain C++ with a small library instead of an engine on purpose. raylib o
 
 ## Current status
 
-This is day 7 of 15, and the boss fight is in progress. Progress is tracked in the [roadmap](docs/ROADMAP.md) and the [changelog](CHANGELOG.md).
+Version 1.0.0, the version I present, came out on day 10 of 15: the whole fight, drawn, scored and with menus. Progress is tracked in the [roadmap](docs/ROADMAP.md) and the [changelog](CHANGELOG.md).
 
 **What works today:**
 - A CMake project that downloads raylib and doctest at a pinned version, so a fresh clone builds with one command.
@@ -147,7 +147,7 @@ The full day-by-day plan, with what I cut first if I fall behind, is in [docs/RO
 
 - [x] `v0.0.1` Project setup: CMake, raylib, tests, CI, fixed-timestep loop
 - [x] `v0.1.0` The fight: the boss with its five attacks, its shield, its second phase and its frenzy, the dash and the flasks, death and victory
-- [ ] `v1.0.0` The version I present: art, game feel, sound, menus and balancing
+- [x] `v1.0.0` The version I present: art, game feel, sound, music, menus, settings, gamepads and a browser build
 
 ## Credits
 

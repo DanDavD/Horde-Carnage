@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.25)
 
 # The version here is the game version. The release steps in CONTRIBUTING.md bump it.
-project(HordeCarnage VERSION 0.1.0 LANGUAGES C CXX)
+project(HordeCarnage VERSION 1.0.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
