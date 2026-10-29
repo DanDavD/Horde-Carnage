@@ -10,11 +10,15 @@ add_library(horde_core STATIC
     core/FixedTimestep.cpp
     core/Flasks.cpp
     core/FollowCamera.cpp
+    core/GamepadAim.cpp
+    core/GamepadConnection.cpp
+    core/GamepadType.cpp
     core/Health.cpp
     core/HitStop.cpp
     core/ImpactFeel.cpp
     core/Loadout.cpp
     core/Menu.cpp
+    core/MenuRepeat.cpp
     core/Movement.cpp
     core/Particle.cpp
     core/ParticleEmitter.cpp
@@ -52,6 +56,7 @@ add_executable(HordeCarnage
     app/render/EndScreen.cpp
     app/render/HairBody.cpp
     app/render/Hud.cpp
+    app/render/InputPrompts.cpp
     app/render/MenuDraw.cpp
     app/render/ParticleDraw.cpp
     app/render/PlayerDraw.cpp

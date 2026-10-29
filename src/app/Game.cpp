@@ -24,6 +24,7 @@
 #include "app/render/Palette.h"
 #include "app/render/View.h"
 #include "app/render/WorldDraw.h"
+#include "core/GamepadAim.h"
 #include "core/ImpactFeel.h"
 #include "core/ScreenFit.h"
 
@@ -81,6 +82,7 @@ Game::Game(bool windowed)
     SetExitKey(KEY_NULL);
     ReturnToTitle(_session);
     ResetHealthTrails();
+    _lastMouse = AimInGame(CurrentScreenFit());
 }
 
 Game::~Game() {
@@ -104,10 +106,28 @@ void Game::Run() {
 }
 
 void Game::Frame() {
+    const float frameSeconds = GetFrameTime();
+    const Vec2 mouse = AimInGame(CurrentScreenFit());
+    const std::optional<int> usedPadSlot = FindActiveGamepadSlot(_gamepadConnection.activeSlot);
+    const GamepadConnectionEvents padEvents =
+        StepGamepadConnection(_gamepadConnection, ReadGamepadPresence(), usedPadSlot);
+    if (padEvents.activeDisconnected) {
+        _menuRepeat = {};
+        _inputDevice = InputDevice::KeyboardMouse;
+    }
+    if (_gamepadConnection.activeSlot.has_value()) {
+        _gamepadType = ReadGamepadType(_gamepadConnection.activeSlot);
+    } else {
+        _gamepadType = GamepadType::Generic;
+    }
+    if (const auto device = DetectActiveInputDevice(mouse, _lastMouse, usedPadSlot)) {
+        _inputDevice = *device;
+    }
     // Key presses are read once per frame, not per fixed step: a frame with no step would miss them.
-    HandleMenus();
+    HandleMenus(frameSeconds, padEvents.activeDisconnected);
+    _lastMouse = mouse;
     if (_session.state == SessionState::Playing) {
-        CollectButtonPresses(_pendingPresses);
+        CollectButtonPresses(_pendingPresses, _gamepadConnection.activeSlot);
     } else {
         // A click or a key in a menu is not a shot or a dash in the fight that follows it.
         _pendingPresses = {};
@@ -135,10 +155,25 @@ void Game::Frame() {
     if (IsKeyPressed(KEY_F4) && _session.state == SessionState::Playing) {
         DefeatBoss(_session.world);
     }
+    // Cycles on-screen prompts through Keyboard/Mouse, Xbox, PlayStation, Switch, Generic and back to live input.
+    if (IsKeyPressed(KEY_F5)) {
+        if (!_debugPromptOverride.has_value()) {
+            _debugPromptOverride = InputPromptStyle{InputDevice::KeyboardMouse, GamepadType::Generic};
+        } else if (_debugPromptOverride->device == InputDevice::KeyboardMouse) {
+            _debugPromptOverride = InputPromptStyle{InputDevice::Gamepad, GamepadType::Xbox};
+        } else if (_debugPromptOverride->gamepad == GamepadType::Xbox) {
+            _debugPromptOverride = InputPromptStyle{InputDevice::Gamepad, GamepadType::PlayStation};
+        } else if (_debugPromptOverride->gamepad == GamepadType::PlayStation) {
+            _debugPromptOverride = InputPromptStyle{InputDevice::Gamepad, GamepadType::Switch};
+        } else if (_debugPromptOverride->gamepad == GamepadType::Switch) {
+            _debugPromptOverride = InputPromptStyle{InputDevice::Gamepad, GamepadType::Generic};
+        } else {
+            _debugPromptOverride.reset();
+        }
+    }
 #endif
     // A hit stop slows the fight's clock, so the world takes fewer of its fixed steps. Every step is still the
     // same length, so the rules play out exactly as at full speed, only slower to watch.
-    const float frameSeconds = GetFrameTime();
     _menuSinceMoved += frameSeconds;
     // Behind the title and the pause menu everything holds still: the particles, the slow-down and the
     // shake pick up where they were when the fight resumes.
@@ -176,14 +211,15 @@ void Game::Frame() {
     Draw(static_cast<float>(_timestep.Alpha()));
 }
 
-void Game::HandleMenus() {
+void Game::HandleMenus(float frameSeconds, bool padDisconnected) {
     const SessionState state = _session.state;
     if (state == SessionState::Playing) {
         // The next menu, whichever it is, opens fresh on its first item.
         _menuPage = MenuPage::None;
         _openedPage = MenuPage::None;
-        if (ReadPausePressed() || TakePointerLockLost()) {
+        if (ReadPausePressed(_gamepadConnection.activeSlot) || TakePointerLockLost() || padDisconnected) {
             PauseFight(_session);
+            OpenPage(MenuPage::Pause, 0);
             _backdrop.ready = false;
             PlayCue(_sounds, SoundCue{SoundId::MenuConfirm, kMenuConfirmVolume});
         }
@@ -200,21 +236,28 @@ void Game::HandleMenus() {
         ForgetLastFight();
         return;
     }
+    // The end screens' choices wait for the restart delay, like the restart itself.
+    if ((state == SessionState::Dead || state == SessionState::Victory) && !CanRestart(_session)) {
+        if (LengthSquared(ReadPadMenuDirection(_gamepadConnection.activeSlot)) == 0.0f) {
+            _menuRepeat = {};
+        }
+        return;
+    }
 
-    MenuInput input = ReadMenuKeys();
+    MenuInput input = ReadMenuInput(_menuRepeat, frameSeconds, _gamepadConnection.activeSlot);
     // In a row of choices, left and right move along it; elsewhere they change the selected value.
     if (IsRowMenu(page)) {
         input.move = input.move != 0 ? input.move : input.adjust;
         input.adjust = 0;
     }
     // Start goes back from the pause menu, as it came in, and from the pages opened over it.
-    input.back = input.back || (state == SessionState::Paused && ReadPausePressed());
+    input.back = input.back ||
+                 (state == SessionState::Paused && ReadPausePressed(_gamepadConnection.activeSlot));
     const Vec2 mouse = AimInGame(CurrentScreenFit());
     const std::optional<MenuTarget> under = MenuTargetAt(page, mouse, _art);
     if (mouse != _lastMouse && under) {
         input.hovered = under->item;
     }
-    _lastMouse = mouse;
     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && under) {
         input.hovered = under->item;
         if (under->lowerArrow) {
@@ -222,10 +265,6 @@ void Game::HandleMenus() {
         } else {
             input.confirm = true;
         }
-    }
-    // The end screens' choices wait for the restart delay, like the restart itself.
-    if ((state == SessionState::Dead || state == SessionState::Victory) && !CanRestart(_session)) {
-        return;
     }
 
     const MenuResult result = StepMenu(_menu, input);
@@ -263,6 +302,7 @@ void Game::OpenPage(MenuPage page, int selected) {
     _menu.selected = selected;
     _menuPage = page;
     _menuSinceMoved = 0.0f;
+    LatchMenuRepeat(_menuRepeat, ReadPadMenuDirection(_gamepadConnection.activeSlot));
 }
 
 void Game::Choose(MenuPage page, int item) {
@@ -397,6 +437,7 @@ void Game::ForgetLastFight() {
     _hitStop = HitStop{};
     _shake = ScreenShake{};
     _pendingPresses = {};
+    _gamepadAim = GamepadAim{};
 }
 
 void Game::Update(float dt) {
@@ -405,11 +446,22 @@ void Game::Update(float dt) {
     //
     // The mouse is turned into a world point with the camera as of the last step. The camera drawn on
     // screen is a fraction of a step behind that, which is far below a pixel of aiming error.
-    const Camera2D camera = ToRaylibCamera(_session.world.camera, 1.0f);
-    const Vec2 aim = AimInGame(CurrentScreenFit());
-    const PlayerCommands commands{.move = ReadMoveInput(),
-                                  .aimAt = FromRaylib(GetScreenToWorld2D(ToRaylib(aim), camera)),
-                                  .fireHeld = ReadFireHeld(),
+    const Vec2 move = ReadMoveInput(_gamepadConnection.activeSlot);
+    const bool fireHeld = ReadFireHeld(_gamepadConnection.activeSlot);
+
+    Vec2 worldAim{};
+    if (_inputDevice == InputDevice::Gamepad) {
+        worldAim = StepGamepadAim(_gamepadAim, _session.world, ReadLookStick(_gamepadConnection.activeSlot),
+                                  move, fireHeld || _pendingPresses.fire);
+    } else {
+        const Camera2D camera = ToRaylibCamera(_session.world.camera, 1.0f);
+        const Vec2 mouseInGame = AimInGame(CurrentScreenFit());
+        worldAim = FromRaylib(GetScreenToWorld2D(ToRaylib(mouseInGame), camera));
+    }
+
+    const PlayerCommands commands{.move = move,
+                                  .aimAt = worldAim,
+                                  .fireHeld = fireHeld,
                                   .firePressed = _pendingPresses.fire,
                                   .selectSlot = _pendingPresses.weaponSlot,
                                   .cycleWeapon = _pendingPresses.cycleWeapon,
@@ -466,12 +518,13 @@ void Game::Draw(float alpha) const {
     if (!playing) {
         alpha = 1.0f;
     }
+    const InputPromptStyle prompts = CurrentPromptStyle();
     switch (_session.state) {
     case SessionState::Title:
         DrawScene(fit, alpha, false);
         BeginMode2D(ScreenCamera(fit));
         if (_openedPage == MenuPage::None) {
-            DrawTitleScreen(_menu, _menuSinceMoved, _art);
+            DrawTitleScreen(_menu, _menuSinceMoved, prompts, _art);
         } else {
             DrawTitleShade();
             DrawOpenedPage();
@@ -482,7 +535,7 @@ void Game::Draw(float alpha) const {
         BeginMode2D(ScreenCamera(fit));
         DrawBackdrop(_backdrop, _session.stateSeconds);
         if (_openedPage == MenuPage::None) {
-            DrawPauseScreen(_menu, _menuSinceMoved, _session.stateSeconds, _art);
+            DrawPauseScreen(_menu, _menuSinceMoved, _session.stateSeconds, prompts, _art);
         } else {
             DrawOpenedPage();
         }
@@ -494,7 +547,7 @@ void Game::Draw(float alpha) const {
         DrawScene(fit, alpha, true);
         if (!playing) {
             BeginMode2D(ScreenCamera(fit));
-            DrawEndScreen(_session, _menu, _menuSinceMoved, _art);
+            DrawEndScreen(_session, _menu, _menuSinceMoved, prompts, _art);
             EndMode2D();
         }
         break;
@@ -504,12 +557,22 @@ void Game::Draw(float alpha) const {
 }
 
 void Game::DrawOpenedPage() const {
+    const InputPromptStyle prompts = CurrentPromptStyle();
     DrawPageShade();
     if (_openedPage == MenuPage::Settings) {
-        DrawSettingsScreen(_menu, _menuSinceMoved, _settings, _art);
+        DrawSettingsScreen(_menu, _menuSinceMoved, _settings, prompts, _art);
     } else if (_openedPage == MenuPage::Controls) {
-        DrawControlsScreen(_menu, _menuSinceMoved, _art);
+        DrawControlsScreen(_menu, _menuSinceMoved, prompts, _art);
     }
+}
+
+InputPromptStyle Game::CurrentPromptStyle() const {
+#ifndef NDEBUG
+    if (_debugPromptOverride.has_value()) {
+        return *_debugPromptOverride;
+    }
+#endif
+    return InputPromptStyle{.device = _inputDevice, .gamepad = _gamepadType};
 }
 
 void Game::DrawScene(const ScreenFit& fit, float alpha, bool withHud) const {
@@ -543,11 +606,23 @@ void Game::DrawScene(const ScreenFit& fit, float alpha, bool withHud) const {
     DrawPainVignette(_art, world.player.health, world.elapsedSeconds);
 #ifndef NDEBUG
     if (_showDebugOverlay) {
-        DrawDebugHud(world, _lastMoveInput, _particles.particles.Size());
+        DrawDebugHud(world, _lastMoveInput, _particles.particles.Size(), _gamepadConnection.activeSlot,
+                     _gamepadType, ReadGamepadName(_gamepadConnection.activeSlot));
     }
 #endif
     if (withHud) {
-        DrawHud(world, _trails, _session.attempt, playing, AimInGame(fit), _art);
+        const InputPromptStyle prompts = CurrentPromptStyle();
+        Vec2 screenAim{};
+        if (prompts.device == InputDevice::Gamepad) {
+            const Camera2D camera = ToRaylibCamera(world.camera, alpha);
+            const Vec2 playerPos = Lerp(world.player.motion.previousPosition, world.player.motion.position, alpha);
+            const Vec2 worldAim = GamepadAimPoint(playerPos, {}, _gamepadAim.direction, kGamepadCrosshairDistance);
+            const Vector2 screenVec = GetWorldToScreen2D(ToRaylib(worldAim), camera);
+            screenAim = Vec2{screenVec.x, screenVec.y};
+        } else {
+            screenAim = AimInGame(fit);
+        }
+        DrawHud(world, _trails, _session.attempt, playing, screenAim, prompts, _art);
     }
     EndMode2D();
 }

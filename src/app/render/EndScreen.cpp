@@ -64,7 +64,8 @@ int HealthPercent(const Health& health) {
 // The end of a fight, in the style of the games it borrows from: the world dims and a dark band across
 // the middle carries one big word. It all fades in over the restart delay, so the moment the choices light
 // up is the moment a press works. After a victory it waits for the boss to finish dying first.
-void DrawEndScreen(const Session& session, const Menu& menu, float sinceMoved, const Art& art) {
+void DrawEndScreen(const Session& session, const Menu& menu, float sinceMoved, InputPromptStyle prompts,
+                   const Art& art) {
     const float shown = std::clamp(EndScreenSeconds(session) / kRestartDelaySeconds, 0.0f, 1.0f);
     if (shown <= 0.0f) {
         return;
@@ -104,6 +105,7 @@ void DrawEndScreen(const Session& session, const Menu& menu, float sinceMoved, c
     // dimmed until the restart delay has passed, so it is clear why an early press did nothing.
     const float ready = CanRestart(session) ? 1.0f : 0.35f * shown;
     DrawMenu(PageFor(session.state), menu, sinceMoved, ready, art);
+    DrawMenuFooter(MenuFooterKind::EndRow, prompts, ready, art);
 }
 
 } // namespace horde

@@ -104,14 +104,15 @@ void DrawDebugWorld(const Player& player, const FollowCamera& camera, float alph
 // In screen space. The numbers I tune against: what the input asks for, what the
 // body does, where the camera is, how many enemies and projectiles there are, the player's health window,
 // and what the boss is doing.
-void DrawDebugHud(const World& world, Vec2 moveInput, std::size_t particleCount) {
+void DrawDebugHud(const World& world, Vec2 moveInput, std::size_t particleCount,
+                  std::optional<int> gamepadSlot, GamepadType gamepadType, const char* gamepadName) {
     const Player& player = world.player;
     const FollowCamera& camera = world.camera;
     const Motion& motion = player.motion;
     constexpr int kX = 10;
     constexpr int kY = 80; // Below the health and dash bars.
     constexpr int kLine = 20;
-    DrawRectangle(kX - 4, kY - 4, 460, 17 * kLine + 8, Fade(BLACK, 0.6f));
+    DrawRectangle(kX - 4, kY - 4, 460, 18 * kLine + 8, Fade(BLACK, 0.6f));
     DrawText(TextFormat("input  %5.2f %5.2f  len %4.2f", moveInput.x, moveInput.y, Length(moveInput)), kX, kY,
              18, RAYWHITE);
     DrawText(TextFormat("speed  %5.0f / %.0f", Length(motion.velocity), player.stats.maxSpeed), kX, kY + kLine, 18,
@@ -147,6 +148,12 @@ void DrawDebugHud(const World& world, Vec2 moveInput, std::size_t particleCount)
              kX, kY + 14 * kLine, 18, RAYWHITE);
     DrawText(AttackPickLabel(world), kX, kY + 15 * kLine, 18, ORANGE);
     DrawText(ShieldLabel(world.boss), kX, kY + 16 * kLine, 18, ORANGE);
+    if (gamepadSlot.has_value()) {
+        DrawText(TextFormat("pad    #%d %s (%.22s)", *gamepadSlot, GamepadTypeName(gamepadType), gamepadName), kX,
+                 kY + 17 * kLine, 18, RAYWHITE);
+    } else {
+        DrawText("pad    none", kX, kY + 17 * kLine, 18, RAYWHITE);
+    }
 }
 
 } // namespace horde

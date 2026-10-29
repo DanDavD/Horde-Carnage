@@ -40,7 +40,7 @@ This is day 7 of 15, and the boss fight is in progress. Progress is tracked in t
 - Bodies push each other apart instead of stacking. You can shove a hairball out of your way but not the boss, and a crowd slows you down. See [Collisions](docs/COLLISIONS.md).
 - A health bar. A touch of the boss takes 20 of your 100 hit points (a hairball's takes 10), and after a hit you blink and cannot be hurt for 0.8 seconds. See [Health](docs/HEALTH.md).
 - A fight that ends one of two ways. "YOU DIED" shows your attempt number, what killed you and when, and how much health the boss kept; "VICTORY" shows the attempt that won, the length of the fight and your accuracy. Both fade in, then a button starts a fresh fight. The attempt count survives every retry. See [Game flow](docs/GAME_FLOW.md).
-- Aiming with the mouse, independent of where you walk, and two guns: a semi-automatic pistol (one shot per click) and an automatic SMG (hold to fire). A panel shows the gun in hand. See [Aiming and weapons](docs/WEAPONS.md).
+- Aiming with the mouse or the right stick (with a fixed-distance crosshair and soft aim assist toward the boss and her children), independent of where you walk, and two guns: a semi-automatic pistol (one shot per click) and an automatic SMG (hold to fire). Keyboard and gamepad work together without switching modes. A panel shows the gun in hand. See [Aiming and weapons](docs/WEAPONS.md).
 - Bullets that fly and hit the first body in their path. A hairball flashes white and gets knocked back; the boss only flashes, it is too heavy to push. See [Bullets and hits](docs/BULLETS.md).
 - Hairballs, bullets, the boss's strands, its shockwaves and the marks of its Summon live in fixed object pools, so the game never allocates memory while you play. See [Object pool](docs/OBJECT_POOL.md).
 - A dash that covers about four body widths in 0.12 s, passes through enemies and makes you untouchable while it lasts. See [Player abilities](docs/ABILITIES.md).
@@ -51,12 +51,12 @@ This is day 7 of 15, and the boss fight is in progress. Progress is tracked in t
 - Hits you can feel. A heavy hit drops the fight into slow motion for a moment, easing back to full speed, and the screen shakes with the hit, the boss's landings, its crashes into the walls and its roars, harder for the bigger moments. The HUD and your aim never shake. Every shot throws muzzle sparks, smoke and a brass casing that bounces on the stone; bullets spark blue or orange off the shield, shatter it into spinning shards when it breaks, and tear dark blood and locks of hair from the exposed boss; dashes kick up dust, leap landings roll out a ring of dust, killed hairballs burst into hair, and the Matriarch sheds locks onto the floor throughout Phase 2 and Frenzy, all from a 512-slot pool with its own random stream so the fight's seed never changes. See [Game feel](docs/GAME_FEEL.md).
 - Health bars in the manner of Dark Souls: a hit leaves a pale trail where the bar was, which waits while the hits keep coming and then drains, and the boss's bar shows the damage of your last run of hits. The edges of the screen go red when you are hit and beat like a heart when your health is low. The boss dies on screen, convulsing, screaming and turning grey, before VICTORY fades in. See [Game feel](docs/GAME_FEEL.md).
 - Sound, all of it synthesized in code like the art: the two guns, the shield's ping, knock and shatter, blows, the dash and the flask, the boss's landings, crashes, roar and death, and a warning sound for each of her attacks, so you can hear what is coming. Sounds lean toward the side of the screen they come from. See [Audio](docs/AUDIO.md).
-- A title screen, a pause menu and choices on the end screens, in the manner of Dark Souls and Hollow Knight: a few words in capitals on the dark, the selected one between a thin line and a diamond on each side. Pausing holds the fight and shows it behind the menu, blurred and stepping back. Keys, mouse or gamepad. See [Menus](docs/MENUS.md).
+- A title screen, a pause menu and choices on the end screens, in the manner of Dark Souls and Hollow Knight: a few words in capitals on the dark, the selected one between a thin line and a diamond on each side, and a prompt bar at the foot of every screen. Pausing holds the fight and shows it behind the menu, blurred and stepping back; unplugging the gamepad mid-fight pauses too. Keys, mouse, d-pad or left stick (with repeat when held), with procedural prompts in the menus and the HUD that switch on the fly between keyboard/mouse and Xbox, PlayStation, Switch or generic controllers. See [Menus](docs/MENUS.md) and [Controllers](docs/CONTROLLERS.md).
 - Settings, from the title or the pause: master volume, screen shake (off, low or full), fullscreen or a window, and the frame rate (vsync, 60, 120, 144 or unlimited), each in effect at once and saved for the next run, plus a page of the controls. See [Settings](docs/SETTINGS.md).
 - Always fullscreen, at the monitor's own resolution and refresh rate, drawn sharp at that resolution, with black bars on screens that are not 16:9 so everyone sees the same arena. Settings > Display, or `--windowed` for one run, gives a window instead. See [Screen and fullscreen](docs/SCREEN.md).
 - Warnings are errors for the project's own code (`/W4 /WX` on MSVC).
 
-**Still to do:** an ambience and music, gamepad aiming, and maybe the numbers in JSON. See the [roadmap](docs/ROADMAP.md) for the order, and for the difficulty I am aiming for.
+**Still to do:** an ambience and music, and maybe the numbers in JSON. See the [roadmap](docs/ROADMAP.md) for the order, and for the difficulty I am aiming for.
 
 ## Tech stack
 
@@ -92,16 +92,16 @@ You can also open the folder in Visual Studio (*File > Open > Folder*). It reads
 | Action | Keyboard and mouse | Gamepad |
 |---|---|---|
 | Move | `WASD` or the arrow keys | Left stick or d-pad |
-| Aim | Mouse | Not yet |
-| Fire | Left click (hold with the SMG) | Not yet |
-| Switch gun | `Q`, `1`, `2` or the mouse wheel | Not yet |
-| Dash | `Space` or left `Shift` | Not yet |
-| Drink a flask | `E` | Not yet |
-| Move through a menu | `W`, `S`, up and down, or the mouse | d-pad |
-| Change a setting | `A`, `D`, left and right, or a click on its line or arrows | d-pad left and right |
+| Aim | Mouse | Right stick |
+| Fire | Left click (hold with the SMG) | `RT` (hold with the SMG) |
+| Switch gun | `Q`, `1`, `2` or the mouse wheel | `Y` / Triangle |
+| Dash | `Space` or left `Shift` | `LT` or `RB` |
+| Drink a flask | `E` | `X` / Square |
+| Move through a menu | `W`, `S`, up and down, or the mouse | Left stick or d-pad (hold to repeat) |
+| Change a setting | `A`, `D`, left and right, or a click on its line or arrows | Left stick or d-pad, left and right (hold to repeat) |
 | Choose | `Enter`, `Space` or a click | `A` |
 | Back, or resume from the pause | `Esc` or `Backspace` | `B` |
-| Pause | `Esc` | `Start` |
+| Pause | `Esc` | `Start` (also pauses if unplugged) |
 | Try again at once after "YOU DIED" or "VICTORY" | `R` | |
 | Quit | Quit on the title | |
 | Play in a window instead of fullscreen | Settings > Display, or start it with `--windowed` for one run | |
@@ -109,6 +109,7 @@ You can also open the folder in Visual Studio (*File > Open > Folder*). It reads
 | Break the boss's shield (Debug builds only) | `F2` | |
 | Skip to the second phase, then to the frenzy (Debug builds only) | `F3` | |
 | Defeat the boss at once (Debug builds only) | `F4` | |
+| Cycle input prompt styles (Debug builds only) | `F5` | |
 
 ## Building and testing
 
