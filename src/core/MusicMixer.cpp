@@ -31,6 +31,11 @@ void CueMusic(MusicMixer& mixer, const MusicCue& cue) {
         mixer.position = 0;
         mixer.gains = cue.stems;
     }
+    if (cue.startStinger != MusicStinger::None) {
+        mixer.stinger = cue.startStinger;
+        mixer.stingerPosition = 0;
+        mixer.stingerGain = cue.stingerVolume;
+    }
 }
 
 void MixMusic(MusicMixer& mixer, const MusicTrack& track, std::span<float> out) {
@@ -41,6 +46,13 @@ void MixMusic(MusicMixer& mixer, const MusicTrack& track, std::span<float> out) 
     const float stemIn = StepPerFrame(mixer.stats.stemInSeconds, track.sampleRate);
     const float stemOut = StepPerFrame(mixer.stats.stemOutSeconds, track.sampleRate);
     const float volumeStep = StepPerFrame(mixer.cue.volumeSeconds, track.sampleRate);
+    const float stingerStep = StepPerFrame(mixer.cue.stingerVolumeSeconds, track.sampleRate);
+    const std::vector<float>* stinger = nullptr;
+    if (mixer.stinger == MusicStinger::Victory) {
+        stinger = &track.victory;
+    } else if (mixer.stinger == MusicStinger::Defeat) {
+        stinger = &track.defeat;
+    }
     for (float& sample : out) {
         mixer.volume = Approach(mixer.volume, mixer.cue.volume, volumeStep);
         float sum = 0.0f;
@@ -53,7 +65,13 @@ void MixMusic(MusicMixer& mixer, const MusicTrack& track, std::span<float> out) 
                 sum += gain * samples[mixer.position];
             }
         }
-        sample = std::clamp(sum * mixer.volume, -1.0f, 1.0f);
+        float mixed = sum * mixer.volume;
+        mixer.stingerGain = Approach(mixer.stingerGain, mixer.cue.stingerVolume, stingerStep);
+        if (stinger != nullptr && mixer.stingerPosition < stinger->size()) {
+            mixed += mixer.stingerGain * (*stinger)[mixer.stingerPosition];
+            ++mixer.stingerPosition;
+        }
+        sample = std::clamp(mixed, -1.0f, 1.0f);
         mixer.position = mixer.position + 1 == track.loopFrames ? 0 : mixer.position + 1;
     }
 }

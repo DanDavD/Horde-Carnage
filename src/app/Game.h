@@ -57,7 +57,7 @@ private:
     void GoBack(MenuPage page);
     /// Changes one setting by `step`, puts it into effect and saves it.
     void ChangeSetting(Setting setting, int step);
-    /// Puts the volume and the frame rate of `_settings` into effect.
+    /// Puts the volumes and the frame rate of `_settings` into effect.
     void ApplySettings();
     /// Makes the window fullscreen or not, as `_settings` says.
     void ApplyDisplay();

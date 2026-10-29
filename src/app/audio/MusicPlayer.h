@@ -32,4 +32,7 @@ void UnloadMusicPlayer(MusicPlayer& player);
 /// frame.
 void UpdateMusicPlayer(MusicPlayer& player, const Session& session, float frameSeconds);
 
+/// Sets the player's music volume, from 0 to 1, under raylib's master volume.
+void SetMusicPlayerVolume(MusicPlayer& player, float gain);
+
 } // namespace horde

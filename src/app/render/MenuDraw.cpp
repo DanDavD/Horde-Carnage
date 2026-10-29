@@ -81,16 +81,18 @@ constexpr float kEndMenuSpread = 170.0f;
 // In a browser the tab is closed, not the game, so there is nothing to quit.
 constexpr std::array<const char*, 2> kTitleItems{"BEGIN", "SETTINGS"};
 // Nor a display or a frame rate to choose: the page decides both.
-constexpr std::array<SettingsRow, 4> kSettingsRows{{
+constexpr std::array<SettingsRow, 5> kSettingsRows{{
     {"MASTER VOLUME", SettingsRowKind::Value, Setting::MasterVolume},
+    {"MUSIC VOLUME", SettingsRowKind::Value, Setting::MusicVolume},
     {"SCREEN SHAKE", SettingsRowKind::Value, Setting::ScreenShake},
     {"CONTROLS", SettingsRowKind::Controls},
     {"BACK", SettingsRowKind::Back},
 }};
 #else
 constexpr std::array<const char*, 3> kTitleItems{"BEGIN", "SETTINGS", "QUIT"};
-constexpr std::array<SettingsRow, 6> kSettingsRows{{
+constexpr std::array<SettingsRow, 7> kSettingsRows{{
     {"MASTER VOLUME", SettingsRowKind::Value, Setting::MasterVolume},
+    {"MUSIC VOLUME", SettingsRowKind::Value, Setting::MusicVolume},
     {"SCREEN SHAKE", SettingsRowKind::Value, Setting::ScreenShake},
     {"DISPLAY", SettingsRowKind::Value, Setting::Display},
     {"FRAME RATE", SettingsRowKind::Value, Setting::FrameRate},
@@ -348,8 +350,9 @@ void DrawSettingsScreen(const Menu& menu, float sinceMoved, const Settings& sett
             continue;
         }
         const Vec2 value{kValueCenterX, center.y};
-        if (row.setting == Setting::MasterVolume) {
-            DrawVolumeTicks(value, settings.masterVolume, color);
+        if (row.setting == Setting::MasterVolume || row.setting == Setting::MusicVolume) {
+            DrawVolumeTicks(value, row.setting == Setting::MasterVolume ? settings.masterVolume : settings.musicVolume,
+                            color);
         } else {
             const std::string text = SettingValueText(settings, row.setting);
             DrawGameTextCentered(art.titleFont, text.c_str(), value.x, value.y - 0.55f * kValueSize, kValueSize,

@@ -12,7 +12,7 @@ namespace {
 // one block (a hitch while loading) still has the other block queued, so the music does not stutter.
 constexpr int kBlockFrames = 4096;
 // The music sits under the effects: a warning or a hit must always cut through it.
-constexpr float kMusicVolume = 0.7f;
+constexpr float kMusicVolume = 0.8f;
 
 } // namespace
 
@@ -54,6 +54,13 @@ void UpdateMusicPlayer(MusicPlayer& player, const Session& session, float frameS
         MixMusic(player.mixer, player.track, std::span<float>(player.block));
         UpdateAudioStream(player.stream, player.block.data(), kBlockFrames);
     }
+}
+
+void SetMusicPlayerVolume(MusicPlayer& player, float gain) {
+    if (!player.ready) {
+        return;
+    }
+    SetAudioStreamVolume(player.stream, kMusicVolume * gain);
 }
 
 } // namespace horde

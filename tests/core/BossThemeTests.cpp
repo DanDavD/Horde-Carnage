@@ -63,13 +63,59 @@ TEST_CASE("every layer of the theme plays, and all four together never clip") {
     CHECK(loudest == doctest::Approx(0.89f).epsilon(0.001));
 }
 
-TEST_CASE("the Pulse hits on every beat of the loop") {
+TEST_CASE("the Pulse hits on every beat of the loop, but for the two bars where the band stops") {
     const std::vector<float>& pulse = Stem(MusicStem::Pulse);
     const float peak = Peak(pulse, 0, pulse.size());
     const auto window = static_cast<std::size_t>(0.03 * kRate);
     for (int beat = 0; beat < horde::kBossThemeBars * 4; ++beat) {
+        if ((beat / 4) % 8 == 7) {
+            continue;
+        }
         const std::size_t start = horde::BossThemeStepFrame(beat * 4, kRate);
         CHECK(Peak(pulse, start, start + window) > 0.25f * peak);
+    }
+}
+
+TEST_CASE("the band stops in the last bar of each phrase") {
+    const std::vector<float>& pulse = Stem(MusicStem::Pulse);
+    const auto rms = [&](int fromStep, int toStep) {
+        const std::size_t from = horde::BossThemeStepFrame(fromStep, kRate);
+        const std::size_t to = horde::BossThemeStepFrame(toStep, kRate);
+        double sum = 0.0;
+        for (std::size_t i = from; i < to; ++i) {
+            sum += static_cast<double>(pulse[i]) * pulse[i];
+        }
+        return std::sqrt(sum / static_cast<double>(to - from));
+    };
+    for (const int bar : {7, 15}) {
+        const int start = bar * horde::kStepsPerBar;
+        const int before = start - horde::kStepsPerBar;
+        // The beat after the last stab, against the same beat of the bar before, where the band plays on. Only
+        // the crash and the last stab ring on into it.
+        CHECK(rms(start + 8, start + 12) < 0.6 * rms(before + 8, before + 12));
+    }
+}
+
+TEST_CASE("the Hook plays through both phrases and holds its breath with the band at the end") {
+    const std::vector<float>& hook = Stem(MusicStem::Hook);
+    const std::size_t half = Theme().loopFrames / 2;
+    CHECK(Peak(hook, 0, half) > 0.05f);
+    CHECK(Peak(hook, half, hook.size()) > 0.05f);
+    // The second half of the last bar is a rest.
+    const int lastBar = (horde::kBossThemeBars - 1) * horde::kStepsPerBar;
+    CHECK(Peak(hook, horde::BossThemeStepFrame(lastBar + 9, kRate), Theme().loopFrames) < 0.001f);
+}
+
+TEST_CASE("the victory and the defeat open on their blow, peak like the theme and die away to silence") {
+    const std::vector<float>& victory = Theme().victory;
+    const std::vector<float>& defeat = Theme().defeat;
+    CHECK(victory.size() == static_cast<std::size_t>(10.5f * kRate));
+    CHECK(defeat.size() == static_cast<std::size_t>(6.5f * kRate));
+    for (const std::vector<float>* stinger : {&victory, &defeat}) {
+        const float peak = Peak(*stinger, 0, stinger->size());
+        CHECK(peak == doctest::Approx(0.89f).epsilon(0.001));
+        CHECK(Peak(*stinger, 0, static_cast<std::size_t>(0.05 * kRate)) > 0.4f * peak);
+        CHECK(Peak(*stinger, stinger->size() - static_cast<std::size_t>(0.1 * kRate), stinger->size()) < 0.02f);
     }
 }
 
@@ -86,4 +132,6 @@ TEST_CASE("the same rate always composes the same theme") {
     const MusicTrack first = horde::ComposeBossTheme(4000);
     const MusicTrack second = horde::ComposeBossTheme(4000);
     CHECK(first.stems == second.stems);
+    CHECK(first.victory == second.victory);
+    CHECK(first.defeat == second.defeat);
 }

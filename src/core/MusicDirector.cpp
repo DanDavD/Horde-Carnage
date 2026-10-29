@@ -1,11 +1,18 @@
 #include "core/MusicDirector.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstddef>
 
 namespace horde {
 
 namespace {
+
+// The other side of an equal-power crossfade: at every point the two gains' squares add up to 1, so the
+// loudness holds while one tune hands over to the other. A straight line would dip by 3 dB half way.
+float CrossfadeOf(float level) {
+    return std::sqrt(std::max(1.0f - level * level, 0.0f));
+}
 
 // 0 above `from`, 1 at `full` and below, a straight line between.
 float Ramp(float value, float from, float full) {
@@ -20,16 +27,18 @@ std::array<float, kMusicStemCount> RawLevels(const MusicDirectorStats& stats, co
     std::array<float, kMusicStemCount> raw{};
     raw[static_cast<std::size_t>(MusicStem::Pulse)] = 1.0f;
     raw[static_cast<std::size_t>(MusicStem::Hymn)] = situation.bossPhase == BossPhase::Two ? 1.0f : 0.0f;
+    // Only the second phase: the first bar running low is not yet the end of her, so the music saves its climax.
     float wrath = 0.0f;
     if (situation.bossFrenzied) {
         wrath = 1.0f;
-    } else if (situation.bossPhase != BossPhase::Transforming) {
+    } else if (situation.bossPhase == BossPhase::Two) {
         wrath = Ramp(situation.bossHealthFraction, stats.wrathFromFraction, stats.wrathFullFraction);
     }
     raw[static_cast<std::size_t>(MusicStem::Wrath)] = wrath;
     raw[static_cast<std::size_t>(MusicStem::Desperation)] =
         Ramp(static_cast<float>(situation.playerHealth), static_cast<float>(stats.desperationFromHealth),
              static_cast<float>(stats.desperationFullHealth));
+    raw[static_cast<std::size_t>(MusicStem::Hook)] = CrossfadeOf(wrath);
     return raw;
 }
 
@@ -53,6 +62,11 @@ MusicCue StepMusicDirector(MusicDirector& director, const MusicSituation& situat
     // a dying player in the last fight, the first phase's Wrath, is not held over into it.
     cue.restart = inFight && (!director.inFight || (director.bossPhase == BossPhase::Transforming &&
                                                     situation.bossPhase == BossPhase::Two));
+    if (director.inFight && situation.state == SessionState::Dead) {
+        cue.startStinger = MusicStinger::Defeat;
+    } else if (director.inFight && situation.state == SessionState::Victory) {
+        cue.startStinger = MusicStinger::Victory;
+    }
     director.inFight = inFight;
     director.bossPhase = situation.bossPhase;
 
@@ -75,9 +89,13 @@ MusicCue StepMusicDirector(MusicDirector& director, const MusicSituation& situat
                 }
             }
         }
+        // Not held on its own: it answers the Wrath as the Wrath is now, held or not.
+        director.levels[static_cast<std::size_t>(MusicStem::Hook)] =
+            CrossfadeOf(director.levels[static_cast<std::size_t>(MusicStem::Wrath)]);
     }
     cue.stems = director.levels;
 
+    cue.stingerVolumeSeconds = stats.stingerCutSeconds;
     switch (situation.state) {
     case SessionState::Playing:
         cue.volume = situation.bossPhase == BossPhase::Transforming ? stats.transformingVolume : 1.0f;
@@ -89,12 +107,15 @@ MusicCue StepMusicDirector(MusicDirector& director, const MusicSituation& situat
         break;
     case SessionState::Dead:
         cue.volumeSeconds = stats.deathVolumeSeconds;
+        cue.stingerVolume = 1.0f;
         break;
     case SessionState::Victory:
         cue.volumeSeconds = stats.victoryVolumeSeconds;
+        cue.stingerVolume = 1.0f;
         break;
     case SessionState::Title:
         cue.volumeSeconds = stats.titleVolumeSeconds;
+        cue.stingerVolumeSeconds = stats.titleVolumeSeconds;
         break;
     }
     return cue;

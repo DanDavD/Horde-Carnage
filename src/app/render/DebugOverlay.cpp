@@ -156,11 +156,19 @@ void DrawDebugHud(const World& world, Vec2 moveInput, std::size_t particleCount,
     } else {
         DrawText("pad    none", kX, kY + 17 * kLine, 18, RAYWHITE);
     }
-    // What the music is playing: the volume, each layer (pulse, hymn, wrath, desperation) and the bar.
+    // What the music is playing: the volume, each layer (pulse, hymn, wrath, desperation, hook), the bar, and
+    // a stinger while one plays.
     const MusicMixer& mixer = music.mixer;
     const std::size_t barFrames = std::max<std::size_t>(music.track.loopFrames / kBossThemeBars, 1);
-    DrawText(TextFormat("music  vol %.2f  p%.2f h%.2f w%.2f d%.2f  bar %d", mixer.volume, mixer.gains[0],
-                        mixer.gains[1], mixer.gains[2], mixer.gains[3], static_cast<int>(mixer.position / barFrames) + 1),
+    const std::size_t stingerFrames = mixer.stinger == MusicStinger::Victory ? music.track.victory.size()
+                                      : mixer.stinger == MusicStinger::Defeat ? music.track.defeat.size()
+                                                                              : 0;
+    const char* stinger = mixer.stingerPosition >= stingerFrames        ? "-"
+                          : mixer.stinger == MusicStinger::Victory ? "victory"
+                                                                    : "defeat";
+    DrawText(TextFormat("music  %.2f p%.1f h%.1f w%.1f d%.1f k%.1f bar %d %s %.2f", mixer.volume, mixer.gains[0],
+                        mixer.gains[1], mixer.gains[2], mixer.gains[3], mixer.gains[4],
+                        static_cast<int>(mixer.position / barFrames) + 1, stinger, mixer.stingerGain),
              kX, kY + 18 * kLine, 18, music.ready ? ORANGE : GRAY);
 }
 

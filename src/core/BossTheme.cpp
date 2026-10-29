@@ -5,6 +5,7 @@
 #include <cmath>
 #include <cstdint>
 #include <initializer_list>
+#include <iterator>
 #include <map>
 #include <vector>
 
@@ -15,8 +16,12 @@ namespace horde {
 namespace {
 
 constexpr int kLoopSteps = kBossThemeBars * kStepsPerBar;
-// The loudest the four layers ever get together, like the sound effects' peak.
+// The loudest the layers ever get together, like the sound effects' peak.
 constexpr float kPeak = 0.89f;
+// A stinger plays alone, at the same peak as the theme with everything in.
+constexpr float kStingerPeak = 0.89f;
+constexpr float kVictorySeconds = 10.5f;
+constexpr float kDefeatSeconds = 6.5f;
 
 enum class Quality { Minor, Major };
 
@@ -90,6 +95,57 @@ constexpr int MelodySteps() {
     return steps;
 }
 static_assert(MelodySteps() == kLoopSteps, "the melody must fill the loop exactly");
+
+// A rest in a melody.
+constexpr int kRest = 0;
+
+// The Hook, a guitar in the register under the lead, so the opening of the fight has a tune of its own. Over the
+// first phrase, a figure on each chord that climbs, answered by a held note; over the second, long notes on
+// the chords' thirds and fifths, under the riffs; and in the last bar it hits with the band and holds its breath
+// with it.
+constexpr MelodyNote kHookMelody[] = {
+    {62, 4}, {65, 2}, {64, 2}, {62, 2}, {57, 2}, {60, 4},  // Dm
+    {62, 6}, {57, 2}, {62, 8},                             // Dm
+    {65, 4}, {70, 2}, {69, 2}, {65, 2}, {62, 2}, {65, 4},  // Bb
+    {67, 6}, {65, 2}, {62, 8},                             // Bb
+    {64, 4}, {67, 2}, {65, 2}, {64, 2}, {60, 2}, {64, 4},  // C
+    {69, 6}, {67, 2}, {64, 8},                             // C
+    {61, 4}, {64, 2}, {62, 2}, {61, 2}, {57, 2}, {64, 4},  // A
+    {69, 4}, {67, 2}, {64, 2}, {61, 8},                    // A, the band stopping under it
+    {65, 8}, {69, 8},                                      // Dm
+    {67, 8}, {64, 8},                                      // C
+    {65, 8}, {62, 8},                                      // Bb
+    {64, 8}, {61, 8},                                      // A
+    {69, 16},                                              // Dm
+    {72, 16},                                              // F
+    {70, 8}, {67, 8},                                      // Gm
+    {69, 3}, {67, 3}, {64, 2}, {kRest, 8},                 // A, on the band's three hits
+};
+
+constexpr int HookSteps() {
+    int steps = 0;
+    for (const MelodyNote& note : kHookMelody) {
+        steps += note.steps;
+    }
+    return steps;
+}
+static_assert(HookSteps() == kLoopSteps, "the hook must fill the loop exactly");
+
+// The second phrase answers three of its chords with power chords that walk down to the next one: E, D, C, B
+// into B flat; A, C sharp, E, C sharp into D; C, B flat, A, A flat into G.
+struct Riff {
+    int bar;
+    std::array<int, 4> roots;
+};
+constexpr std::array<Riff, 3> kRiffs{{{9, {52, 50, 48, 47}}, {11, {45, 49, 52, 49}}, {13, {48, 46, 45, 44}}}};
+
+// The victory's fanfare, over B flat, C and D major: the theme's own VI and VII rising to a major tonic.
+constexpr MelodyNote kFanfare[] = {
+    {74, 4}, {78, 4}, {81, 4}, {86, 4}, // D
+    {86, 6}, {84, 2}, {82, 8},          // Bb
+    {84, 4}, {86, 4}, {88, 8},          // C
+    {81, 2}, {86, 22},                  // D, held as the last chord rings
+};
 
 SoundRecipe Recipe(float seconds, float drive, std::uint64_t seed, std::initializer_list<SynthLayer> layers) {
     SoundRecipe recipe{.seconds = seconds, .drive = drive, .seed = seed};
@@ -236,6 +292,70 @@ SoundRecipe Tremolo(int pitch) {
                     .vibratoHz = 6.4f, .vibratoDepth = 0.005f, .lowPassFromHz = 3200.0f, .lowPassToHz = 3200.0f}});
 }
 
+// A power chord hit hard and let ring a moment: the band's stabs when it stops.
+SoundRecipe Stab(int root) {
+    const float hz = NoteHz(root);
+    constexpr float kTight = 180.0f;
+    return Recipe(0.32f, 6.0f, 220 + static_cast<std::uint64_t>(root),
+                  {{.waveform = Waveform::Saw, .fromHz = hz, .toHz = hz, .decay = 0.25f, .lowPassFromHz = 6500.0f,
+                    .lowPassToHz = 2500.0f, .highPassHz = kTight},
+                   {.waveform = Waveform::Saw, .fromHz = hz * 1.007f, .toHz = hz * 1.007f, .gain = 0.8f,
+                    .decay = 0.25f, .lowPassFromHz = 6500.0f, .lowPassToHz = 2500.0f, .highPassHz = kTight},
+                   {.waveform = Waveform::Saw, .fromHz = hz * 1.4983f, .toHz = hz * 1.4983f, .gain = 0.8f,
+                    .decay = 0.25f, .lowPassFromHz = 6500.0f, .lowPassToHz = 2500.0f, .highPassHz = kTight},
+                   {.waveform = Waveform::Square, .fromHz = hz * 2.0f, .toHz = hz * 2.0f, .gain = 0.35f,
+                    .decay = 0.25f, .lowPassFromHz = 6500.0f, .lowPassToHz = 2500.0f, .highPassHz = kTight}});
+}
+
+// A power chord left to ring out, for the last chord of a stinger. `slide` bends it as it dies: below 1, the
+// strings go slack.
+SoundRecipe Ring(int root, float seconds, float slide) {
+    const float hz = NoteHz(root);
+    constexpr float kTight = 180.0f;
+    return Recipe(seconds, 6.0f, 240 + static_cast<std::uint64_t>(root),
+                  {{.waveform = Waveform::Saw, .fromHz = hz, .toHz = hz * slide, .decay = 1.6f,
+                    .lowPassFromHz = 5500.0f, .lowPassToHz = 2200.0f, .highPassHz = kTight},
+                   {.waveform = Waveform::Saw, .fromHz = hz * 1.007f, .toHz = hz * 1.007f * slide, .gain = 0.8f,
+                    .decay = 1.6f, .lowPassFromHz = 5500.0f, .lowPassToHz = 2200.0f, .highPassHz = kTight},
+                   {.waveform = Waveform::Saw, .fromHz = hz * 1.4983f, .toHz = hz * 1.4983f * slide, .gain = 0.8f,
+                    .decay = 1.6f, .lowPassFromHz = 5500.0f, .lowPassToHz = 2200.0f, .highPassHz = kTight},
+                   {.waveform = Waveform::Square, .fromHz = hz * 2.0f, .toHz = hz * 2.0f * slide, .gain = 0.35f,
+                    .decay = 1.6f, .lowPassFromHz = 5500.0f, .lowPassToHz = 2200.0f, .highPassHz = kTight}});
+}
+
+// A tom: a short, pitched thump.
+SoundRecipe Tom(float hz) {
+    return Recipe(0.35f, 1.5f, 960 + static_cast<std::uint64_t>(hz),
+                  {{.waveform = Waveform::Sine, .fromHz = hz * 1.3f, .toHz = hz, .decay = 0.18f, .sweepSeconds = 0.05f},
+                   {.waveform = Waveform::Noise, .gain = 0.4f, .decay = 0.02f, .lowPassFromHz = 3000.0f,
+                    .lowPassToHz = 3000.0f}});
+}
+
+// A gong: sines at a bell's out-of-tune partials, each dying at its own rate, over the strike.
+SoundRecipe Gong(float hz) {
+    return Recipe(5.0f, 1.2f, 950,
+                  {{.waveform = Waveform::Sine, .fromHz = hz, .toHz = hz, .decay = 2.5f},
+                   {.waveform = Waveform::Sine, .fromHz = hz * 2.76f, .toHz = hz * 2.76f, .gain = 0.8f, .decay = 1.8f},
+                   {.waveform = Waveform::Sine, .fromHz = hz * 5.4f, .toHz = hz * 5.4f, .gain = 0.5f, .decay = 1.0f},
+                   {.waveform = Waveform::Noise, .gain = 0.4f, .decay = 0.03f, .lowPassFromHz = 1200.0f,
+                    .lowPassToHz = 1200.0f}});
+}
+
+// The Hook's guitar: two saws a little apart for width, an octave under for body, through less clip than the
+// rhythm guitar so the tune stays clear, and darker than the Wrath's lead so the two never sound alike.
+SoundRecipe HookGuitar(int pitch, float seconds) {
+    const float hz = NoteHz(pitch);
+    return Recipe(seconds, 3.5f, 900 + static_cast<std::uint64_t>(pitch),
+                  {{.waveform = Waveform::Saw, .fromHz = hz, .toHz = hz, .attack = 0.005f, .decay = 1.2f,
+                    .vibratoHz = 5.0f, .vibratoDepth = 0.004f, .lowPassFromHz = 3200.0f, .lowPassToHz = 3200.0f,
+                    .highPassHz = 150.0f},
+                   {.waveform = Waveform::Saw, .fromHz = hz * 1.005f, .toHz = hz * 1.005f, .gain = 0.8f,
+                    .attack = 0.005f, .decay = 1.2f, .vibratoHz = 4.6f, .vibratoDepth = 0.004f,
+                    .lowPassFromHz = 3200.0f, .lowPassToHz = 3200.0f, .highPassHz = 150.0f},
+                   {.waveform = Waveform::Square, .fromHz = hz * 0.5f, .toHz = hz * 0.5f, .gain = 0.3f,
+                    .attack = 0.005f, .decay = 1.2f, .lowPassFromHz = 1500.0f, .lowPassToHz = 1500.0f}});
+}
+
 // --- Voicing. ---
 
 // `pitchClass` (0 to 11) moved into the octave that starts at `low`.
@@ -280,6 +400,11 @@ enum Instrument : std::uint64_t {
     kLead,
     kHeartbeat,
     kTremolo,
+    kStab,
+    kRing,
+    kTom,
+    kGong,
+    kHook,
 };
 
 std::uint64_t Key(Instrument instrument, int pitch = 0, int steps = 0) {
@@ -304,49 +429,149 @@ bool IsFillBar(int bar) {
     return bar % 8 == 7;
 }
 
-// Drums, guitar and bass: everything the fight needs to sound like a boss fight on its own.
+std::size_t Frames(float seconds, int sampleRate) {
+    return static_cast<std::size_t>(seconds * static_cast<float>(sampleRate));
+}
+
+// A gallop: an eighth and two sixteenths on every beat, the run of the heavy metal of the eighties.
+constexpr std::array<int, 12> kGallop{0, 2, 3, 4, 6, 7, 8, 10, 11, 12, 14, 15};
+
+// The last bar of each phrase: the band stops dead on three hits, a dotted eighth apart, holds its breath for
+// a beat and a half, and the snare rolls over the last beat into the next phrase.
+void ComposeBreak(Composer& composer, int start, const Chord& chord) {
+    NoteCache& cache = composer.cache;
+    const std::vector<float>& kick = cache.Get(Key(kKick), Kick());
+    const std::vector<float>& snare = cache.Get(Key(kSnare), Snare());
+    const std::vector<float>& stab = cache.Get(Key(kStab, chord.root), Stab(chord.root));
+    const std::vector<float>& bass = cache.Get(Key(kBass, chord.root), Bass(chord.root));
+    composer.Play(start, cache.Get(Key(kCrash), Crash()), 0.4f);
+    for (const int step : {0, 3, 6}) {
+        composer.Play(start + step, stab, 0.75f);
+        composer.Play(start + step, kick, 0.9f);
+        composer.Play(start + step, bass, 0.4f);
+    }
+    for (int i = 0; i < 4; ++i) {
+        composer.Play(start + 12 + i, snare, 0.5f + 0.12f * static_cast<float>(i));
+    }
+}
+
+// Four toms down the kit over the last beat of a bar.
+void ComposeTomFill(Composer& composer, int start) {
+    constexpr std::array<float, 4> kToms{196.0f, 165.0f, 131.0f, 110.0f};
+    for (std::size_t i = 0; i < kToms.size(); ++i) {
+        const auto hz = static_cast<int>(kToms[i]);
+        composer.Play(start + 12 + static_cast<int>(i), composer.cache.Get(Key(kTom, hz), Tom(kToms[i])),
+                      0.55f + 0.05f * static_cast<float>(i));
+    }
+}
+
+// Drums, guitar and bass: everything the fight needs to sound like a boss fight on its own. The first phrase
+// gallops under the Hook; the second turns to a thrash beat, a snare on every off beat, with power-chord riffs
+// that walk into the next chord. Each phrase stops dead in its last bar, and rolls the toms halfway through.
 void ComposePulse(Composer& composer) {
     NoteCache& cache = composer.cache;
     const std::vector<float>& kick = cache.Get(Key(kKick), Kick());
     const std::vector<float>& snare = cache.Get(Key(kSnare), Snare());
     const std::vector<float>& hat = cache.Get(Key(kHiHat), HiHat());
     const std::vector<float>& crash = cache.Get(Key(kCrash), Crash());
-    // A gallop: an eighth and two sixteenths on every beat, the run of the heavy metal of the eighties.
-    constexpr std::array<int, 12> kGallop{0, 2, 3, 4, 6, 7, 8, 10, 11, 12, 14, 15};
     for (int bar = 0; bar < kBossThemeBars; ++bar) {
         const int start = bar * kStepsPerBar;
         const Chord& chord = kChords[static_cast<std::size_t>(bar)];
-        const bool fill = IsFillBar(bar);
+        if (IsFillBar(bar)) {
+            ComposeBreak(composer, start, chord);
+            continue;
+        }
+        const bool thrash = bar >= kBossThemeBars / 2;
+        const bool tomFill = bar % 8 == 3;
         if (bar % 4 == 0) {
             composer.Play(start, crash, 0.35f);
         }
-        for (const int step : {0, 2, 6, 8, 10, 14}) {
-            if (!(fill && step == 14)) {
+        if (thrash) {
+            for (const int step : {0, 4, 8, 12}) {
                 composer.Play(start + step, kick, 0.9f);
             }
-        }
-        composer.Play(start + 4, snare, 0.85f);
-        if (fill) {
-            // The last beat of each phrase rolls into the next one.
-            constexpr std::array<float, 4> kRoll{0.45f, 0.55f, 0.65f, 0.8f};
-            for (int i = 0; i < 4; ++i) {
-                composer.Play(start + 12 + i, snare, kRoll[static_cast<std::size_t>(i)]);
+            for (const int step : {2, 6, 10, 14}) {
+                if (!(tomFill && step == 14)) {
+                    composer.Play(start + step, snare, 0.7f);
+                }
             }
         } else {
-            composer.Play(start + 12, snare, 0.85f);
+            for (const int step : {0, 2, 6, 8, 10, 14}) {
+                if (!(tomFill && step == 14)) {
+                    composer.Play(start + step, kick, 0.9f);
+                }
+            }
+            composer.Play(start + 4, snare, 0.85f);
+            if (!tomFill) {
+                composer.Play(start + 12, snare, 0.85f);
+            }
         }
         for (int step = 0; step < kStepsPerBar; step += 2) {
             composer.Play(start + step, hat, step % 4 == 0 ? 0.35f : 0.25f);
         }
-        const std::vector<float>& chug = cache.Get(Key(kChug, chord.root), Chug(chord.root, false));
-        const std::vector<float>& accent = cache.Get(Key(kAccentChug, chord.root), Chug(chord.root, true));
-        for (const int step : kGallop) {
-            composer.Play(start + step, step == 0 ? accent : chug, step == 0 ? 0.7f : 0.6f);
+        if (tomFill) {
+            ComposeTomFill(composer, start);
         }
-        const std::vector<float>& bass = cache.Get(Key(kBass, chord.root), Bass(chord.root));
+
+        if (!thrash) {
+            const std::vector<float>& chug = cache.Get(Key(kChug, chord.root), Chug(chord.root, false));
+            const std::vector<float>& accent = cache.Get(Key(kAccentChug, chord.root), Chug(chord.root, true));
+            for (const int step : kGallop) {
+                composer.Play(start + step, step == 0 ? accent : chug, step == 0 ? 0.7f : 0.6f);
+            }
+            const std::vector<float>& bass = cache.Get(Key(kBass, chord.root), Bass(chord.root));
+            for (int step = 0; step < kStepsPerBar; step += 2) {
+                composer.Play(start + step, bass, 0.35f);
+            }
+            continue;
+        }
+        const Riff* riff = nullptr;
+        for (const Riff& candidate : kRiffs) {
+            if (candidate.bar == bar) {
+                riff = &candidate;
+            }
+        }
+        // Straight eighths, picked hard, the riff taking over the second half of its bar.
         for (int step = 0; step < kStepsPerBar; step += 2) {
-            composer.Play(start + step, bass, 0.35f);
+            const int root = riff != nullptr && step >= 8 ? riff->roots[static_cast<std::size_t>((step - 8) / 2)]
+                                                         : chord.root;
+            const bool accent = step == 0 || (riff != nullptr && step >= 8);
+            composer.Play(start + step,
+                          cache.Get(Key(accent ? kAccentChug : kChug, root), Chug(root, accent)),
+                          accent ? 0.7f : 0.6f);
+            composer.Play(start + step, cache.Get(Key(kBass, root), Bass(root)), 0.35f);
         }
+    }
+}
+
+// The Hook's melody, through the whole loop.
+void ComposeHook(Composer& composer) {
+    const auto release = static_cast<std::size_t>(0.03f * static_cast<float>(composer.sampleRate));
+    int step = 0;
+    for (const MelodyNote& note : kHookMelody) {
+        if (note.pitch != kRest) {
+            const float seconds = composer.StepSeconds() * static_cast<float>(note.steps);
+            composer.Play(step,
+                          composer.cache.Get(Key(kHook, note.pitch, note.steps), HookGuitar(note.pitch, seconds)),
+                          0.55f, release);
+        }
+        step += note.steps;
+    }
+}
+
+// A close voicing between A4 and G#5, high over the guitars where a choir sings, so the voices move by small
+// steps from chord to chord, and the root again an octave under.
+std::array<int, 4> HymnVoicing(const Chord& chord) {
+    return {InRange(chord.root % 12, 69), InRange(ThirdOf(chord) % 12, 69), InRange(FifthOf(chord) % 12, 69),
+            InRange(chord.root % 12, 57)};
+}
+
+void PlayHymnChord(Composer& composer, const Chord& chord, int step, float seconds, float gain,
+                   std::size_t releaseFrames) {
+    const int tenths = static_cast<int>(std::lround(seconds * 10.0f));
+    for (const int pitch : HymnVoicing(chord)) {
+        composer.Play(step, composer.cache.Get(Key(kHymn, pitch, tenths), HymnVoice(pitch, seconds)), gain,
+                      releaseFrames);
     }
 }
 
@@ -360,13 +585,7 @@ void ComposeHymn(Composer& composer) {
     for (int bar = 0; bar < kBossThemeBars; ++bar) {
         const int start = bar * kStepsPerBar;
         const Chord& chord = kChords[static_cast<std::size_t>(bar)];
-        // A close voicing between A4 and G#5, high over the guitars where a choir sings, so the voices move by
-        // small steps from chord to chord, and the root again an octave under.
-        const std::array<int, 4> voices{InRange(chord.root % 12, 69), InRange(ThirdOf(chord) % 12, 69),
-                                        InRange(FifthOf(chord) % 12, 69), InRange(chord.root % 12, 57)};
-        for (const int pitch : voices) {
-            composer.Play(start, cache.Get(Key(kHymn, pitch), HymnVoice(pitch, voiceSeconds)), 0.32f, release);
-        }
+        PlayHymnChord(composer, chord, start, voiceSeconds, 0.32f, release);
         const std::vector<float>& timpani = cache.Get(Key(kTimpani, chord.root), Timpani(chord.root));
         composer.Play(start, timpani, 0.7f);
         composer.Play(start + 8, timpani, 0.55f);
@@ -408,14 +627,120 @@ void ComposeDesperation(Composer& composer) {
         const Chord& chord = kChords[static_cast<std::size_t>(bar)];
         for (int beat = 0; beat < kStepsPerBar; beat += 4) {
             // Lub on the beat, dub a sixteenth after, between the kicks.
-            composer.Play(start + beat, heart, 0.9f);
-            composer.Play(start + beat + 1, heart, 0.55f);
+            composer.Play(start + beat, heart, 1.45f);
+            composer.Play(start + beat + 1, heart, 0.9f);
         }
         const int pitch = InRange(FifthOf(chord) % 12, 76);
         const std::vector<float>& stroke = cache.Get(Key(kTremolo, pitch), Tremolo(pitch));
         for (int step = 0; step < kStepsPerBar; ++step) {
-            composer.Play(start + step, stroke, step % 4 == 0 ? 0.65f : 0.55f);
+            composer.Play(start + step, stroke, step % 4 == 0 ? 1.1f : 0.9f);
         }
+    }
+}
+
+// The victory: the gallop climbs B flat, C and D major under a fanfare, and the minor theme lands on a major
+// chord that rings out under the choir. The rise from VI and VII to a major I is a classic heroic cadence, and
+// the two chords come from the theme itself.
+void ComposeVictory(Composer& composer) {
+    NoteCache& cache = composer.cache;
+    const std::vector<float>& kick = cache.Get(Key(kKick), Kick());
+    const std::vector<float>& snare = cache.Get(Key(kSnare), Snare());
+    const std::vector<float>& hat = cache.Get(Key(kHiHat), HiHat());
+    const std::vector<float>& crash = cache.Get(Key(kCrash), Crash());
+    constexpr std::array<Chord, 3> kRise{{{kD, Quality::Major}, {kBb, Quality::Major}, {kC, Quality::Major}}};
+    const float barSeconds = composer.StepSeconds() * static_cast<float>(kStepsPerBar);
+    const auto release = static_cast<std::size_t>(0.2f * static_cast<float>(composer.sampleRate));
+    for (int bar = 0; bar < static_cast<int>(kRise.size()); ++bar) {
+        const int start = bar * kStepsPerBar;
+        const Chord& chord = kRise[static_cast<std::size_t>(bar)];
+        const bool roll = bar == static_cast<int>(kRise.size()) - 1;
+        composer.Play(start, crash, 0.4f);
+        for (int step = 0; step < kStepsPerBar; step += 2) {
+            if (step != 4 && step != 12 && !(roll && step >= 12)) {
+                composer.Play(start + step, kick, 0.85f);
+            }
+            composer.Play(start + step, hat, 0.3f);
+        }
+        composer.Play(start + 4, snare, 0.85f);
+        if (roll) {
+            for (int i = 0; i < 4; ++i) {
+                composer.Play(start + 12 + i, snare, 0.5f + 0.12f * static_cast<float>(i));
+            }
+        } else {
+            composer.Play(start + 12, snare, 0.85f);
+        }
+        const std::vector<float>& chug = cache.Get(Key(kChug, chord.root), Chug(chord.root, false));
+        const std::vector<float>& accent = cache.Get(Key(kAccentChug, chord.root), Chug(chord.root, true));
+        for (const int step : kGallop) {
+            composer.Play(start + step, step == 0 ? accent : chug, step == 0 ? 0.7f : 0.6f);
+        }
+        const std::vector<float>& bass = cache.Get(Key(kBass, chord.root), Bass(chord.root));
+        for (int step = 0; step < kStepsPerBar; step += 2) {
+            composer.Play(start + step, bass, 0.35f);
+        }
+        PlayHymnChord(composer, chord, start, barSeconds + 0.1f, 0.3f, release);
+        const std::vector<float>& timpani = cache.Get(Key(kTimpani, chord.root), Timpani(chord.root));
+        composer.Play(start, timpani, 0.7f);
+        if (roll) {
+            for (int i = 0; i < 8; ++i) {
+                composer.Play(start + 8 + i, timpani, 0.3f + 0.07f * static_cast<float>(i));
+            }
+        }
+    }
+
+    const int last = static_cast<int>(kRise.size()) * kStepsPerBar;
+    const Chord tonic{kD, Quality::Major};
+    composer.Play(last, kick, 1.0f);
+    composer.Play(last, crash, 0.5f);
+    composer.Play(last, cache.Get(Key(kTimpani, kD), Timpani(kD)), 1.0f);
+    composer.Play(last, cache.Get(Key(kRing, kD, 1), Ring(kD, 4.5f, 1.0f)), 0.8f,
+                  Frames(1.0f, composer.sampleRate));
+    PlayHymnChord(composer, tonic, last, 5.0f, 0.32f, Frames(1.5f, composer.sampleRate));
+
+    int step = 0;
+    for (std::size_t i = 0; i < std::size(kFanfare); ++i) {
+        const MelodyNote& note = kFanfare[i];
+        const float seconds = composer.StepSeconds() * static_cast<float>(note.steps);
+        // The last note is let go slowly, the rest are cut to their length.
+        const bool held = i + 1 == std::size(kFanfare);
+        composer.Play(step, cache.Get(Key(kLead, note.pitch, note.steps), Lead(note.pitch, seconds)), 0.6f,
+                      Frames(held ? 0.6f : 0.03f, composer.sampleRate));
+        step += note.steps;
+    }
+}
+
+// The death: one blow, a gong, and a chord whose strings go slack as it dies, under a choir on a minor chord
+// with the half step above its root; then the Desperation's heartbeat, three beats further and further apart,
+// and nothing.
+void ComposeDefeat(Composer& composer) {
+    NoteCache& cache = composer.cache;
+    const std::vector<float>& heart = cache.Get(Key(kHeartbeat), Heartbeat());
+    const std::vector<float>& timpani = cache.Get(Key(kTimpani, kD), Timpani(kD));
+    composer.Play(0, cache.Get(Key(kKick), Kick()), 1.0f);
+    composer.Play(0, cache.Get(Key(kCrash), Crash()), 0.3f);
+    composer.Play(0, timpani, 1.0f);
+    composer.Play(0, cache.Get(Key(kGong), Gong(NoteHz(kD))), 0.8f);
+    // Down a whole step over four seconds.
+    composer.Play(0, cache.Get(Key(kRing, kD, 2), Ring(kD, 4.0f, 0.8909f)), 0.7f, Frames(1.0f, composer.sampleRate));
+    for (const int pitch : {50, 62, 63, 65}) {
+        composer.Play(0, cache.Get(Key(kHymn, pitch, 50), HymnVoice(pitch, 5.0f)), 0.4f,
+                      Frames(1.5f, composer.sampleRate));
+    }
+    composer.Play(0, heart, 1.0f);
+    composer.Play(12, heart, 0.7f);
+    composer.Play(12, timpani, 0.45f);
+    composer.Play(26, heart, 0.45f);
+}
+
+// Scales `samples` so its loudest sample is `peak`.
+void Normalize(std::vector<float>& samples, float peak) {
+    float loudest = 0.0f;
+    for (const float sample : samples) {
+        loudest = std::max(loudest, std::abs(sample));
+    }
+    const float scale = loudest > 0.0f ? peak / loudest : 0.0f;
+    for (float& sample : samples) {
+        sample *= scale;
     }
 }
 
@@ -442,8 +767,19 @@ MusicTrack ComposeBossTheme(int sampleRate) {
     compose(MusicStem::Hymn, ComposeHymn);
     compose(MusicStem::Wrath, ComposeWrath);
     compose(MusicStem::Desperation, ComposeDesperation);
+    compose(MusicStem::Hook, ComposeHook);
 
-    // One scale for all four layers, from the loudest moment of all of them together, so the balance between
+    // The stingers are long enough that no note of theirs wraps round to their start.
+    track.victory.assign(Frames(kVictorySeconds, sampleRate), 0.0f);
+    composer.stem = &track.victory;
+    ComposeVictory(composer);
+    Normalize(track.victory, kStingerPeak);
+    track.defeat.assign(Frames(kDefeatSeconds, sampleRate), 0.0f);
+    composer.stem = &track.defeat;
+    ComposeDefeat(composer);
+    Normalize(track.defeat, kStingerPeak);
+
+    // One scale for all the layers, from the loudest moment of all of them together, so the balance between
     // them is kept and the mix never clips, whichever layers are up.
     float loudest = 0.0f;
     for (std::size_t i = 0; i < track.loopFrames; ++i) {

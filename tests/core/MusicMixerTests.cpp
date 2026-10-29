@@ -123,6 +123,62 @@ TEST_CASE("the mix never leaves -1 to 1") {
     CHECK(out[0] == doctest::Approx(1.0f));
 }
 
+TEST_CASE("a stinger plays once, over the theme, at its own volume") {
+    MusicMixer mixer;
+    MusicTrack track = Steady(100, 10, {0.2f, 0.0f, 0.0f, 0.0f});
+    track.defeat = {0.5f, 0.5f, 0.5f};
+    horde::CueMusic(mixer, Cue({1.0f, 0.0f, 0.0f, 0.0f}, true));
+    MusicCue end = Cue({1.0f, 0.0f, 0.0f, 0.0f}, false);
+    end.startStinger = horde::MusicStinger::Defeat;
+    end.stingerVolume = 1.0f;
+    horde::CueMusic(mixer, end);
+    std::vector<float> out(5);
+    horde::MixMusic(mixer, track, out);
+    CHECK(out[0] == doctest::Approx(0.7f));
+    CHECK(out[2] == doctest::Approx(0.7f));
+    CHECK(out[3] == doctest::Approx(0.2f));
+    CHECK(mixer.stinger == horde::MusicStinger::Defeat);
+}
+
+TEST_CASE("a stinger's volume moves at the speed its cue asks for") {
+    MusicMixer mixer;
+    MusicTrack track = Steady(100, 10, {0.0f, 0.0f, 0.0f, 0.0f});
+    track.victory.assign(100, 1.0f);
+    MusicCue end = Cue({0.0f, 0.0f, 0.0f, 0.0f}, true);
+    end.startStinger = horde::MusicStinger::Victory;
+    end.stingerVolume = 1.0f;
+    horde::CueMusic(mixer, end);
+    MusicCue cut = Cue({0.0f, 0.0f, 0.0f, 0.0f}, false);
+    cut.stingerVolume = 0.0f;
+    cut.stingerVolumeSeconds = 0.05f;
+    horde::CueMusic(mixer, cut);
+    std::vector<float> out(6);
+    horde::MixMusic(mixer, track, out);
+    // 0.05 s at 100 frames a second: from 1 to 0 in five frames.
+    CHECK(out[0] == doctest::Approx(0.8f));
+    CHECK(out[4] == doctest::Approx(0.0f));
+    CHECK(out[5] == doctest::Approx(0.0f));
+}
+
+TEST_CASE("a stinger's volume follows its cue even after the stinger has ended") {
+    MusicMixer mixer;
+    MusicTrack track = Steady(100, 10, {0.0f, 0.0f, 0.0f, 0.0f});
+    track.defeat = {0.5f};
+    MusicCue end = Cue({0.0f, 0.0f, 0.0f, 0.0f}, true);
+    end.startStinger = horde::MusicStinger::Defeat;
+    end.stingerVolume = 1.0f;
+    horde::CueMusic(mixer, end);
+    std::vector<float> out(3);
+    horde::MixMusic(mixer, track, out);
+    MusicCue retry = Cue({1.0f, 0.0f, 0.0f, 0.0f}, true);
+    retry.stingerVolume = 0.0f;
+    horde::CueMusic(mixer, retry);
+    // The default cut takes 0.05 s: five frames at 100 a second.
+    std::vector<float> longer(5);
+    horde::MixMusic(mixer, track, longer);
+    CHECK(mixer.stingerGain == doctest::Approx(0.0f));
+}
+
 TEST_CASE("an empty track plays silence") {
     MusicMixer mixer;
     const MusicTrack track;

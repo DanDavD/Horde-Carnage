@@ -75,9 +75,9 @@ Game::Game(bool windowed)
     // Every sound is synthesized here, once, in a few hundredths of a second. Without an audio device the
     // game still runs, silent.
     InitAudioDevice();
-    ApplySettings();
     _sounds = LoadSoundBank();
     _music = LoadMusicPlayer();
+    ApplySettings();
     _backdrop = LoadBackdrop();
     // Esc pauses the fight instead of closing the game; the title's Quit and the window's close button do.
     SetExitKey(KEY_NULL);
@@ -411,6 +411,7 @@ void Game::ChangeSetting(Setting setting, int step) {
 
 void Game::ApplySettings() {
     SetMasterVolume(MasterGain(_settings));
+    SetMusicPlayerVolume(_music, MusicGain(_settings));
 #ifndef __EMSCRIPTEN__
     // In a browser the page draws once per refresh of the screen, whatever is asked.
     if (_settings.frameRate == FrameRateCap::VSync) {
