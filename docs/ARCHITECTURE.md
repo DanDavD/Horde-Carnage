@@ -64,7 +64,8 @@ src/app/render/
   Shapes        Shapes raylib does not have: a radius at each angle, a rotated ellipse
   BossDraw      The boss in each pose, its shield, and the warnings of its attacks
   PlayerDraw    The player, the gun, the dash trail and the drink ring
-  Hud           The bars, the flasks, the weapon panel, the crosshair, the attempt and the controls line
+  Hud           The bars, the flasks, the weapon panel, the crosshair, the attempt and the combat prompt strip
+  InputPrompts  Procedural keycaps, mouse icons and Xbox/PlayStation/Switch/Generic gamepad prompts
   EndScreen     YOU DIED and VICTORY, with their row of choices
   MenuDraw      The items of each menu, where they sit, the title, pause, settings and controls screens
   Backdrop      The blurred still of the fight behind the pause menu
@@ -114,7 +115,7 @@ Game objects are plain structs (components) that hold data, and free functions (
 - `tests/core/CollisionTests.cpp` and the crowd cases in `WorldTests.cpp`: see [Collisions](COLLISIONS.md#tests).
 - `tests/core/HealthTests.cpp` and the contact damage cases in `WorldTests.cpp`: see [Health](HEALTH.md#tests).
 - `tests/core/SessionTests.cpp`: see [Game flow](GAME_FLOW.md#tests).
-- `tests/core/MenuTests.cpp`, `MenuRepeatTests.cpp` and `GamepadConnectionTests.cpp`: see [Menus](MENUS.md#tests).
+- `tests/core/MenuTests.cpp`, `MenuRepeatTests.cpp`, `GamepadConnectionTests.cpp` and `GamepadTypeTests.cpp`: see [Menus](MENUS.md#tests).
 - `tests/core/SettingsTests.cpp`: see [Settings](SETTINGS.md#tests).
 - `tests/core/WeaponTests.cpp`, `LoadoutTests.cpp` and the aim and fire cases in `FacingTests.cpp` and `WorldTests.cpp`: see [Aiming and weapons](WEAPONS.md#tests).
 - `tests/core/ObjectPoolTests.cpp`: see [Object pool](OBJECT_POOL.md#tests).

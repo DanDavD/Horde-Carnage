@@ -313,23 +313,26 @@ void DrawPageShade() {
     DrawRectangle(0, 0, kScreenWidth, kScreenHeight, Fade(kBackground, 0.6f));
 }
 
-void DrawTitleScreen(const Menu& menu, float sinceMoved, const Art& art) {
+void DrawTitleScreen(const Menu& menu, float sinceMoved, InputPromptStyle prompts, const Art& art) {
     DrawTitleShade();
     DrawGameTextCentered(art.titleFont, "HORDE CARNAGE", kMiddle, kTitleY, kTitleSize, kText, kTitleTracking * 1.6f);
     DrawLineEx(Vector2{kMiddle - kTitleRuleHalf, kTitleRuleY}, Vector2{kMiddle + kTitleRuleHalf, kTitleRuleY}, 1.0f,
                kHudFrame);
     DrawMenu(MenuPage::Title, menu, sinceMoved, 1.0f, art);
-    DrawGameTextCentered(art.uiFont, "v" HORDE_VERSION, kMiddle, kScreenHeight - 34.0f, 13.0f, kMenuFaint);
+    DrawMenuFooter(MenuFooterKind::Title, prompts, 1.0f, art);
+    DrawGameTextRight(art.uiFont, "v" HORDE_VERSION, kScreenWidth - 24.0f, kScreenHeight - 34.0f, 13.0f, kMenuFaint);
 }
 
-void DrawPauseScreen(const Menu& menu, float sinceMoved, float seconds, const Art& art) {
+void DrawPauseScreen(const Menu& menu, float sinceMoved, float seconds, InputPromptStyle prompts, const Art& art) {
     const float shown = std::clamp(seconds / kPauseFadeSeconds, 0.0f, 1.0f);
     DrawGameTextCentered(art.titleFont, "PAUSED", kMiddle, kPauseY, kPauseSize, Fade(kText, shown),
                          kTitleTracking * 2.0f);
     DrawMenu(MenuPage::Pause, menu, sinceMoved, shown, art);
+    DrawMenuFooter(MenuFooterKind::Pause, prompts, shown, art);
 }
 
-void DrawSettingsScreen(const Menu& menu, float sinceMoved, const Settings& settings, const Art& art) {
+void DrawSettingsScreen(const Menu& menu, float sinceMoved, const Settings& settings, InputPromptStyle prompts,
+                        const Art& art) {
     DrawHeading("SETTINGS", art);
     for (std::size_t i = 0; i < kSettingsRows.size(); ++i) {
         const SettingsRow& row = kSettingsRows[i];
@@ -357,9 +360,13 @@ void DrawSettingsScreen(const Menu& menu, float sinceMoved, const Settings& sett
             DrawArrow(Vec2{value.x + kArrowOffset, value.y}, 1.0f, color);
         }
     }
+    const auto idx = static_cast<std::size_t>(std::clamp(menu.selected, 0, static_cast<int>(kSettingsRows.size()) - 1));
+    const MenuFooterKind footer = kSettingsRows[idx].kind == SettingsRowKind::Value ? MenuFooterKind::SettingsValue
+                                                                                    : MenuFooterKind::SettingsChoice;
+    DrawMenuFooter(footer, prompts, 1.0f, art);
 }
 
-void DrawControlsScreen(const Menu& menu, float sinceMoved, const Art& art) {
+void DrawControlsScreen(const Menu& menu, float sinceMoved, InputPromptStyle prompts, const Art& art) {
     DrawHeading("CONTROLS", art);
     const auto drawLine = [&art](float y, const ControlsLine& line, float size, Color first, Color rest) {
         DrawGameText(art.uiFont, line.action, Vec2{kControlsLeft, y}, size, first);
@@ -372,6 +379,7 @@ void DrawControlsScreen(const Menu& menu, float sinceMoved, const Art& art) {
                  kSoftText);
     }
     DrawMenu(MenuPage::Controls, menu, sinceMoved, 1.0f, art);
+    DrawMenuFooter(MenuFooterKind::Controls, prompts, 1.0f, art);
 }
 
 } // namespace horde

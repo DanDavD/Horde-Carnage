@@ -9,8 +9,10 @@ The code:
 - `src/core/Menu.h`, `src/core/Menu.cpp`: `Menu`, `MenuInput` and `StepMenu`, the selection and what one frame of input does to it.
 - `src/core/MenuRepeat.h`, `src/core/MenuRepeat.cpp`: `MenuRepeat`, `LatchMenuRepeat` and `StepMenuRepeat`, which turn a held left stick or d-pad into discrete menu steps with hysteresis and key-like repeat.
 - `src/core/GamepadConnection.h`, `src/core/GamepadConnection.cpp`: `GamepadConnection` and `StepGamepadConnection`, which pick up newly plugged-in controllers across the four slots and report when the active one unplugs.
+- `src/core/GamepadType.h`, `src/core/GamepadType.cpp`: `GamepadType`, `ClassifyGamepadName` and `GamepadControlLabel`, which classify a controller's raw platform name into `Xbox`, `PlayStation`, `Switch` or `Generic` and name its positional buttons.
 - `src/core/Session.h`, `src/core/Session.cpp`: the `Title` and `Paused` states, `ReturnToTitle`, `BeginFight`, `PauseFight` and `ResumeFight` (see [Game flow](GAME_FLOW.md)).
 - `src/app/render/MenuDraw.h`, `src/app/render/MenuDraw.cpp`: the pages (`MenuPage`), the items of each, where they sit, which one the mouse is over, and how they are drawn; the title, pause, settings and controls screens.
+- `src/app/render/InputPrompts.h`, `src/app/render/InputPrompts.cpp`: `DrawMenuFooter` and `DrawHudPrompts`, which draw procedural keyboard keycaps, mouse icons and gamepad badges for all four controller families.
 - `src/app/render/Backdrop.h`, `src/app/render/Backdrop.cpp`: the blurred still of the fight behind the pause menu.
 - `src/app/PlayerInput.cpp`: `ReadMenuInput`, `ReadPadMenuDirection`, `ReadGamepadPresence`, `FindActiveGamepadSlot`, `ReadPausePressed`, `ReadQuickRetryPressed` and, in a browser, `TakePointerLockLost`.
 - `src/app/Game.cpp`: `HandleMenus`, `Choose` and `GoBack`, which turn a choice into a change of state or of page.
@@ -34,6 +36,8 @@ The game opens on the title, over a fresh world that waits behind it, darkened. 
 
 **The marks.** When the selection moves, the two lines beside the new item slide out over 0.12 s from its diamonds. It is the only animation in the menus.
 
+**The prompt bar.** Every menu screen carries a centered bar of prompts at its foot (`Move`, `Select`, `Change` on setting values vs `Select` on setting actions, `Resume`, `Back`), with small diamonds between the groups to echo the selection marks above, and the version tucked into the bottom-right corner on the title so the foot stays clear. Both the menu footer and the combat HUD strip switch on the fly between forged dark keycaps and icons for `Xbox` (weathered jewel rims), `PlayStation` (Cross, Circle, Square, Triangle and `L2`/`R2`/`R1`), `Switch` (bone-rimmed `B`/`A`/`Y`/`X` in Nintendo's swapped positions and `ZL`/`ZR`/`R`) or `Generic` (monochrome `A`/`B`/`X`/`Y` caps and a `Start` pill), classified from `GetGamepadName` on the active slot.
+
 **The pause.** `PauseFight` holds the fight: `StepSession` does not step the world, and `Game` stops the particles, the slow-down and the shake, so the fight resumes exactly as it was. When the pause begins, the game draws the fight once into a texture at the game's resolution, then halves it three times with smooth filtering, down to 160x90. Behind the menu it draws that small copy stretched over the whole screen, darkened, and a second copy over it that shrinks to 94% over a quarter of a second and is darkened less. The fight seems to step back and go out of focus behind the menu.
 
 **In a browser.** Esc is taken by the browser to free a locked pointer and never reaches the game, so the page tells the game when the pointer is let go mid-fight, and the game pauses. In the menus the game asks the page not to lock the pointer, so the mouse can point at the choices; the click that resumes a fight locks it again when the button comes up.
@@ -50,6 +54,8 @@ The game opens on the title, over a fresh world that waits behind it, darkened. 
 - **Left and right adjust, and a row turns them into moves.** In the settings, up and down go between lines and left and right change a value, as in most games. The menu does not know about values, so `StepMenu` only reports which way, and `Game` changes the setting.
 - **The title is a state of the `Session`, not a separate screen object.** The world waits behind it, and beginning the fight is a change of state, so all the screens are one state machine with tests.
 - **Unplugging the active gamepad pauses the fight, while plugging one in never interrupts it.** A dead battery or a pulled cable mid-fight would otherwise cost the attempt, whereas plugging a controller in works straight away on whichever of the four slots the system assigns it.
+- **Prompts drawn in code, classified by name in `horde_core`.** Everything else in the game is procedural in code, so drawing the keycaps, mouse icons, PlayStation shapes, Xbox jewel rims, Switch letters and generic caps with raylib primitives keeps one dark-iron look and adds nothing to download in the web build. `ClassifyGamepadName` checks explicit brand and USB vendor tokens before bare HID names such as Sony's `"Wireless Controller"` on Windows DirectInput or Nintendo's `"Pro Controller"`, so `"Xbox Wireless Controller"` still lands on `Xbox` and unknown controllers fall back cleanly to `Generic`.
+  - Rejected: an external prompt sprite pack. Crisper for tiny logos, but it would be the only image asset in an all-code game and would add weight to the web build.
 
 ## How to tune it
 
@@ -62,12 +68,14 @@ The game opens on the title, over a fresh world that waits behind it, darkened. 
 | The pause's blur and step back | `Backdrop` halves, `kRecededScale`, `kRecedeSeconds`, `kEdgeDark`, `kMiddleDark` (`Backdrop.cpp`) | Down to 160x90; 94% over 0.25 s; 86% and 50% dark |
 | The menu colors | `kMenuIdle`, `kMenuFaint` (`Palette.h`) | |
 | Stick and d-pad repeat in menus | `MenuRepeatStats` (`MenuRepeat.h`) | Engage 0.5, release 0.35, 0.38 s delay, 0.11 s repeat |
+| Footer and HUD button prompts | `InputPrompts.cpp`, `Palette.h` | 20 px face caps, 18 px keycaps, weathered Xbox/PlayStation rims |
 
 ## Tests
 
 - `tests/core/MenuTests.cpp`: a new menu selects its first item; moving goes item by item and wraps at both ends; the mouse selects the item it moves onto, over a key in the same frame, and an item that does not exist is ignored; confirming chooses the selected item, and a click the item under the mouse; an adjust asks to change the selected item's value, on the item under the mouse, and a confirm in the same frame wins; going back wins over everything; an empty menu ignores everything.
 - `tests/core/MenuRepeatTests.cpp`: immediate step on tilt, initial delay and steady repeat, hysteresis against thumb tremor vs immediate re-arm on release, dominant-axis selection on diagonals, latching a held stick on menu open, and clamping long frames.
 - `tests/core/GamepadConnectionTests.cpp`: recording pads at start-up without hotplug events, plugging in and unplugging mid-run across slots, switching to the slot with input, and ignoring an idle slot unplugging while another slot is active.
+- `tests/core/GamepadTypeTests.cpp`: classifying Xbox, PlayStation (including Windows DirectInput `"Wireless Controller"`), Nintendo Switch (including `"Pro Controller"`) and unrecognized controller names, plus positional button and trigger labels across all four families.
 - `tests/core/SessionTests.cpp`: the title waits over a fresh world that does not move until the fight begins; a paused fight holds still, cannot restart, and resumes where it stopped; only a fight in progress pauses; going back to the title gives a fresh world and starts the attempts over.
 
 The screens I checked with window captures in Release: the title with each item selected, a fight, the pause over the blurred fight, YOU DIED with its choices dim and then lit, D moving the selection to Return to title, and Enter taking the game back to the title. In the browser build, with keys and a click held across a frame (my test browser's own clicks are shorter than a frame), Enter began the fight, Esc paused it over the blurred still, and a click on Return to title went back to the title. Not checked: the pause when a real browser lets go of a locked pointer, which needs a real click to lock it first, and the gamepad's buttons.

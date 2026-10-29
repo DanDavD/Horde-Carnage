@@ -143,6 +143,18 @@ std::optional<int> FindActiveGamepadSlot(std::optional<int> preferredSlot) {
     return std::nullopt;
 }
 
+const char* ReadGamepadName(std::optional<int> gamepad) {
+    if (!IsSlotAvailable(gamepad)) {
+        return "";
+    }
+    const char* raw = GetGamepadName(*gamepad);
+    return raw != nullptr ? raw : "";
+}
+
+GamepadType ReadGamepadType(std::optional<int> gamepad) {
+    return ClassifyGamepadName(ReadGamepadName(gamepad));
+}
+
 Vec2 ReadMoveInput(std::optional<int> gamepad) {
     // All devices add up. StepMovement clamps the sum to length 1, so using two at once is never faster.
     const Vec2 pad = IsSlotAvailable(gamepad) ? ReadPadMoveSlot(*gamepad) : Vec2{};

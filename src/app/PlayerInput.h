@@ -4,6 +4,7 @@
 #include <optional>
 
 #include "core/GamepadConnection.h"
+#include "core/GamepadType.h"
 #include "core/Menu.h"
 #include "core/MenuRepeat.h"
 #include "core/Vec2.h"
@@ -22,6 +23,12 @@ enum class InputDevice {
 /// Returns the connected gamepad slot that has stick, d-pad, trigger or button input this frame,
 /// checking `preferredSlot` first when given, or `std::nullopt` if every connected pad is idle.
 [[nodiscard]] std::optional<int> FindActiveGamepadSlot(std::optional<int> preferredSlot = std::nullopt);
+
+/// Classifies `gamepad` from its platform device string, or returns `GamepadType::Generic` when disconnected.
+[[nodiscard]] GamepadType ReadGamepadType(std::optional<int> gamepad);
+
+/// Raw device name reported by the platform for `gamepad`, or `""` when disconnected.
+[[nodiscard]] const char* ReadGamepadName(std::optional<int> gamepad);
 
 /// Reads where the player wants to move this step, from the keyboard (WASD or arrows) and the
 /// left stick and d-pad of `gamepad` (when connected). The result can be longer than 1; `StepMovement` clamps it.

@@ -88,5 +88,16 @@ inline constexpr Color kHitFlash{255, 255, 255, 255};
 inline constexpr Color kDust{142, 138, 132, 255};
 inline constexpr Color kGunSmoke{168, 172, 180, 255};
 inline constexpr Color kDarkBlood{108, 18, 24, 255};
+// Button and keycap prompts: dark iron caps, with weathered jewel accents for Xbox and PlayStation so they
+// belong in the crypt without shouting over the HUD.
+inline constexpr Color kPromptFill{18, 18, 24, 235};
+inline constexpr Color kXboxA{92, 178, 96, 255};
+inline constexpr Color kXboxB{204, 74, 68, 255};
+inline constexpr Color kXboxX{86, 148, 224, 255};
+inline constexpr Color kXboxY{224, 182, 78, 255};
+inline constexpr Color kPsCross{116, 158, 232, 255};
+inline constexpr Color kPsCircle{218, 96, 88, 255};
+inline constexpr Color kPsSquare{204, 132, 196, 255};
+inline constexpr Color kPsTriangle{92, 190, 156, 255};
 
 } // namespace horde

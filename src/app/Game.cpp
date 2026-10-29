@@ -115,6 +115,11 @@ void Game::Frame() {
         _menuRepeat = {};
         _inputDevice = InputDevice::KeyboardMouse;
     }
+    if (_gamepadConnection.activeSlot.has_value()) {
+        _gamepadType = ReadGamepadType(_gamepadConnection.activeSlot);
+    } else {
+        _gamepadType = GamepadType::Generic;
+    }
     if (const auto device = DetectActiveInputDevice(mouse, _lastMouse, usedPadSlot)) {
         _inputDevice = *device;
     }
@@ -149,6 +154,22 @@ void Game::Frame() {
     // Skips to the victory screen without emptying both bars. The next step ends the fight.
     if (IsKeyPressed(KEY_F4) && _session.state == SessionState::Playing) {
         DefeatBoss(_session.world);
+    }
+    // Cycles on-screen prompts through Keyboard/Mouse, Xbox, PlayStation, Switch, Generic and back to live input.
+    if (IsKeyPressed(KEY_F5)) {
+        if (!_debugPromptOverride.has_value()) {
+            _debugPromptOverride = InputPromptStyle{InputDevice::KeyboardMouse, GamepadType::Generic};
+        } else if (_debugPromptOverride->device == InputDevice::KeyboardMouse) {
+            _debugPromptOverride = InputPromptStyle{InputDevice::Gamepad, GamepadType::Xbox};
+        } else if (_debugPromptOverride->gamepad == GamepadType::Xbox) {
+            _debugPromptOverride = InputPromptStyle{InputDevice::Gamepad, GamepadType::PlayStation};
+        } else if (_debugPromptOverride->gamepad == GamepadType::PlayStation) {
+            _debugPromptOverride = InputPromptStyle{InputDevice::Gamepad, GamepadType::Switch};
+        } else if (_debugPromptOverride->gamepad == GamepadType::Switch) {
+            _debugPromptOverride = InputPromptStyle{InputDevice::Gamepad, GamepadType::Generic};
+        } else {
+            _debugPromptOverride.reset();
+        }
     }
 #endif
     // A hit stop slows the fight's clock, so the world takes fewer of its fixed steps. Every step is still the
@@ -497,12 +518,13 @@ void Game::Draw(float alpha) const {
     if (!playing) {
         alpha = 1.0f;
     }
+    const InputPromptStyle prompts = CurrentPromptStyle();
     switch (_session.state) {
     case SessionState::Title:
         DrawScene(fit, alpha, false);
         BeginMode2D(ScreenCamera(fit));
         if (_openedPage == MenuPage::None) {
-            DrawTitleScreen(_menu, _menuSinceMoved, _art);
+            DrawTitleScreen(_menu, _menuSinceMoved, prompts, _art);
         } else {
             DrawTitleShade();
             DrawOpenedPage();
@@ -513,7 +535,7 @@ void Game::Draw(float alpha) const {
         BeginMode2D(ScreenCamera(fit));
         DrawBackdrop(_backdrop, _session.stateSeconds);
         if (_openedPage == MenuPage::None) {
-            DrawPauseScreen(_menu, _menuSinceMoved, _session.stateSeconds, _art);
+            DrawPauseScreen(_menu, _menuSinceMoved, _session.stateSeconds, prompts, _art);
         } else {
             DrawOpenedPage();
         }
@@ -525,7 +547,7 @@ void Game::Draw(float alpha) const {
         DrawScene(fit, alpha, true);
         if (!playing) {
             BeginMode2D(ScreenCamera(fit));
-            DrawEndScreen(_session, _menu, _menuSinceMoved, _art);
+            DrawEndScreen(_session, _menu, _menuSinceMoved, prompts, _art);
             EndMode2D();
         }
         break;
@@ -535,12 +557,22 @@ void Game::Draw(float alpha) const {
 }
 
 void Game::DrawOpenedPage() const {
+    const InputPromptStyle prompts = CurrentPromptStyle();
     DrawPageShade();
     if (_openedPage == MenuPage::Settings) {
-        DrawSettingsScreen(_menu, _menuSinceMoved, _settings, _art);
+        DrawSettingsScreen(_menu, _menuSinceMoved, _settings, prompts, _art);
     } else if (_openedPage == MenuPage::Controls) {
-        DrawControlsScreen(_menu, _menuSinceMoved, _art);
+        DrawControlsScreen(_menu, _menuSinceMoved, prompts, _art);
     }
+}
+
+InputPromptStyle Game::CurrentPromptStyle() const {
+#ifndef NDEBUG
+    if (_debugPromptOverride.has_value()) {
+        return *_debugPromptOverride;
+    }
+#endif
+    return InputPromptStyle{.device = _inputDevice, .gamepad = _gamepadType};
 }
 
 void Game::DrawScene(const ScreenFit& fit, float alpha, bool withHud) const {
@@ -574,12 +606,14 @@ void Game::DrawScene(const ScreenFit& fit, float alpha, bool withHud) const {
     DrawPainVignette(_art, world.player.health, world.elapsedSeconds);
 #ifndef NDEBUG
     if (_showDebugOverlay) {
-        DrawDebugHud(world, _lastMoveInput, _particles.particles.Size());
+        DrawDebugHud(world, _lastMoveInput, _particles.particles.Size(), _gamepadConnection.activeSlot,
+                     _gamepadType, ReadGamepadName(_gamepadConnection.activeSlot));
     }
 #endif
     if (withHud) {
+        const InputPromptStyle prompts = CurrentPromptStyle();
         Vec2 screenAim{};
-        if (_inputDevice == InputDevice::Gamepad) {
+        if (prompts.device == InputDevice::Gamepad) {
             const Camera2D camera = ToRaylibCamera(world.camera, alpha);
             const Vec2 playerPos = Lerp(world.player.motion.previousPosition, world.player.motion.position, alpha);
             const Vec2 worldAim = GamepadAimPoint(playerPos, {}, _gamepadAim.direction, kGamepadCrosshairDistance);
@@ -588,7 +622,7 @@ void Game::DrawScene(const ScreenFit& fit, float alpha, bool withHud) const {
         } else {
             screenAim = AimInGame(fit);
         }
-        DrawHud(world, _trails, _session.attempt, playing, screenAim, _art);
+        DrawHud(world, _trails, _session.attempt, playing, screenAim, prompts, _art);
     }
     EndMode2D();
 }

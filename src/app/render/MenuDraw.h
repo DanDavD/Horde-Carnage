@@ -6,6 +6,7 @@
 #include <raylib.h>
 
 #include "app/render/Art.h"
+#include "app/render/InputPrompts.h"
 #include "core/Menu.h"
 #include "core/Session.h"
 #include "core/Settings.h"
@@ -71,16 +72,17 @@ void DrawPageShade();
 
 /// The title screen over the world drawn behind it: the game's name and the menu, all in the middle of the
 /// screen, and the version at the bottom.
-void DrawTitleScreen(const Menu& menu, float sinceMoved, const Art& art);
+void DrawTitleScreen(const Menu& menu, float sinceMoved, InputPromptStyle prompts, const Art& art);
 
 /// "PAUSED" and the pause menu, over the fight held behind it. Fades in over `seconds`.
-void DrawPauseScreen(const Menu& menu, float sinceMoved, float seconds, const Art& art);
+void DrawPauseScreen(const Menu& menu, float sinceMoved, float seconds, InputPromptStyle prompts, const Art& art);
 
 /// The settings: a name on the left of each line and its value on the right, with arrows on each side of
 /// the selected value. The volume is a row of ten marks.
-void DrawSettingsScreen(const Menu& menu, float sinceMoved, const Settings& settings, const Art& art);
+void DrawSettingsScreen(const Menu& menu, float sinceMoved, const Settings& settings, InputPromptStyle prompts,
+                        const Art& art);
 
 /// What each key and button does, in a table, and Back.
-void DrawControlsScreen(const Menu& menu, float sinceMoved, const Art& art);
+void DrawControlsScreen(const Menu& menu, float sinceMoved, InputPromptStyle prompts, const Art& art);
 
 } // namespace horde

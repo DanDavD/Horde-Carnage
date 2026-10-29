@@ -7,10 +7,12 @@
 #include "app/render/Art.h"
 #include "app/render/Backdrop.h"
 #include "app/render/Hud.h"
+#include "app/render/InputPrompts.h"
 #include "app/render/MenuDraw.h"
 #include "core/FixedTimestep.h"
 #include "core/GamepadAim.h"
 #include "core/GamepadConnection.h"
+#include "core/GamepadType.h"
 #include "core/HitStop.h"
 #include "core/Menu.h"
 #include "core/MenuRepeat.h"
@@ -73,6 +75,8 @@ private:
     void Draw(float alpha) const;
     /// The settings or the controls, opened over the title or the pause.
     void DrawOpenedPage() const;
+    /// Active device and controller family for on-screen button prompts.
+    [[nodiscard]] InputPromptStyle CurrentPromptStyle() const;
 
     FixedTimestep _timestep;
     Session _session;
@@ -97,6 +101,7 @@ private:
     Vec2 _lastMouse;       ///< The mouse last frame: only a mouse that moves takes the selection.
     InputDevice _inputDevice = InputDevice::KeyboardMouse;
     GamepadConnection _gamepadConnection;
+    GamepadType _gamepadType = GamepadType::Generic;
     MenuRepeat _menuRepeat;
     GamepadAim _gamepadAim;
     Backdrop _backdrop;    ///< The blurred still behind the pause menu.
@@ -104,6 +109,7 @@ private:
 
 #ifndef NDEBUG
     bool _showDebugOverlay = false;
+    std::optional<InputPromptStyle> _debugPromptOverride; ///< Cycled by F5 to inspect all four controller icon sets.
     Vec2 _lastMoveInput; ///< Kept only so the overlay can show what the last step read.
 #endif
 };

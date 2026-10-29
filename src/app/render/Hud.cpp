@@ -44,15 +44,6 @@ constexpr float kSlotBoxWidth = 150.0f;
 constexpr float kSlotBoxHeight = 48.0f;
 constexpr float kSlotBoxGap = 8.0f;
 
-// Esc pauses everywhere. In a browser the first Esc frees the mouse, which pauses all the same.
-#ifndef NDEBUG
-constexpr const char* kControlsHint =
-    "WASD move  Mouse aim  Click fire  Space dash  E heal  Q/1/2 swap gun  Esc pause  Debug: F1 F2 F3 F4";
-#else
-constexpr const char* kControlsHint =
-    "WASD move  Mouse aim  Click fire  Space dash  E heal  Q/1/2/wheel swap gun  Esc pause";
-#endif
-
 const char* FireModeLabel(FireMode mode) {
     return mode == FireMode::Auto ? "AUTO" : "SEMI-AUTO";
 }
@@ -208,7 +199,8 @@ void DrawCrosshair(Vector2 at) {
 
 } // namespace
 
-void DrawHud(const World& world, const HealthTrails& trails, int attempt, bool playing, Vec2 aim, const Art& art) {
+void DrawHud(const World& world, const HealthTrails& trails, int attempt, bool playing, Vec2 aim,
+             InputPromptStyle prompts, const Art& art) {
     const Player& player = world.player;
     DrawHealthBar(player.health, trails.player);
     DrawDashBar(player.dash);
@@ -223,7 +215,7 @@ void DrawHud(const World& world, const HealthTrails& trails, int attempt, bool p
     DrawGameText(art.uiFont, TextFormat("%d FPS", GetFPS()), Vec2{kHudMargin, kScreenHeight - 56.0f}, 12.0f,
                  Fade(kSoftText, 0.7f));
     if (playing) {
-        DrawGameText(art.uiFont, kControlsHint, Vec2{kHudMargin, kScreenHeight - 34.0f}, 14.0f, kSoftText);
+        DrawHudPrompts(prompts, art);
         DrawCrosshair(ToRaylib(aim));
     }
 }
