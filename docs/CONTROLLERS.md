@@ -31,7 +31,7 @@ The code:
 | Try again | A (on end screen) | Cross (on end screen) | B (on end screen) | A (on end screen) |
 
 - **Movement.** The left stick passes through `ApplyRadialDeadzone` with a threshold of 0.18. Beyond the deadzone, magnitude rescales from zero to one, so nudging the stick starts at slow speed and full tilt gives full speed.
-- **Aiming and crosshair.** The right stick pushes a crosshair held 260 world units ahead of the hunter. Releasing the stick while holding the fire trigger (`RT`, `R2` or `ZR`) locks the current aiming heading, letting you kite backwards or circle-strafe freely without holding the stick at an exact angle.
+- **Aiming and crosshair.** The right stick pushes a crosshair held 260 world units ahead of the hunter, and `Game::Update` passes the resulting unit heading as `PlayerCommands::aimDirection` so strafing never skews shots sideways. Releasing the stick while holding the fire trigger (`RT`, `R2` or `ZR`) keeps the unassisted `GamepadAim::rawDirection` and recomputes soft aim assist from it each step rather than compounding onto `direction`, letting you kite backwards or circle-strafe freely without drift.
 - **Soft aim assist.** `ApplyAimAssist` scans the boss and active hairballs within a 48-degree cone (0.418 radians half-angle). If a target sits inside the cone, the aim heading nudges toward it smoothly. The boss takes priority unless a living hairball is significantly closer.
 - **Dual dash triggers.** Both the lower trigger (`LT`, `L2`, `ZL`) and the upper right shoulder (`RB`, `R1`, `R`) trigger a dash. Players coming from Souls-likes often prefer bumper dashes, while twin-stick shooter players prefer triggers; both work simultaneously.
 

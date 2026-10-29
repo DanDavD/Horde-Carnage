@@ -32,14 +32,14 @@ Before the steps, `Run` also reads button presses that are events rather than he
 
 ### Input becomes commands
 
-The simulation never reads a key or the mouse. Every step, `Game::Update` turns the hardware into a `PlayerCommands` (`src/core/PlayerCommands.h`): the movement input, the world point the mouse or right stick aims at, the fire button, and weapon switches. Tests drive the world with the same struct, and a gamepad fills it without the rules changing. See [Aiming and weapons](WEAPONS.md).
+The simulation never reads a key or the mouse. Every step, `Game::Update` turns the hardware into a `PlayerCommands` (`src/core/PlayerCommands.h`): the movement input, the view-space mouse offset (`aimInView`), twin-stick unit heading (`aimDirection`) or world point (`aimAt`) the player aims with, the fire button, and weapon switches. Tests drive the world with the same struct, and a gamepad fills it without the rules changing. See [Aiming and weapons](WEAPONS.md).
 
 ### The world
 
 `World` (`src/core/World.h`) holds everything the simulation needs as plain data: the arena, the player, the boss, the hairballs, the player's bullets, the boss's projectiles and shockwaves, the camera, a seeded random generator (see [Random numbers](RANDOM.md)), what landed the last hit on the player (`lastHitBy`, for the death screen), and the events of the last steps (`events`: hits, breaks, landings, for the game to react to; see [Game feel](GAME_FEEL.md)). Hairballs, projectiles and shockwaves live in fixed-size pools inside it (see [Object pool](OBJECT_POOL.md)), so a running game never allocates memory. Two functions work on it:
 
 - `CreateWorld` builds the starting state: the boss in the middle of the arena, the player south of it and facing it, the camera on both, and the random generator seeded with the seed it is given.
-- `StepWorld` advances it by one fixed step, in this order: the invulnerability window and the dash cooldown, the player (start a dash or a drink, the drink, the dash or normal movement, aim, weapons), every hairball (chase, movement) and then the boss (`StepBoss`: stalking and picking its next attack from the world's generator, or the stage of its attack and the start of a combo's second attack, the strands of a Hair Ring spawned into their pool when it spits, and the impact and shockwave of a Leap when it lands), collisions between bodies and the walls (four passes, see [Collisions](COLLISIONS.md)), bullets and their hits (see [Bullets and hits](BULLETS.md)), dead hairballs removed, contact damage (see [Health](HEALTH.md)), the boss's strands and shockwaves and their hits on the player (see [The boss](BOSS.md)), then the camera, which follows a point between the player and the boss (see [Camera](CAMERA.md)).
+- `StepWorld` advances it by one fixed step, in this order: the invulnerability window and the dash cooldown, the player (start a dash or a drink, the drink, the dash or normal movement), every hairball (chase, movement) and then the boss (`StepBoss`: stalking and picking its next attack from the world's generator, or the stage of its attack and the start of a combo's second attack, the strands of a Hair Ring spawned into their pool when it spits, and the impact and shockwave of a Leap when it lands), collisions between bodies and the walls (four passes, see [Collisions](COLLISIONS.md)), the player's aim and weapons (resolved against `NextFollowCameraCenter` so shots fly straight through the crosshair while strafing), bullets and their hits (see [Bullets and hits](BULLETS.md)), dead hairballs removed, contact damage (see [Health](HEALTH.md)), the boss's strands and shockwaves and their hits on the player (see [The boss](BOSS.md)), then the camera, which follows a point between the player and the boss (see [Camera](CAMERA.md)).
 
 ### The session
 
@@ -118,7 +118,7 @@ Game objects are plain structs (components) that hold data, and free functions (
 - `tests/core/SessionTests.cpp`: see [Game flow](GAME_FLOW.md#tests).
 - `tests/core/MenuTests.cpp`, `MenuRepeatTests.cpp`, `GamepadConnectionTests.cpp` and `GamepadTypeTests.cpp`: see [Menus](MENUS.md#tests) and [Controllers](CONTROLLERS.md#tests).
 - `tests/core/SettingsTests.cpp`: see [Settings](SETTINGS.md#tests).
-- `tests/core/WeaponTests.cpp`, `LoadoutTests.cpp` and the aim and fire cases in `FacingTests.cpp` and `WorldTests.cpp`: see [Aiming and weapons](WEAPONS.md#tests).
+- `tests/core/WeaponTests.cpp`, `LoadoutTests.cpp`, `LaserSightTests.cpp` and the aim and fire cases in `FacingTests.cpp` and `WorldTests.cpp`: see [Aiming and weapons](WEAPONS.md#tests).
 - `tests/core/ObjectPoolTests.cpp`: see [Object pool](OBJECT_POOL.md#tests).
 - `tests/core/DashTests.cpp`, `FlasksTests.cpp` and the dash and flask cases in `WorldTests.cpp`: see [Player abilities](ABILITIES.md#tests).
 - `tests/core/ProjectileTests.cpp`, the sweep cases in `CollisionTests.cpp` and the bullet cases in `WorldTests.cpp`: see [Bullets and hits](BULLETS.md#tests).

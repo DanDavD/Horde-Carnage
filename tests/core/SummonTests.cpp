@@ -251,3 +251,29 @@ TEST_CASE("a hairball the boss did not summon never spits") {
     Step(world, 300);
     CHECK(world.hostileProjectiles.Size() == 0);
 }
+
+TEST_CASE("summon threat is zero in phase one or transforming and rises from mid to far in phase two") {
+    World world = horde::CreateWorld(kArena, kView);
+    Boss& boss = world.boss;
+    CHECK(horde::SummonThreat(boss, 300.0f) == 0.0f);
+    CHECK(horde::SummonThreat(boss, 500.0f) == 0.0f);
+    CHECK(horde::SummonThreat(boss, 700.0f) == 0.0f);
+
+    horde::StartTransformation(boss);
+    CHECK(horde::SummonThreat(boss, 600.0f) == 0.0f);
+
+    Step(world, 130);
+    REQUIRE(boss.phase == BossPhase::Two);
+    CHECK(horde::SummonThreat(boss, 250.0f) == 0.0f);
+    CHECK(horde::SummonThreat(boss, 400.0f) == 0.0f);
+    CHECK(horde::SummonThreat(boss, 475.0f) == doctest::Approx(0.5f));
+    CHECK(horde::SummonThreat(boss, 440.0f) < horde::SummonThreat(boss, 510.0f));
+    CHECK(horde::SummonThreat(boss, 550.0f) == doctest::Approx(1.0f));
+    CHECK(horde::SummonThreat(boss, 750.0f) == doctest::Approx(1.0f));
+
+    horde::EnterFrenzy(boss);
+    CHECK(horde::SummonThreat(boss, 550.0f) == doctest::Approx(1.0f));
+
+    boss.health.current = 0;
+    CHECK(horde::SummonThreat(boss, 600.0f) == 0.0f);
+}

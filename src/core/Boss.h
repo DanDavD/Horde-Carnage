@@ -348,6 +348,11 @@ void StartTransformation(Boss& boss);
 /// Puts the boss in a frenzy: `FrenzyStats` replace the numbers of the second phase.
 void EnterFrenzy(Boss& boss);
 
+/// How far into the Summon's far range the player stands, from 0 inside `midDistance` (400) to 1 at or
+/// past `farDistance` (550), eased with smoothstep. Zero in the first phase, while transforming, or once
+/// the boss is dead.
+[[nodiscard]] float SummonThreat(const Boss& boss, float distance);
+
 /// Where a strand leaving the boss now meets a player who keeps their velocity, at most
 /// `VolleyStats::maxLeadSeconds` ahead and inside the arena.
 [[nodiscard]] Vec2 LeadPoint(const Boss& boss, const Motion& player, const Arena& arena);

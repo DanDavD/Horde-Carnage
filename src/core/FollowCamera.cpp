@@ -32,7 +32,8 @@ FollowCamera FollowCameraAt(Vec2 target, Vec2 viewSize, const Arena& arena, cons
     return FollowCamera{.center = center, .previousCenter = center, .viewSize = viewSize, .stats = stats};
 }
 
-void StepFollowCamera(FollowCamera& camera, Vec2 target, Vec2 targetVelocity, const Arena& arena, float dt) {
+Vec2 NextFollowCameraCenter(const FollowCamera& camera, Vec2 target, Vec2 targetVelocity, const Arena& arena,
+                            float dt) {
     // The goal is clamped, not the result. The current center is already inside the allowed range, and
     // a blend of two points inside it stays inside, so the camera slows down into the edge instead of
     // overshooting and snapping back.
@@ -42,9 +43,13 @@ void StepFollowCamera(FollowCamera& camera, Vec2 target, Vec2 targetVelocity, co
     // 1 - exp(-k * dt) is the fraction of the gap closed in one step. Unlike a fixed fraction per step,
     // it means the same follow speed if the simulation rate ever changes.
     const float blend = 1.0f - std::exp(-camera.stats.sharpness * dt);
+    return Lerp(camera.center, goal, blend);
+}
 
+void StepFollowCamera(FollowCamera& camera, Vec2 target, Vec2 targetVelocity, const Arena& arena, float dt) {
+    const Vec2 next = NextFollowCameraCenter(camera, target, targetVelocity, arena, dt);
     camera.previousCenter = camera.center;
-    camera.center = Lerp(camera.center, goal, blend);
+    camera.center = next;
 }
 
 } // namespace horde

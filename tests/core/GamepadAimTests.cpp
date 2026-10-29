@@ -182,3 +182,19 @@ TEST_CASE("stepping gamepad aim keeps twin-stick aim independent of movement and
     CHECK(doctest::Approx(runningEastAim.x).epsilon(kTolerance) == playerPos.x + horde::kGamepadCrosshairDistance);
     CHECK(doctest::Approx(runningEastAim.y).epsilon(kTolerance) == playerPos.y);
 }
+
+TEST_CASE("holding fire with right stick released does not compound aim assist across steps") {
+    const horde::World world = horde::CreateWorld(horde::kBossArena, kView, 789);
+    horde::GamepadAim aim;
+    const float offAngle = 10.0f * (kPi / 180.0f);
+    const horde::Vec2 stick{std::sin(offAngle), -std::cos(offAngle)};
+
+    (void)horde::StepGamepadAim(aim, world, stick, {}, true);
+    const horde::Vec2 initialAssisted = aim.direction;
+
+    for (int i = 0; i < 120; ++i) {
+        (void)horde::StepGamepadAim(aim, world, {}, {-1.0f, 0.0f}, true);
+    }
+    CHECK(doctest::Approx(aim.direction.x).epsilon(kTolerance) == initialAssisted.x);
+    CHECK(doctest::Approx(aim.direction.y).epsilon(kTolerance) == initialAssisted.y);
+}

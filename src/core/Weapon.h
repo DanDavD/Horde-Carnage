@@ -19,7 +19,7 @@ struct WeaponStats {
     /// Highest fire rate. A semi-automatic gun cannot go faster however fast the player clicks.
     float shotsPerSecond = 6.0f;
     int damage = 10;             ///< Hit points one bullet takes.
-    float bulletSpeed = 950.0f;  ///< Units per second.
+    float bulletSpeed = 2090.0f; ///< Units per second.
     float range = 750.0f;        ///< How far a bullet flies before it is gone.
     float knockback = 300.0f;    ///< Speed a bullet adds to what it hits.
     float barrelLength = 18.0f;  ///< How far the muzzle sticks out of the body. Bullets start there.
@@ -32,7 +32,7 @@ inline constexpr WeaponStats kPistol{.name = "Pistol",
                                      .mode = FireMode::SemiAuto,
                                      .shotsPerSecond = 6.0f,
                                      .damage = 10,
-                                     .bulletSpeed = 950.0f,
+                                     .bulletSpeed = 2090.0f,
                                      .range = 750.0f,
                                      .knockback = 300.0f,
                                      .barrelLength = 18.0f};
@@ -40,7 +40,7 @@ inline constexpr WeaponStats kSmg{.name = "SMG",
                                   .mode = FireMode::Auto,
                                   .shotsPerSecond = 10.0f,
                                   .damage = 6,
-                                  .bulletSpeed = 850.0f,
+                                  .bulletSpeed = 1870.0f,
                                   .range = 600.0f,
                                   .knockback = 120.0f,
                                   .barrelLength = 30.0f};

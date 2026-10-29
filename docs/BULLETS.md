@@ -12,11 +12,11 @@ The rules live in `horde_core`:
 - `src/core/Enemy.h`: the hairball's `Health` (30 hit points), and its hit flash and stun timers.
 - `src/core/World.cpp`: firing (`HandleWeapons`), flight and hits (`StepBullets`, `FirstHit`, `HitEnemy`, `HitBoss`) and deaths (`RemoveDeadEnemies`).
 
-The game executable draws bullets as short yellow streaks and flashes the bodies they hit.
+The game executable draws bullets as short yellow streaks (clamped to `Projectile::origin` so a newly spawned streak never pokes behind the barrel) and flashes the bodies they hit.
 
 ## How it works
 
-**Firing.** When `PullTrigger` fires (see [Aiming and weapons](WEAPONS.md)), `HandleWeapons` spawns a bullet into the bullet pool (see [Object pool](OBJECT_POOL.md)) at `MuzzlePoint`: the player's centre, plus the facing direction times the body radius plus the barrel length. `MakeBullet` builds it with `LaunchProjectile`: its velocity is the facing direction times the gun's bullet speed, and its lifetime is the gun's range divided by that speed. Then it takes the gun's damage and knockback.
+**Firing.** Right after the collision passes settle every body for the step, when `PullTrigger` fires (see [Aiming and weapons](WEAPONS.md)), `HandleWeapons` spawns a bullet into the bullet pool (see [Object pool](OBJECT_POOL.md)) at `MuzzlePoint`: the player's centre, plus the facing direction times the body radius plus the barrel length. `MakeBullet` builds it with `LaunchProjectile`, recording `origin` at the muzzle: its velocity is the facing direction times the gun's bullet speed, and its lifetime is the gun's range divided by that speed. Then it takes the gun's damage and knockback.
 
 **Flight and hits.** Every fixed step, after bodies have moved and collided, `StepBullets` goes through the pool once. For each bullet:
 
@@ -33,7 +33,7 @@ The game executable draws bullets as short yellow streaks and flashes the bodies
 
 - **Bullets are objects that fly, not instant rays.** A visible bullet with travel time is what SAS 4 and Dead Ops Arcade feel like: the player leads moving targets and sees the stream.
   - Rejected: hitscan (an instant ray from the muzzle). It is simpler and never misses a fast target, but there is nothing to see and nothing to dodge, and the boss's ranged attacks need travelling projectiles anyway.
-- **A swept test instead of checking where the bullet ends the step.** At 950 units a second a bullet moves about 16 units a step. A hairball is 36 wide, so a point test would work today, but a faster gun would skip over enemies, and a point test cannot tell which of two enemies in a line came first. `SweepCircle` solves both with one quadratic.
+- **A swept test instead of checking where the bullet ends the step.** At 2090 units a second a bullet moves about 35 units a step. A hairball is 36 wide, so a point test would work today, but a faster gun would skip over enemies, and a point test cannot tell which of two enemies in a line came first. `SweepCircle` solves both with one quadratic.
 - **The nearest hit wins, and a bullet hits one body.** A bullet that stops on the first body reads like a bullet, and a hairball in front of the boss shields it.
 - **Hairballs have no invulnerability window.** The player's 0.8 s window exists so a crowd cannot drain the bar in a moment. For enemies it would cut the SMG's 10 bullets a second down to one hit every 0.8 s, so it is 0.
 - **A short stun with the knockback.** The slide is the same either way, because chasing back toward the player counts as braking, at the same rate as having no input. The difference is what comes after: without the stun, the hairball turns around and walks back the moment it stops, and the hit reads as a twitch. With it, the hairball holds still a moment where it landed, which reads as a stagger.
@@ -47,7 +47,7 @@ The game executable draws bullets as short yellow streaks and flashes the bodies
 | Value | Where | Default |
 |---|---|---|
 | Damage per bullet | `WeaponStats::damage` (`src/core/Weapon.h`) | Pistol 10, SMG 6 |
-| Bullet speed | `WeaponStats::bulletSpeed` | Pistol 950, SMG 850 units/s |
+| Bullet speed | `WeaponStats::bulletSpeed` | Pistol 2090, SMG 1870 units/s |
 | Range | `WeaponStats::range` | Pistol 750, SMG 600 units |
 | Knockback | `WeaponStats::knockback` | Pistol 300, SMG 120 units/s |
 | Barrel length (where bullets start) | `WeaponStats::barrelLength` | Pistol 18, SMG 30 units |

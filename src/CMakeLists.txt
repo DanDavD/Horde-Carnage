@@ -17,6 +17,7 @@ add_library(horde_core STATIC
     core/Health.cpp
     core/HitStop.cpp
     core/ImpactFeel.cpp
+    core/LaserSight.cpp
     core/Loadout.cpp
     core/Menu.cpp
     core/MenuRepeat.cpp

@@ -27,14 +27,13 @@ constexpr float kShieldGap = 6.0f;
 constexpr float kShieldWidth = 5.0f;
 constexpr float kShieldBounceWidth = 4.0f;
 constexpr float kBarrierPulse = 6.0f;
-// The Hair Ring. During the warning the boss swells by this fraction and the ring is drawn on the floor
-// just outside the tips of its tufts, with the gap as a pale lane running out from it. As it spits, it
-// deflates for a moment.
+// The Hair Ring. During the warning the boss swells by this fraction and a broad red danger arc is
+// drawn on the floor outside the tufts reaching into the arena, leaving the gap as clean stone floor so the
+// safe way out is immediately obvious. As it spits, it deflates for a moment.
 constexpr float kRingSwell = 0.15f;
 constexpr float kRingSpitShrink = 0.08f;
 constexpr float kRingMarkGap = 8.0f;
-constexpr float kRingMarkWidth = 10.0f;
-constexpr float kRingLaneLength = 420.0f;
+constexpr float kRingTelegraphReach = 420.0f;
 constexpr float kDegreesPerRadian = 180.0f / std::numbers::pi_v<float>;
 // The Leap. The boss crouches by this fraction before it jumps, then flies in an arc this high above the
 // floor, drawn up to this much bigger at the top, as if closer to the camera. It lands a little squashed.
@@ -75,6 +74,12 @@ constexpr float kBurstMouth = 0.6f;
 // The boss's eyes light the floor around it, faintly.
 constexpr float kEyeLightReach = 2.2f;
 constexpr float kEyeLight = 0.07f;
+// In the second phase, kiting into the Summon's far range shrouds only the Matriarch in shadow while her
+// slit eyes flare bright through her darkened fur, warning why keeping away invites a pack.
+constexpr float kSummonShroudDarken = 0.78f;
+constexpr float kSummonShroudHalo = 0.55f;
+constexpr float kSummonShroudEyeSize = 0.32f;
+constexpr float kSummonShroudMouth = 0.28f;
 
 // A dark, matted mass with amber eyes. In the second phase the eyes turn red and the hair bristles; in a
 // frenzy it bristles all over and reddens, over a pulsing glow on the floor.
@@ -149,9 +154,9 @@ void DrawLeapTelegraph(const Boss& boss) {
              Fade(kBlood, locked ? 0.95f : 0.25f + 0.25f * progress));
 }
 
-// The Hair Ring on the floor while the boss swells: a red band around the body wherever a strand will leave,
-// thicker and brighter as the spit comes closer, and the gap as a pale lane running out from the body, so
-// the player can see from anywhere which way is safe.
+// The Hair Ring on the floor while the boss swells: a broad red danger arc extending into the arena
+// wherever strands will fly, with bright inner and outer borders and radial boundary rays flanking the
+// gap, while the safe gap itself is kept clear of tint so the player reads danger and safety at a glance.
 void DrawHairRingTelegraph(const Boss& boss) {
     if (IsDead(boss.health) || !InAttack(boss, AttackKind::HairRing, AttackStage::Warning)) {
         return;
@@ -164,19 +169,27 @@ void DrawHairRingTelegraph(const Boss& boss) {
     const float gapMiddle = std::atan2(ring.direction.y, ring.direction.x) * kDegreesPerRadian;
     const float gapHalf = 180.0f * static_cast<float>(stats.gapSlots) / static_cast<float>(stats.slots);
 
-    DrawCircleSector(center, kRingLaneLength, gapMiddle - gapHalf, gapMiddle + gapHalf, 24,
-                     Fade(kRingLane, 0.06f + 0.08f * progress));
-    for (const float edge : {gapMiddle - gapHalf, gapMiddle + gapHalf}) {
-        const Vec2 out = Rotated(Vec2{1.0f, 0.0f}, edge / kDegreesPerRadian);
-        DrawLineEx(ToRaylib(boss.motion.position + out * boss.radius),
-                   ToRaylib(boss.motion.position + out * kRingLaneLength), 2.0f, Fade(kRingLane, 0.5f));
-    }
-
     // Outside the tips of the swollen tufts, so the hair never covers it.
     const float inner = boss.radius * (1.0f + kRingSwell) * (1.0f + kTuftLength) + kRingMarkGap;
+    const float reach = kRingTelegraphReach;
+    const float dangerStart = gapMiddle + gapHalf;
+    const float dangerEnd = gapMiddle + 360.0f - gapHalf;
 
-    DrawRing(center, inner, inner + kRingMarkWidth * (0.4f + 0.6f * progress), gapMiddle + gapHalf,
-             gapMiddle + 360.0f - gapHalf, 64, Fade(kBlood, 0.3f + 0.6f * progress));
+    // Red wash across the 315-degree danger area where strands will fly.
+    DrawRing(center, inner, reach, dangerStart, dangerEnd, 64, Fade(kBlood, 0.05f + 0.12f * progress));
+
+    // Boundary rays flanking the safe gap.
+    for (const float edge : {gapMiddle - gapHalf, gapMiddle + gapHalf}) {
+        const Vec2 out = Rotated(Vec2{1.0f, 0.0f}, edge / kDegreesPerRadian);
+        DrawLineEx(ToRaylib(boss.motion.position + out * inner),
+                   ToRaylib(boss.motion.position + out * reach), 2.5f, Fade(kBlood, 0.45f + 0.50f * progress));
+    }
+
+    // Outer rim defining the danger zone reach.
+    DrawRing(center, reach - 3.0f, reach, dangerStart, dangerEnd, 64, Fade(kBlood, 0.35f + 0.55f * progress));
+
+    // Inner collar around the swollen boss.
+    DrawRing(center, inner, inner + 8.0f, dangerStart, dangerEnd, 64, Fade(kBlood, 0.45f + 0.50f * progress));
 }
 
 // The Volley's aim on the floor: a thin line from the body toward the player, brighter as the first burst
@@ -243,16 +256,31 @@ const HairStyle& LivingStyle(const Boss& boss) {
 
 // Every pose of the boss ends here: the glow of its eyes on the floor, the body, its shield around it, and
 // stars while its broken shield staggers it.
-void DrawBossBody(const Boss& boss, Vec2 position, float radius, const HairPose& pose, const Art& art) {
-    const HairStyle* style = &LivingStyle(boss);
+void DrawBossBody(const Boss& boss, Vec2 position, float radius, HairPose pose, const Art& art) {
+    HairStyle style = LivingStyle(boss);
+    const float threat = SummonThreat(boss, Length(pose.light - position));
+    if (threat > 0.0f) {
+        const float pulse = 0.5f + 0.5f * std::sin(pose.seconds * 7.0f);
+        DrawCircleV(ToRaylib(position), radius * (1.0f + kSummonShroudHalo),
+                    Fade(kDarkness, (0.32f + 0.14f * pulse) * threat));
+        DrawCircleV(ToRaylib(position), radius * 1.2f, Fade(kDarkness, 0.38f * threat));
+        style.fill = Mix(style.fill, kDarkness, kSummonShroudDarken * threat);
+        style.edge = Mix(style.edge, kDarkness, 0.85f * threat);
+        style.sheen = Mix(style.sheen, kDarkness, 0.88f * threat);
+        style.eye = Mix(style.eye, Color{255, 105, 80, 255}, 0.45f * threat * pulse);
+        style.bristle = std::max(style.bristle, 0.92f * threat);
+        style.eyeSize += kSummonShroudEyeSize * threat;
+        style.eyeGlow = 1.0f + (1.7f + 0.7f * pulse) * threat;
+        OpenMouth(boss, pose, kSummonShroudMouth * threat);
+    }
     if (boss.frenzied) {
         const float pulse = 0.5f + 0.5f * std::sin(pose.seconds * 8.0f);
         DrawCircleV(ToRaylib(position), radius * (1.0f + kFrenzyGlow), Fade(kBlood, 0.08f + 0.1f * pulse));
     }
     BeginBlendMode(BLEND_ADDITIVE);
-    DrawGlow(art, position, radius * kEyeLightReach, Fade(style->eye, kEyeLight));
+    DrawGlow(art, position, radius * kEyeLightReach, Fade(style.eye, kEyeLight * (1.0f + 1.4f * threat)));
     EndBlendMode();
-    DrawHairBody(position, radius, *style, pose, art);
+    DrawHairBody(position, radius, style, pose, art);
     DrawBossShield(boss.shield, position, radius, pose.seconds);
     if (IsStaggered(boss)) {
         DrawStunStars(position, radius, boss.staggerSeconds);

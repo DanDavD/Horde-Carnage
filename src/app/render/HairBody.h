@@ -26,6 +26,7 @@ struct HairStyle {
     /// stay white for the whole fight.
     float flash;
     float eyeSize; ///< Eyes are a share of the radius times this, so a small body's eyes still read.
+    float eyeGlow = 1.0f; ///< Multiplier on the additive eye glow; above 1 flares through a dark shroud.
 };
 
 /// How a hairy body stands in this frame.
