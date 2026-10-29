@@ -49,8 +49,8 @@ constexpr float kHeadingRuleY = kHeadingY + kHeadingSize + 22.0f;
 // Each line of the settings: the name on the left and the value in a column on the right. The arrows on each
 // side of the selected value sit at a fixed place, so they do not move as the value's width changes.
 constexpr float kRowSize = 20.0f;
-constexpr float kRowFirstY = 262.0f;
-constexpr float kRowSpacing = 46.0f;
+constexpr float kRowFirstY = 240.0f;
+constexpr float kRowSpacing = 40.0f;
 constexpr float kRowGap = 22.0f; // Between the values and Controls and Back.
 constexpr float kRowHalf = 260.0f;
 constexpr float kValueCenterX = kMiddle + 160.0f;
@@ -81,18 +81,22 @@ constexpr float kEndMenuSpread = 170.0f;
 // In a browser the tab is closed, not the game, so there is nothing to quit.
 constexpr std::array<const char*, 2> kTitleItems{"BEGIN", "SETTINGS"};
 // Nor a display or a frame rate to choose: the page decides both.
-constexpr std::array<SettingsRow, 5> kSettingsRows{{
+constexpr std::array<SettingsRow, 7> kSettingsRows{{
     {"MASTER VOLUME", SettingsRowKind::Value, Setting::MasterVolume},
     {"MUSIC VOLUME", SettingsRowKind::Value, Setting::MusicVolume},
+    {"MOUSE SENSITIVITY", SettingsRowKind::Value, Setting::MouseSensitivity},
+    {"GAMEPAD SENSITIVITY", SettingsRowKind::Value, Setting::StickSensitivity},
     {"SCREEN SHAKE", SettingsRowKind::Value, Setting::ScreenShake},
     {"CONTROLS", SettingsRowKind::Controls},
     {"BACK", SettingsRowKind::Back},
 }};
 #else
 constexpr std::array<const char*, 3> kTitleItems{"BEGIN", "SETTINGS", "QUIT"};
-constexpr std::array<SettingsRow, 7> kSettingsRows{{
+constexpr std::array<SettingsRow, 9> kSettingsRows{{
     {"MASTER VOLUME", SettingsRowKind::Value, Setting::MasterVolume},
     {"MUSIC VOLUME", SettingsRowKind::Value, Setting::MusicVolume},
+    {"MOUSE SENSITIVITY", SettingsRowKind::Value, Setting::MouseSensitivity},
+    {"GAMEPAD SENSITIVITY", SettingsRowKind::Value, Setting::StickSensitivity},
     {"SCREEN SHAKE", SettingsRowKind::Value, Setting::ScreenShake},
     {"DISPLAY", SettingsRowKind::Value, Setting::Display},
     {"FRAME RATE", SettingsRowKind::Value, Setting::FrameRate},
@@ -217,6 +221,25 @@ void DrawArrow(Vec2 tip, float side, Color color) {
     } else {
         DrawTriangle(point, top, bottom, color);
     }
+}
+
+// The level of a line drawn as ten marks: the volumes and the sensitivities.
+std::optional<int> MarkedLevel(const Settings& settings, Setting setting) {
+    switch (setting) {
+    case Setting::MasterVolume:
+        return settings.masterVolume;
+    case Setting::MusicVolume:
+        return settings.musicVolume;
+    case Setting::MouseSensitivity:
+        return settings.mouseSensitivity;
+    case Setting::StickSensitivity:
+        return settings.stickSensitivity;
+    case Setting::ScreenShake:
+    case Setting::Display:
+    case Setting::FrameRate:
+        break;
+    }
+    return std::nullopt;
 }
 
 void DrawVolumeTicks(Vec2 center, int volume, Color lit) {
@@ -350,9 +373,8 @@ void DrawSettingsScreen(const Menu& menu, float sinceMoved, const Settings& sett
             continue;
         }
         const Vec2 value{kValueCenterX, center.y};
-        if (row.setting == Setting::MasterVolume || row.setting == Setting::MusicVolume) {
-            DrawVolumeTicks(value, row.setting == Setting::MasterVolume ? settings.masterVolume : settings.musicVolume,
-                            color);
+        if (const std::optional<int> level = MarkedLevel(settings, row.setting)) {
+            DrawVolumeTicks(value, *level, color);
         } else {
             const std::string text = SettingValueText(settings, row.setting);
             DrawGameTextCentered(art.titleFont, text.c_str(), value.x, value.y - 0.55f * kValueSize, kValueSize,

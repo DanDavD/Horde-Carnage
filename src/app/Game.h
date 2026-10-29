@@ -57,7 +57,12 @@ private:
     void GoBack(MenuPage page);
     /// Changes one setting by `step`, puts it into effect and saves it.
     void ChangeSetting(Setting setting, int step);
-    /// Puts the volumes and the frame rate of `_settings` into effect.
+    /// Where the mouse aims, in game pixels: the game's own crosshair while the cursor is locked in a fight,
+    /// the system cursor otherwise.
+    [[nodiscard]] Vec2 MouseAimInGame(const ScreenFit& fit) const;
+    /// Locks the cursor while playing and gives it back in the menus, keeping the crosshair where it was.
+    void UpdateAimLock(const ScreenFit& fit);
+    /// Puts the volumes, the mouse sensitivity and the frame rate of `_settings` into effect.
     void ApplySettings();
     /// Makes the window fullscreen or not, as `_settings` says.
     void ApplyDisplay();
@@ -101,6 +106,9 @@ private:
     MenuPage _openedPage = MenuPage::None; ///< The settings or the controls, over the title or the pause.
     float _menuSinceMoved = 0.0f; ///< Real seconds since the selection last moved, for the marks to slide.
     Vec2 _lastMouse;       ///< The mouse last frame: only a mouse that moves takes the selection.
+    /// The crosshair, in game pixels, moved by the mouse times its sensitivity while the cursor is locked.
+    Vec2 _mouseAim;
+    bool _aimLocked = false; ///< Whether the system cursor is locked to the game, in a fight on the desktop.
     InputDevice _inputDevice = InputDevice::KeyboardMouse;
     GamepadConnection _gamepadConnection;
     GamepadType _gamepadType = GamepadType::Generic;

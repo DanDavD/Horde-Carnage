@@ -6,7 +6,7 @@ The few things a player may want to change before or during a fight: how loud th
 
 The code:
 
-- `src/core/Settings.h`, `src/core/Settings.cpp`: `Settings`, `AdjustSetting` (one step of one value), what each value means to the game (`MasterGain`, `MusicGain`, `ShakeAmount`, `TargetFramesPerSecond`), how it reads on screen (`SettingValueText`), and the saved text (`FormatSettings`, `ParseSettings`). Pure logic, with tests.
+- `src/core/Settings.h`, `src/core/Settings.cpp`: `Settings`, `AdjustSetting` (one step of one value), what each value means to the game (`MasterGain`, `MusicGain`, `MouseAimScale`, `StickTurnRadiansPerSecond`, `ShakeAmount`, `TargetFramesPerSecond`), how it reads on screen (`SettingValueText`), and the saved text (`FormatSettings`, `ParseSettings`). Pure logic, with tests.
 - `src/app/SettingsStore.h`, `src/app/SettingsStore.cpp`: where the text is kept. A file on the desktop, the page's local storage in a browser.
 - `src/app/render/MenuDraw.cpp`: the settings and controls pages (`DrawSettingsScreen`, `DrawControlsScreen`) and where the mouse hits them (`MenuTargetAt`).
 - `src/app/Game.cpp`: `ChangeSetting`, `ApplySettings` and `ApplyDisplay`, and the pages opened over the title and the pause (`OpenPage`, `GoBack`).
@@ -19,6 +19,8 @@ The code:
 |---|---|---|---|
 | Master volume | 0 to 10, as ten marks | 10 | raylib's master volume: 0.8 x (level / 10) squared |
 | Music volume | 0 to 10, as ten marks | 10 | The music's stream alone, under the master: (level / 10) squared. See [Music](MUSIC.md) |
+| Mouse sensitivity | 1 to 10, as ten marks | 5 | How far the crosshair moves for the mouse's movement: 1 at 5, as the cursor moves, about a third at 1 and 4 at 10 (`MouseAimScale`) |
+| Gamepad sensitivity | 1 to 10, as ten marks | 5 | How fast the aim turns toward the right stick: about 1440 degrees a second at 5, 160 at 1, and at once at 10 (`StickTurnRadiansPerSecond`) |
 | Screen shake | Off, Low, Full | Full | The shake drawn: none, half, all of it |
 | Display | Fullscreen, Windowed | Fullscreen | A borderless window over the monitor, or a 1280x720 window that can be resized |
 | Frame rate | VSync, 60, 120, 144, Unlimited | VSync | How often a frame is drawn. The fight always steps 60 times a second |
@@ -31,11 +33,13 @@ In a browser there is no Display or Frame rate line: the page decides the size o
 
 **Taking effect.** `ChangeSetting` changes the value with `AdjustSetting`, then puts it into effect: the volume through `SetMasterVolume`, the music volume through the music's own stream (`SetMusicPlayerVolume`), the frame rate by turning vsync on or off and setting raylib's target, the display by toggling the borderless window. The shake is read when the world is drawn, so it needs nothing. A tick plays after every change, at the new volume, which is how the volume is set by ear.
 
-**Saving.** Every change writes all the settings as five lines of text:
+**Saving.** Every change writes all the settings as seven lines of text:
 
 ```
 volume=8
 music=6
+mouse=5
+stick=5
 shake=low
 display=fullscreen
 framerate=vsync
@@ -48,6 +52,8 @@ On the desktop that is `settings.txt` next to the game's executable; in a browse
 ## Design decisions
 
 - **A handful of values, not a full options menu.** These are the settings the players of a short action game look for first, and each one fixes a real problem: no sound control, motion sickness from shake, a game that will not leave fullscreen, and a frame rate that heats a laptop.
+- **The sensitivities are steps on a log scale, with the plain speed in the middle.** Each level is the same ratio faster than the last, which is how a change of speed is felt, and level 5 keeps the mouse moving as the cursor did before this setting existed. The gamepad's sensitivity is how fast the aim may turn, not a curve on the stick: the aim follows where the stick points, so the stick has no speed to scale, but a lower turn rate makes small corrections steadier.
+  - Rejected: a separate horizontal and vertical sensitivity, and an acceleration curve. Players of a top-down game expect one number.
 - **The music has a volume of its own.** A player who wants to hear the warnings over everything, or to play to their own music, turns the theme down without losing the effects. It acts on the music's stream, under the master volume, so turning the master down still turns everything down. A file saved before this line existed has no `music=` and reads with the music at full.
   - Rejected: an effects volume as well. The effects carry the warnings of every attack, which a player should not turn off by accident; the master volume is enough for them.
   - Rejected: remapping keys. It needs a page that waits for a key, a check for clashes and a reset, about a day of work for a fight with six actions. The controls page shows them instead.
@@ -78,7 +84,7 @@ On the desktop that is `settings.txt` next to the game's executable; in a browse
 
 ## Tests
 
-- `tests/core/SettingsTests.cpp`: the defaults; the volume stops at 0 and 10 while the other values wrap round both ways; the volume curve is silent at 0, under 1 at 10, and at 5 a quarter of full; the music volume stops at both ends, is squared to 1 at full and leaves the master alone; a file without a music line reads with the music at full; the shake and frame rate turn into the right numbers; each value reads in capitals; settings written as text read back the same; and a damaged file (Windows line ends, spaces, an unknown key, an unknown value, a line without `=`, a number with junk after it, a volume out of range) keeps the defaults for what it gets wrong.
+- `tests/core/SettingsTests.cpp`: the defaults; the volume stops at 0 and 10 while the other values wrap round both ways; the volume curve is silent at 0, under 1 at 10, and at 5 a quarter of full; the music volume stops at both ends, is squared to 1 at full and leaves the master alone; the sensitivities stop at 1 and 10, are the plain speed at 5, grow with every level and are saved, and a file without them reads at 5; a file without a music line reads with the music at full; the shake and frame rate turn into the right numbers; each value reads in capitals; settings written as text read back the same; and a damaged file (Windows line ends, spaces, an unknown key, an unknown value, a line without `=`, a number with junk after it, a volume out of range) keeps the defaults for what it gets wrong.
 - `tests/core/MenuTests.cpp`: an adjust asks to change the selected item's value, on the item the mouse points at, and a confirm in the same frame wins.
 
 What I checked in a Release build, with keys posted to a window resized to 1600x900:

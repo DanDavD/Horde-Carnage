@@ -13,6 +13,8 @@ constexpr float kPi = 3.1415926535f;
 constexpr float kDeadzone = 0.2f;
 constexpr float kTolerance = 0.001f;
 constexpr horde::Vec2 kView{1280.0f, 720.0f};
+// A turn limit no step can reach: the aim lands on the stick at once.
+constexpr float kInstant = 100.0f;
 
 float AngleBetween(horde::Vec2 a, horde::Vec2 b) {
     const float dot = horde::Dot(horde::Normalized(a), horde::Normalized(b));
@@ -163,24 +165,55 @@ TEST_CASE("assist aim in world targets the boss and minions while alive") {
     }
 }
 
-TEST_CASE("stepping gamepad aim keeps twin-stick aim independent of movement and holds heading while firing") {
+TEST_CASE("only the right stick aims: the left stick never turns the aim, firing or not") {
     const horde::World world = horde::CreateWorld(horde::kBossArena, kView, 456);
     const horde::Vec2 playerPos = world.player.motion.position;
     horde::GamepadAim aim;
 
-    // Right stick north while running south: aims north at the boss, not south with the feet.
-    const horde::Vec2 kitingAim = horde::StepGamepadAim(aim, world, {0.0f, -1.0f}, {0.0f, 1.0f}, true);
-    CHECK(doctest::Approx(kitingAim.x).epsilon(kTolerance) == playerPos.x);
-    CHECK(doctest::Approx(kitingAim.y).epsilon(kTolerance) == playerPos.y - horde::kGamepadCrosshairDistance);
+    // Right stick north: aims north at the boss.
+    const horde::Vec2 north = horde::StepGamepadAim(aim, world, {0.0f, -1.0f}, true, kInstant);
+    CHECK(doctest::Approx(north.x).epsilon(kTolerance) == playerPos.x);
+    CHECK(doctest::Approx(north.y).epsilon(kTolerance) == playerPos.y - horde::kGamepadCrosshairDistance);
 
-    // Letting go of the right stick while still holding RT and running south keeps shooting north.
-    const horde::Vec2 heldFireAim = horde::StepGamepadAim(aim, world, {}, {0.0f, 1.0f}, true);
-    CHECK(doctest::Approx(heldFireAim.y).epsilon(kTolerance) == playerPos.y - horde::kGamepadCrosshairDistance);
+    // Letting go of the right stick, firing or not, keeps aiming north however the hunter walks: the left
+    // stick is not even an input of the aim.
+    const horde::Vec2 held = horde::StepGamepadAim(aim, world, {}, true, kInstant);
+    CHECK(doctest::Approx(held.y).epsilon(kTolerance) == playerPos.y - horde::kGamepadCrosshairDistance);
+    const horde::Vec2 idle = horde::StepGamepadAim(aim, world, {}, false, kInstant);
+    CHECK(doctest::Approx(idle.x).epsilon(kTolerance) == north.x);
+    CHECK(doctest::Approx(idle.y).epsilon(kTolerance) == north.y);
+}
 
-    // Releasing RT as well lets the hunter turn naturally with movement, without magnetizing sideways.
-    const horde::Vec2 runningEastAim = horde::StepGamepadAim(aim, world, {}, {1.0f, 0.0f}, false);
-    CHECK(doctest::Approx(runningEastAim.x).epsilon(kTolerance) == playerPos.x + horde::kGamepadCrosshairDistance);
-    CHECK(doctest::Approx(runningEastAim.y).epsilon(kTolerance) == playerPos.y);
+TEST_CASE("the aim turns toward the right stick no faster than its sensitivity allows") {
+    const horde::World world = horde::CreateWorld(horde::kBossArena, kView, 321);
+    horde::GamepadAim aim;
+    aim.rawDirection = {1.0f, 0.0f};
+    // A stick pointing the other way, a half turn, with at most a tenth of a turn per step.
+    const float step = 0.1f * 2.0f * kPi;
+    (void)horde::StepGamepadAim(aim, world, {-1.0f, 0.0f}, false, step);
+    CHECK(AngleBetween(aim.rawDirection, {1.0f, 0.0f}) == doctest::Approx(step).epsilon(0.001));
+    for (int i = 0; i < 4; ++i) {
+        (void)horde::StepGamepadAim(aim, world, {-1.0f, 0.0f}, false, step);
+    }
+    // Five steps of a tenth of a turn: the half turn is done, and it goes no further.
+    CHECK(AngleBetween(aim.rawDirection, {-1.0f, 0.0f}) < 0.001f);
+    (void)horde::StepGamepadAim(aim, world, {-1.0f, 0.0f}, false, step);
+    CHECK(AngleBetween(aim.rawDirection, {-1.0f, 0.0f}) < 0.001f);
+}
+
+TEST_CASE("turning toward a direction takes the shorter way round") {
+    const horde::Vec2 from{1.0f, 0.0f};
+    const horde::Vec2 down{0.0f, 1.0f};
+    const horde::Vec2 up{0.0f, -1.0f};
+    const float eighth = kPi / 4.0f;
+    const horde::Vec2 towardDown = horde::TurnToward(from, down, eighth);
+    CHECK(towardDown.y > 0.0f);
+    CHECK(AngleBetween(towardDown, from) == doctest::Approx(eighth).epsilon(0.001));
+    const horde::Vec2 towardUp = horde::TurnToward(from, up, eighth);
+    CHECK(towardUp.y < 0.0f);
+    // Already close enough: it lands on the target.
+    const horde::Vec2 near = horde::TurnToward(from, horde::Normalized({1.0f, 0.1f}), eighth);
+    CHECK(AngleBetween(near, {1.0f, 0.1f}) < 0.001f);
 }
 
 TEST_CASE("holding fire with right stick released does not compound aim assist across steps") {
@@ -189,11 +222,11 @@ TEST_CASE("holding fire with right stick released does not compound aim assist a
     const float offAngle = 10.0f * (kPi / 180.0f);
     const horde::Vec2 stick{std::sin(offAngle), -std::cos(offAngle)};
 
-    (void)horde::StepGamepadAim(aim, world, stick, {}, true);
+    (void)horde::StepGamepadAim(aim, world, stick, true, kInstant);
     const horde::Vec2 initialAssisted = aim.direction;
 
     for (int i = 0; i < 120; ++i) {
-        (void)horde::StepGamepadAim(aim, world, {}, {-1.0f, 0.0f}, true);
+        (void)horde::StepGamepadAim(aim, world, {}, true, kInstant);
     }
     CHECK(doctest::Approx(aim.direction.x).epsilon(kTolerance) == initialAssisted.x);
     CHECK(doctest::Approx(aim.direction.y).epsilon(kTolerance) == initialAssisted.y);

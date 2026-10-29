@@ -74,6 +74,47 @@ TEST_CASE("the music has a volume of its own, stopping at both ends, squared lik
     CHECK(horde::SettingValueText(settings, Setting::MusicVolume) == "0");
 }
 
+TEST_CASE("the sensitivities stop at 1 and 10, and the middle is the plain speed") {
+    Settings settings;
+    CHECK(settings.mouseSensitivity == 5);
+    CHECK(settings.stickSensitivity == 5);
+    // At 5 the mouse moves the crosshair as far as the cursor, and the stick turns a whole circle in a
+    // quarter of a second.
+    CHECK(horde::MouseAimScale(settings) == doctest::Approx(1.0f));
+    CHECK(horde::StickTurnRadiansPerSecond(settings) == doctest::Approx(1440.0f * 3.14159265f / 180.0f));
+    CHECK(horde::AdjustSetting(settings, Setting::MouseSensitivity, 5));
+    CHECK(settings.mouseSensitivity == 10);
+    CHECK_FALSE(horde::AdjustSetting(settings, Setting::MouseSensitivity, 1));
+    CHECK(horde::MouseAimScale(settings) == doctest::Approx(4.0f));
+    CHECK(horde::AdjustSetting(settings, Setting::StickSensitivity, -20));
+    CHECK(settings.stickSensitivity == 1);
+    CHECK(horde::StickTurnRadiansPerSecond(settings) < horde::StickTurnRadiansPerSecond(Settings{}) / 8.0f);
+    CHECK(horde::SettingValueText(settings, Setting::StickSensitivity) == "1");
+    // Each level up is faster than the last.
+    Settings slower;
+    Settings faster;
+    for (int level = 1; level < 10; ++level) {
+        slower.mouseSensitivity = level;
+        faster.mouseSensitivity = level + 1;
+        slower.stickSensitivity = level;
+        faster.stickSensitivity = level + 1;
+        CHECK(horde::MouseAimScale(faster) > horde::MouseAimScale(slower));
+        CHECK(horde::StickTurnRadiansPerSecond(faster) > horde::StickTurnRadiansPerSecond(slower));
+    }
+}
+
+TEST_CASE("the sensitivities are saved, and a file without them reads at the middle") {
+    Settings settings;
+    settings.mouseSensitivity = 3;
+    settings.stickSensitivity = 8;
+    const Settings read = horde::ParseSettings(horde::FormatSettings(settings));
+    CHECK(read.mouseSensitivity == 3);
+    CHECK(read.stickSensitivity == 8);
+    CHECK(horde::ParseSettings("volume=4\n").mouseSensitivity == 5);
+    CHECK(horde::ParseSettings("mouse=0\nstick=99").mouseSensitivity == 1);
+    CHECK(horde::ParseSettings("mouse=0\nstick=99").stickSensitivity == 10);
+}
+
 TEST_CASE("the shake and the frame rate turn into numbers for the game") {
     CHECK(horde::ShakeAmount(ShakeLevel::Off) == 0.0f);
     CHECK(horde::ShakeAmount(ShakeLevel::Low) > 0.0f);
@@ -99,7 +140,7 @@ TEST_CASE("settings written as text read back the same") {
     const Settings settings{.masterVolume = 3, .musicVolume = 6, .shake = ShakeLevel::Off, .fullscreen = false,
                             .frameRate = FrameRateCap::Unlimited};
     const std::string text = horde::FormatSettings(settings);
-    CHECK(text == "volume=3\nmusic=6\nshake=off\ndisplay=windowed\nframerate=unlimited\n");
+    CHECK(text == "volume=3\nmusic=6\nmouse=5\nstick=5\nshake=off\ndisplay=windowed\nframerate=unlimited\n");
     const Settings read = horde::ParseSettings(text);
     CHECK(read.masterVolume == 3);
     CHECK(read.musicVolume == 6);

@@ -27,6 +27,7 @@
 #include "core/Facing.h"
 #include "core/GamepadAim.h"
 #include "core/ImpactFeel.h"
+#include "core/MouseAim.h"
 #include "core/ScreenFit.h"
 
 namespace horde {
@@ -110,7 +111,12 @@ void Game::Run() {
 
 void Game::Frame() {
     const float frameSeconds = GetFrameTime();
-    const Vec2 mouse = AimInGame(CurrentScreenFit());
+    if (_aimLocked) {
+        const Vector2 delta = GetMouseDelta();
+        _mouseAim = MoveMouseAim(_mouseAim, Vec2{delta.x, delta.y}, CurrentScreenFit().scale,
+                                 MouseAimScale(_settings), kViewSize);
+    }
+    const Vec2 mouse = MouseAimInGame(CurrentScreenFit());
     const std::optional<int> usedPadSlot = FindActiveGamepadSlot(_gamepadConnection.activeSlot);
     const GamepadConnectionEvents padEvents =
         StepGamepadConnection(_gamepadConnection, ReadGamepadPresence(), usedPadSlot);
@@ -137,7 +143,7 @@ void Game::Frame() {
     }
 
     // The crosshair replaces the system cursor while playing. On the end screens the cursor is back.
-    SetCursorHidden(_session.state == SessionState::Playing);
+    UpdateAimLock(CurrentScreenFit());
 #ifndef NDEBUG
     if (IsKeyPressed(KEY_F1)) {
         _showDebugOverlay = !_showDebugOverlay;
@@ -410,9 +416,38 @@ void Game::ChangeSetting(Setting setting, int step) {
     PlayCue(_sounds, SoundCue{SoundId::MenuMove, kMenuMoveVolume});
 }
 
+Vec2 Game::MouseAimInGame(const ScreenFit& fit) const {
+    return _aimLocked ? _mouseAim : AimInGame(fit);
+}
+
+void Game::UpdateAimLock(const ScreenFit& fit) {
+    const bool lock = _session.state == SessionState::Playing;
+#ifdef __EMSCRIPTEN__
+    // The page locks the pointer itself and scales its movement (web/shell.html).
+    (void)fit;
+    SetCursorHidden(lock);
+#else
+    if (lock == _aimLocked) {
+        return;
+    }
+    if (lock) {
+        // The crosshair starts where the cursor was, and moves on from there by the mouse's movement.
+        _mouseAim = AimInGame(fit);
+    }
+    SetCursorHidden(lock);
+    if (!lock) {
+        // Unlocked, the cursor comes back where the crosshair was, not in the middle of the screen.
+        const Vec2 screen = fit.offset + _mouseAim * fit.scale;
+        SetMousePosition(static_cast<int>(screen.x), static_cast<int>(screen.y));
+    }
+    _aimLocked = lock;
+#endif
+}
+
 void Game::ApplySettings() {
     SetMasterVolume(MasterGain(_settings));
     SetMusicPlayerVolume(_music, MusicGain(_settings));
+    SetMouseSensitivity(MouseAimScale(_settings));
 #ifndef __EMSCRIPTEN__
     // In a browser the page draws once per refresh of the screen, whatever is asked.
     if (_settings.frameRate == FrameRateCap::VSync) {
@@ -459,11 +494,11 @@ void Game::Update(float dt) {
     std::optional<Vec2> aimInView;
     std::optional<Vec2> aimDirection;
     if (_inputDevice == InputDevice::Gamepad) {
-        (void)StepGamepadAim(_gamepadAim, _session.world, ReadLookStick(_gamepadConnection.activeSlot), move,
-                             fireHeld || _pendingPresses.fire);
+        (void)StepGamepadAim(_gamepadAim, _session.world, ReadLookStick(_gamepadConnection.activeSlot),
+                             fireHeld || _pendingPresses.fire, StickTurnRadiansPerSecond(_settings) * dt);
         aimDirection = _gamepadAim.direction;
     } else {
-        aimInView = AimInGame(CurrentScreenFit()) - kViewSize * 0.5f;
+        aimInView = MouseAimInGame(CurrentScreenFit()) - kViewSize * 0.5f;
     }
 
     const PlayerCommands commands{.move = move,
@@ -605,7 +640,7 @@ void Game::DrawScene(const ScreenFit& fit, float alpha, bool withHud) const {
                 liveFacing = _gamepadAim.direction;
             }
         } else {
-            screenAim = AimInGame(fit);
+            screenAim = MouseAimInGame(fit);
             if (playing) {
                 const Vec2 viewCenter = Lerp(world.camera.previousCenter, world.camera.center, alpha);
                 const Vec2 worldAim = viewCenter + (screenAim - kViewSize * 0.5f);
