@@ -1,5 +1,7 @@
 #include "app/PlayerInput.h"
 
+#include <cstddef>
+
 #include <raylib.h>
 
 #ifdef __EMSCRIPTEN__
@@ -11,8 +13,6 @@
 namespace horde {
 
 namespace {
-
-constexpr int kGamepad = 0;
 
 #ifdef __EMSCRIPTEN__
 // The page locks the pointer on the next click only while the game wants it hidden (see web/shell.html).
@@ -31,6 +31,10 @@ EM_JS(int, TakePageLockLost, (), {
 #endif
 constexpr float kStickDeadzone = 0.2f;
 
+bool IsSlotAvailable(std::optional<int> gamepad) {
+    return gamepad.has_value() && *gamepad >= 0 && *gamepad < kMaxGamepads && IsGamepadAvailable(*gamepad);
+}
+
 float KeyAxis(int negativeKey, int negativeAltKey, int positiveKey, int positiveAltKey) {
     float axis = 0.0f;
     if (IsKeyDown(negativeKey) || IsKeyDown(negativeAltKey)) {
@@ -42,28 +46,75 @@ float KeyAxis(int negativeKey, int negativeAltKey, int positiveKey, int positive
     return axis;
 }
 
-float ButtonAxis(int negativeButton, int positiveButton) {
+float ButtonAxis(int slot, int negativeButton, int positiveButton) {
     float axis = 0.0f;
-    if (IsGamepadButtonDown(kGamepad, negativeButton)) {
+    if (IsGamepadButtonDown(slot, negativeButton)) {
         axis -= 1.0f;
     }
-    if (IsGamepadButtonDown(kGamepad, positiveButton)) {
+    if (IsGamepadButtonDown(slot, positiveButton)) {
         axis += 1.0f;
     }
     return axis;
 }
 
-Vec2 ReadPadMove() {
-    if (!IsGamepadAvailable(kGamepad)) {
+Vec2 ReadPadMoveSlot(int slot) {
+    if (!IsGamepadAvailable(slot)) {
         return {};
     }
-    const Vec2 raw{GetGamepadAxisMovement(kGamepad, GAMEPAD_AXIS_LEFT_X),
-                   GetGamepadAxisMovement(kGamepad, GAMEPAD_AXIS_LEFT_Y)};
+    const Vec2 raw{GetGamepadAxisMovement(slot, GAMEPAD_AXIS_LEFT_X),
+                   GetGamepadAxisMovement(slot, GAMEPAD_AXIS_LEFT_Y)};
     const Vec2 stick = ApplyRadialDeadzone(raw, kStickDeadzone);
     // Some players move with the d-pad, as in older arcade brawlers. It works like the keyboard.
-    const Vec2 dpad{ButtonAxis(GAMEPAD_BUTTON_LEFT_FACE_LEFT, GAMEPAD_BUTTON_LEFT_FACE_RIGHT),
-                    ButtonAxis(GAMEPAD_BUTTON_LEFT_FACE_UP, GAMEPAD_BUTTON_LEFT_FACE_DOWN)};
+    const Vec2 dpad{ButtonAxis(slot, GAMEPAD_BUTTON_LEFT_FACE_LEFT, GAMEPAD_BUTTON_LEFT_FACE_RIGHT),
+                    ButtonAxis(slot, GAMEPAD_BUTTON_LEFT_FACE_UP, GAMEPAD_BUTTON_LEFT_FACE_DOWN)};
     return stick + dpad;
+}
+
+Vec2 ReadLookStickSlot(int slot) {
+    if (!IsGamepadAvailable(slot)) {
+        return {};
+    }
+    const Vec2 raw{GetGamepadAxisMovement(slot, GAMEPAD_AXIS_RIGHT_X),
+                   GetGamepadAxisMovement(slot, GAMEPAD_AXIS_RIGHT_Y)};
+    return ApplyRadialDeadzone(raw, kStickDeadzone);
+}
+
+bool HasSlotActivity(int slot) {
+    if (!IsGamepadAvailable(slot)) {
+        return false;
+    }
+    if (LengthSquared(ReadPadMoveSlot(slot)) > 0.0f || LengthSquared(ReadLookStickSlot(slot)) > 0.0f) {
+        return true;
+    }
+    if (IsGamepadButtonDown(slot, GAMEPAD_BUTTON_RIGHT_TRIGGER_2) ||
+        IsGamepadButtonDown(slot, GAMEPAD_BUTTON_LEFT_TRIGGER_2) ||
+        GetGamepadAxisMovement(slot, GAMEPAD_AXIS_RIGHT_TRIGGER) > 0.15f ||
+        GetGamepadAxisMovement(slot, GAMEPAD_AXIS_LEFT_TRIGGER) > 0.15f) {
+        return true;
+    }
+    constexpr int kCheckedButtons[] = {
+        GAMEPAD_BUTTON_LEFT_FACE_UP,
+        GAMEPAD_BUTTON_LEFT_FACE_RIGHT,
+        GAMEPAD_BUTTON_LEFT_FACE_DOWN,
+        GAMEPAD_BUTTON_LEFT_FACE_LEFT,
+        GAMEPAD_BUTTON_RIGHT_FACE_UP,
+        GAMEPAD_BUTTON_RIGHT_FACE_RIGHT,
+        GAMEPAD_BUTTON_RIGHT_FACE_DOWN,
+        GAMEPAD_BUTTON_RIGHT_FACE_LEFT,
+        GAMEPAD_BUTTON_LEFT_TRIGGER_1,
+        GAMEPAD_BUTTON_RIGHT_TRIGGER_1,
+        GAMEPAD_BUTTON_MIDDLE_LEFT,
+        GAMEPAD_BUTTON_MIDDLE,
+        GAMEPAD_BUTTON_MIDDLE_RIGHT,
+        GAMEPAD_BUTTON_LEFT_THUMB,
+        GAMEPAD_BUTTON_RIGHT_THUMB,
+    };
+    for (const int button : kCheckedButtons) {
+        if (IsGamepadButtonDown(slot, button) || IsGamepadButtonPressed(slot, button)) {
+            return true;
+        }
+    }
+    return false;
 }
 
 Vec2 ReadKeyMove() {
@@ -72,48 +123,44 @@ Vec2 ReadKeyMove() {
 
 } // namespace
 
-Vec2 ReadMoveInput() {
-    // All devices add up. StepMovement clamps the sum to length 1, so using two at once is never faster.
-    return ReadKeyMove() + ReadPadMove();
-}
-
-Vec2 ReadLookStick() {
-    if (!IsGamepadAvailable(kGamepad)) {
-        return {};
+std::array<bool, kMaxGamepads> ReadGamepadPresence() {
+    std::array<bool, kMaxGamepads> present{};
+    for (int i = 0; i < kMaxGamepads; ++i) {
+        present[static_cast<std::size_t>(i)] = IsGamepadAvailable(i);
     }
-    const Vec2 raw{GetGamepadAxisMovement(kGamepad, GAMEPAD_AXIS_RIGHT_X),
-                   GetGamepadAxisMovement(kGamepad, GAMEPAD_AXIS_RIGHT_Y)};
-    return ApplyRadialDeadzone(raw, kStickDeadzone);
+    return present;
 }
 
-std::optional<InputDevice> DetectActiveInputDevice(Vec2 currentMousePos, Vec2 lastMousePos) {
-    if (IsGamepadAvailable(kGamepad)) {
-        if (LengthSquared(ReadPadMove()) > 0.0f || LengthSquared(ReadLookStick()) > 0.0f) {
-            return InputDevice::Gamepad;
+std::optional<int> FindActiveGamepadSlot(std::optional<int> preferredSlot) {
+    if (IsSlotAvailable(preferredSlot) && HasSlotActivity(*preferredSlot)) {
+        return preferredSlot;
+    }
+    for (int i = 0; i < kMaxGamepads; ++i) {
+        if (HasSlotActivity(i)) {
+            return i;
         }
-        if (GetGamepadButtonPressed() != GAMEPAD_BUTTON_UNKNOWN) {
-            return InputDevice::Gamepad;
-        }
-        if (IsGamepadButtonDown(kGamepad, GAMEPAD_BUTTON_RIGHT_TRIGGER_2) ||
-            IsGamepadButtonDown(kGamepad, GAMEPAD_BUTTON_LEFT_TRIGGER_2) ||
-            GetGamepadAxisMovement(kGamepad, GAMEPAD_AXIS_RIGHT_TRIGGER) > 0.15f ||
-            GetGamepadAxisMovement(kGamepad, GAMEPAD_AXIS_LEFT_TRIGGER) > 0.15f) {
-            return InputDevice::Gamepad;
-        }
-        constexpr int kCheckedButtons[] = {
-            GAMEPAD_BUTTON_RIGHT_FACE_UP,
-            GAMEPAD_BUTTON_RIGHT_FACE_RIGHT,
-            GAMEPAD_BUTTON_RIGHT_FACE_DOWN,
-            GAMEPAD_BUTTON_RIGHT_FACE_LEFT,
-            GAMEPAD_BUTTON_LEFT_TRIGGER_1,
-            GAMEPAD_BUTTON_RIGHT_TRIGGER_1,
-            GAMEPAD_BUTTON_MIDDLE_RIGHT,
-        };
-        for (const int button : kCheckedButtons) {
-            if (IsGamepadButtonDown(kGamepad, button)) {
-                return InputDevice::Gamepad;
-            }
-        }
+    }
+    return std::nullopt;
+}
+
+Vec2 ReadMoveInput(std::optional<int> gamepad) {
+    // All devices add up. StepMovement clamps the sum to length 1, so using two at once is never faster.
+    const Vec2 pad = IsSlotAvailable(gamepad) ? ReadPadMoveSlot(*gamepad) : Vec2{};
+    return ReadKeyMove() + pad;
+}
+
+Vec2 ReadPadMenuDirection(std::optional<int> gamepad) {
+    return IsSlotAvailable(gamepad) ? ReadPadMoveSlot(*gamepad) : Vec2{};
+}
+
+Vec2 ReadLookStick(std::optional<int> gamepad) {
+    return IsSlotAvailable(gamepad) ? ReadLookStickSlot(*gamepad) : Vec2{};
+}
+
+std::optional<InputDevice> DetectActiveInputDevice(Vec2 currentMousePos, Vec2 lastMousePos,
+                                                   std::optional<int> activeGamepadInputSlot) {
+    if (activeGamepadInputSlot.has_value()) {
+        return InputDevice::Gamepad;
     }
 
     if (LengthSquared(currentMousePos - lastMousePos) > 4.0f) {
@@ -127,7 +174,7 @@ std::optional<InputDevice> DetectActiveInputDevice(Vec2 currentMousePos, Vec2 la
         return InputDevice::KeyboardMouse;
     }
     constexpr int kCheckedKeys[] = {
-        KEY_SPACE, KEY_LEFT_SHIFT, KEY_E,      KEY_Q,     KEY_ONE,      KEY_TWO,
+        KEY_SPACE, KEY_LEFT_SHIFT, KEY_E,      KEY_Q,        KEY_ONE,       KEY_TWO,
         KEY_ESCAPE, KEY_ENTER,     KEY_KP_ENTER, KEY_BACKSPACE, KEY_R,
     };
     for (const int key : kCheckedKeys) {
@@ -163,17 +210,19 @@ void SetCursorHidden(bool hidden) {
 #endif
 }
 
-bool ReadFireHeld() {
+bool ReadFireHeld(std::optional<int> gamepad) {
     const bool mouseFire = IsMouseButtonDown(MOUSE_BUTTON_LEFT);
-    const bool padFire = IsGamepadAvailable(kGamepad) &&
-                         (IsGamepadButtonDown(kGamepad, GAMEPAD_BUTTON_RIGHT_TRIGGER_2) ||
-                          GetGamepadAxisMovement(kGamepad, GAMEPAD_AXIS_RIGHT_TRIGGER) > 0.15f);
+    const bool padFire = IsSlotAvailable(gamepad) &&
+                         (IsGamepadButtonDown(*gamepad, GAMEPAD_BUTTON_RIGHT_TRIGGER_2) ||
+                          GetGamepadAxisMovement(*gamepad, GAMEPAD_AXIS_RIGHT_TRIGGER) > 0.15f);
     return mouseFire || padFire;
 }
 
-void CollectButtonPresses(ButtonPresses& presses) {
-    const bool pad = IsGamepadAvailable(kGamepad);
-    const auto padPressed = [pad](int button) { return pad && IsGamepadButtonPressed(kGamepad, button); };
+void CollectButtonPresses(ButtonPresses& presses, std::optional<int> gamepad) {
+    const bool pad = IsSlotAvailable(gamepad);
+    const auto padPressed = [pad, gamepad](int button) {
+        return pad && IsGamepadButtonPressed(*gamepad, button);
+    };
 
     // Fire: left mouse button or RT.
     presses.fire = presses.fire || IsMouseButtonPressed(MOUSE_BUTTON_LEFT) ||
@@ -198,34 +247,43 @@ void CollectButtonPresses(ButtonPresses& presses) {
     presses.heal = presses.heal || IsKeyPressed(KEY_E) || padPressed(GAMEPAD_BUTTON_RIGHT_FACE_LEFT);
 }
 
-MenuInput ReadMenuKeys() {
-    const bool pad = IsGamepadAvailable(kGamepad);
-    const auto padPressed = [pad](int button) { return pad && IsGamepadButtonPressed(kGamepad, button); };
+MenuInput ReadMenuInput(MenuRepeat& padRepeat, float dt, std::optional<int> gamepad) {
+    const MenuRepeatStep padStep = StepMenuRepeat(padRepeat, ReadPadMenuDirection(gamepad), dt);
+    const bool pad = IsSlotAvailable(gamepad);
+    const auto padPressed = [pad, gamepad](int button) {
+        return pad && IsGamepadButtonPressed(*gamepad, button);
+    };
+
     MenuInput input;
-    if (IsKeyPressed(KEY_W) || IsKeyPressed(KEY_UP) || padPressed(GAMEPAD_BUTTON_LEFT_FACE_UP)) {
+    if (IsKeyPressed(KEY_W) || IsKeyPressed(KEY_UP)) {
         input.move = -1;
     }
-    if (IsKeyPressed(KEY_S) || IsKeyPressed(KEY_DOWN) || padPressed(GAMEPAD_BUTTON_LEFT_FACE_DOWN)) {
+    if (IsKeyPressed(KEY_S) || IsKeyPressed(KEY_DOWN)) {
         input.move = 1;
     }
     // Repeated while held, so the volume can be run from one end to the other without tapping.
-    if (IsKeyPressed(KEY_A) || IsKeyPressedRepeat(KEY_A) || IsKeyPressed(KEY_LEFT) || IsKeyPressedRepeat(KEY_LEFT) ||
-        padPressed(GAMEPAD_BUTTON_LEFT_FACE_LEFT)) {
+    if (IsKeyPressed(KEY_A) || IsKeyPressedRepeat(KEY_A) || IsKeyPressed(KEY_LEFT) || IsKeyPressedRepeat(KEY_LEFT)) {
         input.adjust = -1;
     }
-    if (IsKeyPressed(KEY_D) || IsKeyPressedRepeat(KEY_D) || IsKeyPressed(KEY_RIGHT) || IsKeyPressedRepeat(KEY_RIGHT) ||
-        padPressed(GAMEPAD_BUTTON_LEFT_FACE_RIGHT)) {
+    if (IsKeyPressed(KEY_D) || IsKeyPressedRepeat(KEY_D) || IsKeyPressed(KEY_RIGHT) || IsKeyPressedRepeat(KEY_RIGHT)) {
         input.adjust = 1;
     }
+    if (input.move == 0) {
+        input.move = padStep.move;
+    }
+    if (input.adjust == 0) {
+        input.adjust = padStep.adjust;
+    }
+
     input.confirm = IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_KP_ENTER) || IsKeyPressed(KEY_SPACE) ||
                     padPressed(GAMEPAD_BUTTON_RIGHT_FACE_DOWN);
     input.back = IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_BACKSPACE) || padPressed(GAMEPAD_BUTTON_RIGHT_FACE_RIGHT);
     return input;
 }
 
-bool ReadPausePressed() {
+bool ReadPausePressed(std::optional<int> gamepad) {
     return IsKeyPressed(KEY_ESCAPE) ||
-           (IsGamepadAvailable(kGamepad) && IsGamepadButtonPressed(kGamepad, GAMEPAD_BUTTON_MIDDLE_RIGHT));
+           (IsSlotAvailable(gamepad) && IsGamepadButtonPressed(*gamepad, GAMEPAD_BUTTON_MIDDLE_RIGHT));
 }
 
 bool ReadQuickRetryPressed() {

@@ -1,8 +1,11 @@
 #pragma once
 
+#include <array>
 #include <optional>
 
+#include "core/GamepadConnection.h"
 #include "core/Menu.h"
+#include "core/MenuRepeat.h"
 #include "core/Vec2.h"
 
 namespace horde {
@@ -13,25 +16,38 @@ enum class InputDevice {
     Gamepad,
 };
 
-/// Reads where the player wants to move this step, from the keyboard (WASD or arrows) and the
-/// left stick and d-pad of the first gamepad. The result can be longer than 1; `StepMovement` clamps it.
-[[nodiscard]] Vec2 ReadMoveInput();
+/// Reads which of the `kMaxGamepads` slots currently have a controller plugged in.
+[[nodiscard]] std::array<bool, kMaxGamepads> ReadGamepadPresence();
 
-/// Reads the right stick of the first gamepad, with deadzone applied. Returns {0, 0} if untouched
-/// or inside the deadzone.
-[[nodiscard]] Vec2 ReadLookStick();
+/// Returns the connected gamepad slot that has stick, d-pad, trigger or button input this frame,
+/// checking `preferredSlot` first when given, or `std::nullopt` if every connected pad is idle.
+[[nodiscard]] std::optional<int> FindActiveGamepadSlot(std::optional<int> preferredSlot = std::nullopt);
+
+/// Reads where the player wants to move this step, from the keyboard (WASD or arrows) and the
+/// left stick and d-pad of `gamepad` (when connected). The result can be longer than 1; `StepMovement` clamps it.
+[[nodiscard]] Vec2 ReadMoveInput(std::optional<int> gamepad = 0);
+
+/// Reads the left stick (with radial deadzone) plus the d-pad of `gamepad`, without keyboard keys,
+/// for driving menu navigation and hold-repeat.
+[[nodiscard]] Vec2 ReadPadMenuDirection(std::optional<int> gamepad = 0);
+
+/// Reads the right stick of `gamepad`, with deadzone applied. Returns {0, 0} if untouched, inside
+/// the deadzone, or disconnected.
+[[nodiscard]] Vec2 ReadLookStick(std::optional<int> gamepad = 0);
 
 /// Checks whether any mouse/keyboard or gamepad activity occurred this frame, returning the active device,
-/// or std::nullopt if the controls are idle.
-[[nodiscard]] std::optional<InputDevice> DetectActiveInputDevice(Vec2 currentMousePos, Vec2 lastMousePos);
+/// or `std::nullopt` if the controls are idle.
+[[nodiscard]] std::optional<InputDevice> DetectActiveInputDevice(Vec2 currentMousePos, Vec2 lastMousePos,
+                                                                 std::optional<int> activeGamepadInputSlot);
 
-/// This frame's menu keys: W, S, up and down (or the d-pad) move, A, D, left and right (or the d-pad)
-/// adjust, Enter or Space (or A) confirm, Esc or Backspace (or B) go back. Left and right repeat while held.
-/// The mouse is left to the caller, which knows where the items are. Read once per frame.
-[[nodiscard]] MenuInput ReadMenuKeys();
+/// This frame's menu input: W, S, up and down move, A, D, left and right adjust (repeating while held),
+/// the gamepad's left stick and d-pad move and adjust through `padRepeat` (repeating while held),
+/// Enter or Space (or A) confirm, Esc or Backspace (or B) go back. The mouse is left to the caller, which
+/// knows where the items are. Read once per frame.
+[[nodiscard]] MenuInput ReadMenuInput(MenuRepeat& padRepeat, float dt, std::optional<int> gamepad = 0);
 
-/// Whether the pause button went down this frame: Esc, or Start on the first gamepad.
-[[nodiscard]] bool ReadPausePressed();
+/// Whether the pause button went down this frame: Esc, or Start on `gamepad`.
+[[nodiscard]] bool ReadPausePressed(std::optional<int> gamepad = 0);
 
 /// Whether R went down this frame: a retry without going through the menu, for the next attempt at once.
 [[nodiscard]] bool ReadQuickRetryPressed();
@@ -53,9 +69,9 @@ enum class InputDevice {
 /// lets it go at once when it does not, so the menus can be used with the mouse.
 void SetCursorHidden(bool hidden);
 
-/// Whether the fire button (left mouse button or gamepad RT) is down right now. A held state, so reading
+/// Whether the fire button (left mouse button or `gamepad` RT) is down right now. A held state, so reading
 /// it once per fixed step is right.
-[[nodiscard]] bool ReadFireHeld();
+[[nodiscard]] bool ReadFireHeld(std::optional<int> gamepad = 0);
 
 /// Button presses that are events, gathered over one or more frames until a fixed step uses them.
 struct ButtonPresses {
@@ -68,6 +84,6 @@ struct ButtonPresses {
 
 /// Adds this frame's presses to `presses`. Call it once per frame: a frame that runs no fixed step keeps
 /// them for the next one, instead of losing them.
-void CollectButtonPresses(ButtonPresses& presses);
+void CollectButtonPresses(ButtonPresses& presses, std::optional<int> gamepad = 0);
 
 } // namespace horde

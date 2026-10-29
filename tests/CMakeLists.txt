@@ -19,10 +19,12 @@ add_executable(horde_tests
     core/FollowCameraTests.cpp
     core/FrenzyTests.cpp
     core/GamepadAimTests.cpp
+    core/GamepadConnectionTests.cpp
     core/HealthTests.cpp
     core/HitStopTests.cpp
     core/ImpactFeelTests.cpp
     core/LoadoutTests.cpp
+    core/MenuRepeatTests.cpp
     core/MenuTests.cpp
     core/MovementTests.cpp
     core/ObjectPoolTests.cpp

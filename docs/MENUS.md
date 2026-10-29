@@ -7,10 +7,12 @@ The screens around the fight: the title, the pause menu, the settings and the co
 The code:
 
 - `src/core/Menu.h`, `src/core/Menu.cpp`: `Menu`, `MenuInput` and `StepMenu`, the selection and what one frame of input does to it.
+- `src/core/MenuRepeat.h`, `src/core/MenuRepeat.cpp`: `MenuRepeat`, `LatchMenuRepeat` and `StepMenuRepeat`, which turn a held left stick or d-pad into discrete menu steps with hysteresis and key-like repeat.
+- `src/core/GamepadConnection.h`, `src/core/GamepadConnection.cpp`: `GamepadConnection` and `StepGamepadConnection`, which pick up newly plugged-in controllers across the four slots and report when the active one unplugs.
 - `src/core/Session.h`, `src/core/Session.cpp`: the `Title` and `Paused` states, `ReturnToTitle`, `BeginFight`, `PauseFight` and `ResumeFight` (see [Game flow](GAME_FLOW.md)).
 - `src/app/render/MenuDraw.h`, `src/app/render/MenuDraw.cpp`: the pages (`MenuPage`), the items of each, where they sit, which one the mouse is over, and how they are drawn; the title, pause, settings and controls screens.
 - `src/app/render/Backdrop.h`, `src/app/render/Backdrop.cpp`: the blurred still of the fight behind the pause menu.
-- `src/app/PlayerInput.cpp`: `ReadMenuKeys`, `ReadPausePressed`, `ReadQuickRetryPressed` and, in a browser, `TakePointerLockLost`.
+- `src/app/PlayerInput.cpp`: `ReadMenuInput`, `ReadPadMenuDirection`, `ReadGamepadPresence`, `FindActiveGamepadSlot`, `ReadPausePressed`, `ReadQuickRetryPressed` and, in a browser, `TakePointerLockLost`.
 - `src/app/Game.cpp`: `HandleMenus`, `Choose` and `GoBack`, which turn a choice into a change of state or of page.
 
 ## How it works
@@ -26,9 +28,9 @@ The code:
 | YOU DIED | Try again, Return to title | Nothing |
 | VICTORY | Fight again, Return to title | Nothing |
 
-The game opens on the title, over a fresh world that waits behind it, darkened. The game's name and its menu sit together in the middle of the screen. Esc (or Start on a gamepad) pauses a fight. Settings and Controls open over the title or the pause, which stay in their state behind them; they are described in [Settings](SETTINGS.md). The end screens' choices sit in a row at the foot of the dark band, and stay dim until the restart delay has passed. R still retries at once after a death or a victory, for the next attempt without the menu.
+The game opens on the title, over a fresh world that waits behind it, darkened. The game's name and its menu sit together in the middle of the screen. Esc (or Start on a gamepad, or unplugging the active gamepad) pauses a fight. Settings and Controls open over the title or the pause, which stay in their state behind them; they are described in [Settings](SETTINGS.md). The end screens' choices sit in a row at the foot of the dark band, and stay dim until the restart delay has passed. R still retries at once after a death or a victory, for the next attempt without the menu.
 
-**Choosing.** `StepMenu` takes one frame of input from anything: W, S, up and down (or the d-pad) move. A, D, left and right ask to change the selected item's value, which only the settings have; in a row of choices, such as the end screens', `Game` turns them into moves along the row. Enter or Space (or A) confirm, and Esc or Backspace (or B) go back. The mouse selects the item it moves onto and a click chooses the item under it. A mouse that has not moved does not take the selection, so a player using the keys is not pulled back to wherever the mouse rests. The selection wraps round at both ends. Going back wins over everything else in the same frame. Each move plays a dry tick and each choice a low knock, both synthesized like the rest of the sounds (see [Audio](AUDIO.md)).
+**Choosing.** `StepMenu` takes one frame of input from anything: W, S, up and down (or the left stick and d-pad) move. A, D, left and right (or the left stick and d-pad) ask to change the selected item's value, which only the settings have; in a row of choices, such as the end screens', `Game` turns them into moves along the row. Holding left or right on the keyboard, or holding any direction on the left stick or d-pad, waits 0.38 s after the first step and then repeats every 0.11 s; `StepMenuRepeat` picks the dominant axis so a slanted push in Settings never changes a value while moving to another row, and `LatchMenuRepeat` suppresses an opening jump if the stick was already held when the menu opened. Enter or Space (or A) confirm, and Esc or Backspace (or B) go back. The mouse selects the item it moves onto and a click chooses the item under it. A mouse that has not moved does not take the selection, so a player using the keys is not pulled back to wherever the mouse rests. The selection wraps round at both ends. Going back wins over everything else in the same frame. Each move plays a dry tick and each choice a low knock, both synthesized like the rest of the sounds (see [Audio](AUDIO.md)).
 
 **The marks.** When the selection moves, the two lines beside the new item slide out over 0.12 s from its diamonds. It is the only animation in the menus.
 
@@ -47,6 +49,7 @@ The game opens on the title, over a fresh world that waits behind it, darkened. 
 - **Going back to the title starts the attempts over.** Returning to the title gives up the run of tries, as it does in the games this one borrows from; a retry keeps counting.
 - **Left and right adjust, and a row turns them into moves.** In the settings, up and down go between lines and left and right change a value, as in most games. The menu does not know about values, so `StepMenu` only reports which way, and `Game` changes the setting.
 - **The title is a state of the `Session`, not a separate screen object.** The world waits behind it, and beginning the fight is a change of state, so all the screens are one state machine with tests.
+- **Unplugging the active gamepad pauses the fight, while plugging one in never interrupts it.** A dead battery or a pulled cable mid-fight would otherwise cost the attempt, whereas plugging a controller in works straight away on whichever of the four slots the system assigns it.
 
 ## How to tune it
 
@@ -58,15 +61,17 @@ The game opens on the title, over a fresh world that waits behind it, darkened. 
 | How far the mouse can miss an item | `kHitPadX`, `kHitPadY` (`MenuDraw.cpp`) | 18, 10 pixels |
 | The pause's blur and step back | `Backdrop` halves, `kRecededScale`, `kRecedeSeconds`, `kEdgeDark`, `kMiddleDark` (`Backdrop.cpp`) | Down to 160x90; 94% over 0.25 s; 86% and 50% dark |
 | The menu colors | `kMenuIdle`, `kMenuFaint` (`Palette.h`) | |
+| Stick and d-pad repeat in menus | `MenuRepeatStats` (`MenuRepeat.h`) | Engage 0.5, release 0.35, 0.38 s delay, 0.11 s repeat |
 
 ## Tests
 
 - `tests/core/MenuTests.cpp`: a new menu selects its first item; moving goes item by item and wraps at both ends; the mouse selects the item it moves onto, over a key in the same frame, and an item that does not exist is ignored; confirming chooses the selected item, and a click the item under the mouse; an adjust asks to change the selected item's value, on the item under the mouse, and a confirm in the same frame wins; going back wins over everything; an empty menu ignores everything.
+- `tests/core/MenuRepeatTests.cpp`: immediate step on tilt, initial delay and steady repeat, hysteresis against thumb tremor vs immediate re-arm on release, dominant-axis selection on diagonals, latching a held stick on menu open, and clamping long frames.
+- `tests/core/GamepadConnectionTests.cpp`: recording pads at start-up without hotplug events, plugging in and unplugging mid-run across slots, switching to the slot with input, and ignoring an idle slot unplugging while another slot is active.
 - `tests/core/SessionTests.cpp`: the title waits over a fresh world that does not move until the fight begins; a paused fight holds still, cannot restart, and resumes where it stopped; only a fight in progress pauses; going back to the title gives a fresh world and starts the attempts over.
 
 The screens I checked with window captures in Release: the title with each item selected, a fight, the pause over the blurred fight, YOU DIED with its choices dim and then lit, D moving the selection to Return to title, and Enter taking the game back to the title. In the browser build, with keys and a click held across a frame (my test browser's own clicks are shorter than a frame), Enter began the fight, Esc paused it over the blurred still, and a click on Return to title went back to the title. Not checked: the pause when a real browser lets go of a locked pointer, which needs a real click to lock it first, and the gamepad's buttons.
 
 ## Limitations
 
-- **The gamepad's stick does not move the selection.** The d-pad does; the stick comes with the gamepad support.
 - **The title's world is still.** The boss does not breathe behind the title, because the world does not step there.

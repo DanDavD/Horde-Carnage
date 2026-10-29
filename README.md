@@ -51,12 +51,12 @@ This is day 7 of 15, and the boss fight is in progress. Progress is tracked in t
 - Hits you can feel. A heavy hit drops the fight into slow motion for a moment, easing back to full speed, and the screen shakes with the hit, the boss's landings, its crashes into the walls and its roars, harder for the bigger moments. The HUD and your aim never shake. Every shot throws muzzle sparks, smoke and a brass casing that bounces on the stone; bullets spark blue or orange off the shield, shatter it into spinning shards when it breaks, and tear dark blood and locks of hair from the exposed boss; dashes kick up dust, leap landings roll out a ring of dust, killed hairballs burst into hair, and the Matriarch sheds locks onto the floor throughout Phase 2 and Frenzy, all from a 512-slot pool with its own random stream so the fight's seed never changes. See [Game feel](docs/GAME_FEEL.md).
 - Health bars in the manner of Dark Souls: a hit leaves a pale trail where the bar was, which waits while the hits keep coming and then drains, and the boss's bar shows the damage of your last run of hits. The edges of the screen go red when you are hit and beat like a heart when your health is low. The boss dies on screen, convulsing, screaming and turning grey, before VICTORY fades in. See [Game feel](docs/GAME_FEEL.md).
 - Sound, all of it synthesized in code like the art: the two guns, the shield's ping, knock and shatter, blows, the dash and the flask, the boss's landings, crashes, roar and death, and a warning sound for each of her attacks, so you can hear what is coming. Sounds lean toward the side of the screen they come from. See [Audio](docs/AUDIO.md).
-- A title screen, a pause menu and choices on the end screens, in the manner of Dark Souls and Hollow Knight: a few words in capitals on the dark, the selected one between a thin line and a diamond on each side. Pausing holds the fight and shows it behind the menu, blurred and stepping back. Keys, mouse or gamepad. See [Menus](docs/MENUS.md).
+- A title screen, a pause menu and choices on the end screens, in the manner of Dark Souls and Hollow Knight: a few words in capitals on the dark, the selected one between a thin line and a diamond on each side. Pausing holds the fight and shows it behind the menu, blurred and stepping back; unplugging the gamepad mid-fight pauses too. Keys, mouse, d-pad or left stick (with repeat when held). See [Menus](docs/MENUS.md).
 - Settings, from the title or the pause: master volume, screen shake (off, low or full), fullscreen or a window, and the frame rate (vsync, 60, 120, 144 or unlimited), each in effect at once and saved for the next run, plus a page of the controls. See [Settings](docs/SETTINGS.md).
 - Always fullscreen, at the monitor's own resolution and refresh rate, drawn sharp at that resolution, with black bars on screens that are not 16:9 so everyone sees the same arena. Settings > Display, or `--windowed` for one run, gives a window instead. See [Screen and fullscreen](docs/SCREEN.md).
 - Warnings are errors for the project's own code (`/W4 /WX` on MSVC).
 
-**Still to do:** an ambience and music, gamepad prompts and stick menus, and maybe the numbers in JSON. See the [roadmap](docs/ROADMAP.md) for the order, and for the difficulty I am aiming for.
+**Still to do:** an ambience and music, gamepad prompts, and maybe the numbers in JSON. See the [roadmap](docs/ROADMAP.md) for the order, and for the difficulty I am aiming for.
 
 ## Tech stack
 
@@ -97,11 +97,11 @@ You can also open the folder in Visual Studio (*File > Open > Folder*). It reads
 | Switch gun | `Q`, `1`, `2` or the mouse wheel | `Y` / Triangle |
 | Dash | `Space` or left `Shift` | `LT` or `RB` |
 | Drink a flask | `E` | `X` / Square |
-| Move through a menu | `W`, `S`, up and down, or the mouse | d-pad |
-| Change a setting | `A`, `D`, left and right, or a click on its line or arrows | d-pad left and right |
+| Move through a menu | `W`, `S`, up and down, or the mouse | Left stick or d-pad (hold to repeat) |
+| Change a setting | `A`, `D`, left and right, or a click on its line or arrows | Left stick or d-pad, left and right (hold to repeat) |
 | Choose | `Enter`, `Space` or a click | `A` |
 | Back, or resume from the pause | `Esc` or `Backspace` | `B` |
-| Pause | `Esc` | `Start` |
+| Pause | `Esc` | `Start` (also pauses if unplugged) |
 | Try again at once after "YOU DIED" or "VICTORY" | `R` | |
 | Quit | Quit on the title | |
 | Play in a window instead of fullscreen | Settings > Display, or start it with `--windowed` for one run | |

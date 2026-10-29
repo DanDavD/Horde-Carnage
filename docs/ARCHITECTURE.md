@@ -114,7 +114,7 @@ Game objects are plain structs (components) that hold data, and free functions (
 - `tests/core/CollisionTests.cpp` and the crowd cases in `WorldTests.cpp`: see [Collisions](COLLISIONS.md#tests).
 - `tests/core/HealthTests.cpp` and the contact damage cases in `WorldTests.cpp`: see [Health](HEALTH.md#tests).
 - `tests/core/SessionTests.cpp`: see [Game flow](GAME_FLOW.md#tests).
-- `tests/core/MenuTests.cpp`: see [Menus](MENUS.md#tests).
+- `tests/core/MenuTests.cpp`, `MenuRepeatTests.cpp` and `GamepadConnectionTests.cpp`: see [Menus](MENUS.md#tests).
 - `tests/core/SettingsTests.cpp`: see [Settings](SETTINGS.md#tests).
 - `tests/core/WeaponTests.cpp`, `LoadoutTests.cpp` and the aim and fire cases in `FacingTests.cpp` and `WorldTests.cpp`: see [Aiming and weapons](WEAPONS.md#tests).
 - `tests/core/ObjectPoolTests.cpp`: see [Object pool](OBJECT_POOL.md#tests).

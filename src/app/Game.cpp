@@ -106,15 +106,23 @@ void Game::Run() {
 }
 
 void Game::Frame() {
+    const float frameSeconds = GetFrameTime();
     const Vec2 mouse = AimInGame(CurrentScreenFit());
-    if (const auto device = DetectActiveInputDevice(mouse, _lastMouse)) {
+    const std::optional<int> usedPadSlot = FindActiveGamepadSlot(_gamepadConnection.activeSlot);
+    const GamepadConnectionEvents padEvents =
+        StepGamepadConnection(_gamepadConnection, ReadGamepadPresence(), usedPadSlot);
+    if (padEvents.activeDisconnected) {
+        _menuRepeat = {};
+        _inputDevice = InputDevice::KeyboardMouse;
+    }
+    if (const auto device = DetectActiveInputDevice(mouse, _lastMouse, usedPadSlot)) {
         _inputDevice = *device;
     }
     // Key presses are read once per frame, not per fixed step: a frame with no step would miss them.
-    HandleMenus();
+    HandleMenus(frameSeconds, padEvents.activeDisconnected);
     _lastMouse = mouse;
     if (_session.state == SessionState::Playing) {
-        CollectButtonPresses(_pendingPresses);
+        CollectButtonPresses(_pendingPresses, _gamepadConnection.activeSlot);
     } else {
         // A click or a key in a menu is not a shot or a dash in the fight that follows it.
         _pendingPresses = {};
@@ -145,7 +153,6 @@ void Game::Frame() {
 #endif
     // A hit stop slows the fight's clock, so the world takes fewer of its fixed steps. Every step is still the
     // same length, so the rules play out exactly as at full speed, only slower to watch.
-    const float frameSeconds = GetFrameTime();
     _menuSinceMoved += frameSeconds;
     // Behind the title and the pause menu everything holds still: the particles, the slow-down and the
     // shake pick up where they were when the fight resumes.
@@ -183,14 +190,15 @@ void Game::Frame() {
     Draw(static_cast<float>(_timestep.Alpha()));
 }
 
-void Game::HandleMenus() {
+void Game::HandleMenus(float frameSeconds, bool padDisconnected) {
     const SessionState state = _session.state;
     if (state == SessionState::Playing) {
         // The next menu, whichever it is, opens fresh on its first item.
         _menuPage = MenuPage::None;
         _openedPage = MenuPage::None;
-        if (ReadPausePressed() || TakePointerLockLost()) {
+        if (ReadPausePressed(_gamepadConnection.activeSlot) || TakePointerLockLost() || padDisconnected) {
             PauseFight(_session);
+            OpenPage(MenuPage::Pause, 0);
             _backdrop.ready = false;
             PlayCue(_sounds, SoundCue{SoundId::MenuConfirm, kMenuConfirmVolume});
         }
@@ -207,15 +215,23 @@ void Game::HandleMenus() {
         ForgetLastFight();
         return;
     }
+    // The end screens' choices wait for the restart delay, like the restart itself.
+    if ((state == SessionState::Dead || state == SessionState::Victory) && !CanRestart(_session)) {
+        if (LengthSquared(ReadPadMenuDirection(_gamepadConnection.activeSlot)) == 0.0f) {
+            _menuRepeat = {};
+        }
+        return;
+    }
 
-    MenuInput input = ReadMenuKeys();
+    MenuInput input = ReadMenuInput(_menuRepeat, frameSeconds, _gamepadConnection.activeSlot);
     // In a row of choices, left and right move along it; elsewhere they change the selected value.
     if (IsRowMenu(page)) {
         input.move = input.move != 0 ? input.move : input.adjust;
         input.adjust = 0;
     }
     // Start goes back from the pause menu, as it came in, and from the pages opened over it.
-    input.back = input.back || (state == SessionState::Paused && ReadPausePressed());
+    input.back = input.back ||
+                 (state == SessionState::Paused && ReadPausePressed(_gamepadConnection.activeSlot));
     const Vec2 mouse = AimInGame(CurrentScreenFit());
     const std::optional<MenuTarget> under = MenuTargetAt(page, mouse, _art);
     if (mouse != _lastMouse && under) {
@@ -228,10 +244,6 @@ void Game::HandleMenus() {
         } else {
             input.confirm = true;
         }
-    }
-    // The end screens' choices wait for the restart delay, like the restart itself.
-    if ((state == SessionState::Dead || state == SessionState::Victory) && !CanRestart(_session)) {
-        return;
     }
 
     const MenuResult result = StepMenu(_menu, input);
@@ -269,6 +281,7 @@ void Game::OpenPage(MenuPage page, int selected) {
     _menu.selected = selected;
     _menuPage = page;
     _menuSinceMoved = 0.0f;
+    LatchMenuRepeat(_menuRepeat, ReadPadMenuDirection(_gamepadConnection.activeSlot));
 }
 
 void Game::Choose(MenuPage page, int item) {
@@ -412,13 +425,13 @@ void Game::Update(float dt) {
     //
     // The mouse is turned into a world point with the camera as of the last step. The camera drawn on
     // screen is a fraction of a step behind that, which is far below a pixel of aiming error.
-    const Vec2 move = ReadMoveInput();
-    const bool fireHeld = ReadFireHeld();
+    const Vec2 move = ReadMoveInput(_gamepadConnection.activeSlot);
+    const bool fireHeld = ReadFireHeld(_gamepadConnection.activeSlot);
 
     Vec2 worldAim{};
     if (_inputDevice == InputDevice::Gamepad) {
-        worldAim = StepGamepadAim(_gamepadAim, _session.world, ReadLookStick(), move,
-                                  fireHeld || _pendingPresses.fire);
+        worldAim = StepGamepadAim(_gamepadAim, _session.world, ReadLookStick(_gamepadConnection.activeSlot),
+                                  move, fireHeld || _pendingPresses.fire);
     } else {
         const Camera2D camera = ToRaylibCamera(_session.world.camera, 1.0f);
         const Vec2 mouseInGame = AimInGame(CurrentScreenFit());

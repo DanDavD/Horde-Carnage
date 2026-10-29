@@ -10,8 +10,10 @@
 #include "app/render/MenuDraw.h"
 #include "core/FixedTimestep.h"
 #include "core/GamepadAim.h"
+#include "core/GamepadConnection.h"
 #include "core/HitStop.h"
 #include "core/Menu.h"
+#include "core/MenuRepeat.h"
 #include "core/ParticleEmitter.h"
 #include "core/ScreenFit.h"
 #include "core/ScreenShake.h"
@@ -39,8 +41,9 @@ public:
 private:
     /// One frame: the menus, the presses since the last one, the fixed steps that are due, and one render.
     void Frame();
-    /// Reads the menu on the screen, if any, and acts on a choice. While playing, pauses on Esc or Start.
-    void HandleMenus();
+    /// Reads the menu on the screen, if any, and acts on a choice. While playing, pauses on Esc, Start or
+    /// an unplugged gamepad.
+    void HandleMenus(float frameSeconds, bool padDisconnected);
     /// The page on the screen: one opened over the title or the pause, or else the one of the session's state.
     [[nodiscard]] MenuPage CurrentPage() const;
     /// Shows `page` with `selected` selected, over the session's own page or as it.
@@ -93,6 +96,8 @@ private:
     float _menuSinceMoved = 0.0f; ///< Real seconds since the selection last moved, for the marks to slide.
     Vec2 _lastMouse;       ///< The mouse last frame: only a mouse that moves takes the selection.
     InputDevice _inputDevice = InputDevice::KeyboardMouse;
+    GamepadConnection _gamepadConnection;
+    MenuRepeat _menuRepeat;
     GamepadAim _gamepadAim;
     Backdrop _backdrop;    ///< The blurred still behind the pause menu.
     bool _quit = false;    ///< Set by the title's Quit.

@@ -11,11 +11,13 @@ add_library(horde_core STATIC
     core/Flasks.cpp
     core/FollowCamera.cpp
     core/GamepadAim.cpp
+    core/GamepadConnection.cpp
     core/Health.cpp
     core/HitStop.cpp
     core/ImpactFeel.cpp
     core/Loadout.cpp
     core/Menu.cpp
+    core/MenuRepeat.cpp
     core/Movement.cpp
     core/Particle.cpp
     core/ParticleEmitter.cpp
