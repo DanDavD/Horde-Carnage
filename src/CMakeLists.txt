@@ -21,6 +21,7 @@ add_library(horde_core STATIC
     core/Loadout.cpp
     core/Menu.cpp
     core/MenuRepeat.cpp
+    core/MouseAim.cpp
     core/Movement.cpp
     core/MusicDirector.cpp
     core/MusicMixer.cpp

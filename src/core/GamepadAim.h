@@ -44,12 +44,16 @@ struct GamepadAim {
 [[nodiscard]] Vec2 GamepadAimPoint(Vec2 playerPosition, Vec2 stickDirection, Vec2 fallbackDirection,
                                    float crosshairDistance = kGamepadCrosshairDistance);
 
+/// `from` turned toward `to` by at most `maxRadians`, the shorter way round. Both are unit vectors.
+[[nodiscard]] Vec2 TurnToward(Vec2 from, Vec2 to, float maxRadians);
+
 /// Updates `aim` for one fixed step and returns the world-space aim point. Only the right stick aims: the
 /// left stick moves the hunter and never turns the aim.
-/// - Tilting `rightStick` aims along the stick with soft aim assist.
+/// - Tilting `rightStick` turns the aim toward the stick, by at most `maxTurnRadians` this step (the
+///   gamepad's sensitivity), with soft aim assist.
 /// - Releasing `rightStick` keeps the current heading. While `firing`, the soft assist is worked out again
 ///   from the unassisted heading, so it follows a target without compounding.
 [[nodiscard]] Vec2 StepGamepadAim(GamepadAim& aim, const World& world, Vec2 rightStick, bool firing,
-                                  const AimAssistStats& stats = {});
+                                  float maxTurnRadians, const AimAssistStats& stats = {});
 
 } // namespace horde

@@ -3,7 +3,9 @@
 #include <algorithm>
 #include <array>
 #include <charconv>
+#include <cmath>
 #include <cstddef>
+#include <numbers>
 
 namespace horde {
 
@@ -48,13 +50,18 @@ std::string_view Trimmed(std::string_view text) {
     return text.substr(first, last - first + 1);
 }
 
-// A whole number from 0 to `kMaxVolume`, brought back into range; anything else leaves `volume` as it was.
-void ParseVolume(std::string_view value, int& volume) {
+// A whole number, brought back into `low` to `high`; anything else leaves `level` as it was.
+void ParseLevel(std::string_view value, int& level, int low, int high) {
     int read = 0;
     const auto [end, error] = std::from_chars(value.data(), value.data() + value.size(), read);
     if (error == std::errc{} && end == value.data() + value.size()) {
-        volume = std::clamp(read, 0, kMaxVolume);
+        level = std::clamp(read, low, high);
     }
+}
+
+// How far `level` sits from the middle level 5, as a share of the steps to either end.
+float SensitivityStep(int level) {
+    return static_cast<float>(std::clamp(level, kMinSensitivity, kMaxSensitivity) - 5);
 }
 
 // From 0 to 1 at full, squared: the ear hears loudness on a log scale.
@@ -65,9 +72,13 @@ float VolumeCurve(int volume) {
 
 void ParseLine(std::string_view key, std::string_view value, Settings& settings) {
     if (key == "volume") {
-        ParseVolume(value, settings.masterVolume);
+        ParseLevel(value, settings.masterVolume, 0, kMaxVolume);
     } else if (key == "music") {
-        ParseVolume(value, settings.musicVolume);
+        ParseLevel(value, settings.musicVolume, 0, kMaxVolume);
+    } else if (key == "mouse") {
+        ParseLevel(value, settings.mouseSensitivity, kMinSensitivity, kMaxSensitivity);
+    } else if (key == "stick") {
+        ParseLevel(value, settings.stickSensitivity, kMinSensitivity, kMaxSensitivity);
     } else if (key == "shake") {
         ParseName(value, kShakeNames, settings.shake);
     } else if (key == "display") {
@@ -90,6 +101,12 @@ bool AdjustSetting(Settings& settings, Setting setting, int step) {
     case Setting::MusicVolume:
         settings.musicVolume = std::clamp(settings.musicVolume + step, 0, kMaxVolume);
         return settings.musicVolume != before.musicVolume;
+    case Setting::MouseSensitivity:
+        settings.mouseSensitivity = std::clamp(settings.mouseSensitivity + step, kMinSensitivity, kMaxSensitivity);
+        return settings.mouseSensitivity != before.mouseSensitivity;
+    case Setting::StickSensitivity:
+        settings.stickSensitivity = std::clamp(settings.stickSensitivity + step, kMinSensitivity, kMaxSensitivity);
+        return settings.stickSensitivity != before.stickSensitivity;
     case Setting::ScreenShake:
         settings.shake = Cycled(settings.shake, step, static_cast<int>(kShakeNames.size()));
         return settings.shake != before.shake;
@@ -110,6 +127,18 @@ float MasterGain(const Settings& settings) {
 
 float MusicGain(const Settings& settings) {
     return VolumeCurve(settings.musicVolume);
+}
+
+float MouseAimScale(const Settings& settings) {
+    // Doubling every two and a half levels: 1/3 at 1, 1 at 5, 4 at 10.
+    return std::pow(2.0f, SensitivityStep(settings.mouseSensitivity) / 2.5f);
+}
+
+float StickTurnRadiansPerSecond(const Settings& settings) {
+    constexpr float kMiddleDegrees = 1440.0f;
+    // Doubling every level and a quarter: about 160 degrees a second at 1, 23,000 at 10.
+    const float degrees = kMiddleDegrees * std::pow(2.0f, SensitivityStep(settings.stickSensitivity) / 1.25f);
+    return degrees * std::numbers::pi_v<float> / 180.0f;
 }
 
 float ShakeAmount(ShakeLevel level) {
@@ -145,6 +174,10 @@ std::string SettingValueText(const Settings& settings, Setting setting) {
         return std::to_string(settings.masterVolume);
     case Setting::MusicVolume:
         return std::to_string(settings.musicVolume);
+    case Setting::MouseSensitivity:
+        return std::to_string(settings.mouseSensitivity);
+    case Setting::StickSensitivity:
+        return std::to_string(settings.stickSensitivity);
     case Setting::ScreenShake:
         return kShakeLabels[static_cast<std::size_t>(settings.shake)];
     case Setting::Display:
@@ -159,6 +192,8 @@ std::string FormatSettings(const Settings& settings) {
     std::string text;
     text += "volume=" + std::to_string(settings.masterVolume) + "\n";
     text += "music=" + std::to_string(settings.musicVolume) + "\n";
+    text += "mouse=" + std::to_string(settings.mouseSensitivity) + "\n";
+    text += "stick=" + std::to_string(settings.stickSensitivity) + "\n";
     text += "shake=" + std::string(kShakeNames[static_cast<std::size_t>(settings.shake)]) + "\n";
     text += std::string("display=") + (settings.fullscreen ? "fullscreen" : "windowed") + "\n";
     text += "framerate=" + std::string(kFrameRateNames[static_cast<std::size_t>(settings.frameRate)]) + "\n";

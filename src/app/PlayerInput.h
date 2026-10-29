@@ -71,10 +71,14 @@ enum class InputDevice {
 /// following it while the pointer is locked to the game.
 [[nodiscard]] Vec2 ReadAimPoint();
 
-/// Shows or hides the system cursor over the game. The game draws its own crosshair while playing. In a
-/// browser the page hides the cursor itself, by locking the pointer on a click while this asks for it, and
-/// lets it go at once when it does not, so the menus can be used with the mouse.
+/// Locks and hides the system cursor over the game, or gives it back. The game draws its own crosshair while
+/// playing. In a browser the page hides the cursor itself, by locking the pointer on a click while this asks
+/// for it, and lets it go at once when it does not, so the menus can be used with the mouse.
 void SetCursorHidden(bool hidden);
+
+/// In a browser, how far the page moves the aim point for the mouse's movement while the pointer is locked.
+/// On the desktop the game scales the movement itself, so this does nothing there.
+void SetMouseSensitivity(float scale);
 
 /// Whether the fire button (left mouse button or `gamepad` RT) is down right now. A held state, so reading
 /// it once per fixed step is right.

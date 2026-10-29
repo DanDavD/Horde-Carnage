@@ -87,7 +87,8 @@ There are no web-only tests: the rules are the same `horde_core` the Windows job
 
 ## Limitations
 
-- **raylib's own mouse position is not used in the browser.** Anything new that reads the mouse there has to go through `ReadAimPoint`.
+- **raylib's own mouse position is not used in the browser.** Anything new that reads the mouse there has to go through `ReadAimPoint`. The mouse sensitivity reaches the page as `Module.hordeSensitivity`, which scales the pointer lock's movement.
+- **A browser can keep an old `index.js` in its cache.** The page loads it without a version in its address, so a local test after a rebuild can run the old game under the new page; reload without the cache. itch.io gives every upload its own address, so players are not affected.
 - **Very short key presses can be missed.** raylib reads a key as pressed when it is down at the start of a frame. A real press lasts several frames, but a key sent and released inside one frame (as some automation does) does not count. The same is true on the desktop.
 - **No gamepad testing in the browser.** The browser exposes gamepads, and raylib reads them, but I have not tried one.
 - **Sound will need a click first.** Browsers only start audio after the player interacts with the page. The title screen, when it comes, gives the player that click.

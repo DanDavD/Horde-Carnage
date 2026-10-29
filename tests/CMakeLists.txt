@@ -29,6 +29,7 @@ add_executable(horde_tests
     core/LoadoutTests.cpp
     core/MenuRepeatTests.cpp
     core/MenuTests.cpp
+    core/MouseAimTests.cpp
     core/MovementTests.cpp
     core/MusicDirectorTests.cpp
     core/MusicMixerTests.cpp

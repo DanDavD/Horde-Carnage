@@ -48,10 +48,12 @@
   }
   document.addEventListener('mousemove', function (event) {
     if (locked()) {
-      // Locked, the mouse only reports how far it moved: the aim point moves by that, inside the game.
+      // Locked, the mouse only reports how far it moved: the aim point moves by that, times the mouse
+      // sensitivity the game sets (Module.hordeSensitivity), inside the game.
       var box = canvas.getBoundingClientRect();
-      Module.hordeAim.x = clamp(Module.hordeAim.x + event.movementX * canvas.width / box.width, 0, canvas.width);
-      Module.hordeAim.y = clamp(Module.hordeAim.y + event.movementY * canvas.height / box.height, 0, canvas.height);
+      var speed = Module.hordeSensitivity || 1;
+      Module.hordeAim.x = clamp(Module.hordeAim.x + event.movementX * speed * canvas.width / box.width, 0, canvas.width);
+      Module.hordeAim.y = clamp(Module.hordeAim.y + event.movementY * speed * canvas.height / box.height, 0, canvas.height);
     } else {
       aimAt(event);
     }

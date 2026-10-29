@@ -90,10 +90,19 @@ Vec2 GamepadAimPoint(Vec2 playerPosition, Vec2 stickDirection, Vec2 fallbackDire
     return playerPosition + direction * crosshairDistance;
 }
 
-Vec2 StepGamepadAim(GamepadAim& aim, const World& world, Vec2 rightStick, bool firing,
+Vec2 TurnToward(Vec2 from, Vec2 to, float maxRadians) {
+    const float cross = from.x * to.y - from.y * to.x;
+    const float angle = std::atan2(cross, Dot(from, to));
+    if (std::abs(angle) <= maxRadians) {
+        return to;
+    }
+    return Normalized(Rotated(from, angle > 0.0f ? maxRadians : -maxRadians));
+}
+
+Vec2 StepGamepadAim(GamepadAim& aim, const World& world, Vec2 rightStick, bool firing, float maxTurnRadians,
                     const AimAssistStats& stats) {
     if (LengthSquared(rightStick) > 0.001f) {
-        aim.rawDirection = Normalized(rightStick);
+        aim.rawDirection = TurnToward(aim.rawDirection, Normalized(rightStick), maxTurnRadians);
         aim.direction = AssistAimInWorld(world, aim.rawDirection, stats);
     } else if (firing) {
         aim.direction = AssistAimInWorld(world, aim.rawDirection, stats);

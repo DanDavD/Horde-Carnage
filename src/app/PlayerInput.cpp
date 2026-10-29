@@ -23,6 +23,11 @@ EM_JS(void, SetPageWantsLock, (int wants), {
     }
 });
 
+// How far the aim point moves for the mouse's movement while the pointer is locked (see web/shell.html).
+EM_JS(void, SetPageMouseSensitivity, (double scale), {
+    Module.hordeSensitivity = scale;
+});
+
 EM_JS(int, TakePageLockLost, (), {
     const lost = Module.hordeLockLost ? 1 : 0;
     Module.hordeLockLost = false;
@@ -214,11 +219,22 @@ void SetCursorHidden(bool hidden) {
 #ifdef __EMSCRIPTEN__
     SetPageWantsLock(hidden ? 1 : 0);
 #else
+    // Locked, not only hidden: the cursor can then never leave the window or stop at the screen's edge, and
+    // raylib reports how far the mouse moved, which the game's own crosshair follows (see MoveMouseAim).
     if (hidden && !IsCursorHidden()) {
-        HideCursor();
+        DisableCursor();
     } else if (!hidden && IsCursorHidden()) {
-        ShowCursor();
+        EnableCursor();
     }
+#endif
+}
+
+void SetMouseSensitivity(float scale) {
+#ifdef __EMSCRIPTEN__
+    SetPageMouseSensitivity(static_cast<double>(scale));
+#else
+    // On the desktop the game scales the mouse's movement itself.
+    (void)scale;
 #endif
 }
 
