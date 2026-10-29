@@ -7,9 +7,23 @@
 
 namespace horde {
 
+/// Which device the player interacted with most recently.
+enum class InputDevice {
+    KeyboardMouse,
+    Gamepad,
+};
+
 /// Reads where the player wants to move this step, from the keyboard (WASD or arrows) and the
 /// left stick and d-pad of the first gamepad. The result can be longer than 1; `StepMovement` clamps it.
 [[nodiscard]] Vec2 ReadMoveInput();
+
+/// Reads the right stick of the first gamepad, with deadzone applied. Returns {0, 0} if untouched
+/// or inside the deadzone.
+[[nodiscard]] Vec2 ReadLookStick();
+
+/// Checks whether any mouse/keyboard or gamepad activity occurred this frame, returning the active device,
+/// or std::nullopt if the controls are idle.
+[[nodiscard]] std::optional<InputDevice> DetectActiveInputDevice(Vec2 currentMousePos, Vec2 lastMousePos);
 
 /// This frame's menu keys: W, S, up and down (or the d-pad) move, A, D, left and right (or the d-pad)
 /// adjust, Enter or Space (or A) confirm, Esc or Backspace (or B) go back. Left and right repeat while held.
@@ -39,17 +53,17 @@ namespace horde {
 /// lets it go at once when it does not, so the menus can be used with the mouse.
 void SetCursorHidden(bool hidden);
 
-/// Whether the fire button (the left mouse button) is down right now. A held state, so reading it once
-/// per fixed step is right.
+/// Whether the fire button (left mouse button or gamepad RT) is down right now. A held state, so reading
+/// it once per fixed step is right.
 [[nodiscard]] bool ReadFireHeld();
 
 /// Button presses that are events, gathered over one or more frames until a fixed step uses them.
 struct ButtonPresses {
-    bool fire = false;              ///< Left mouse button.
+    bool fire = false;              ///< Left mouse button or gamepad RT.
     std::optional<int> weaponSlot;  ///< Keys 1 and 2 pick slots 0 and 1.
-    bool cycleWeapon = false;       ///< Q or the mouse wheel.
-    bool dash = false;              ///< Space or left Shift.
-    bool heal = false;              ///< E.
+    bool cycleWeapon = false;       ///< Q, mouse wheel, or gamepad Y/Triangle.
+    bool dash = false;              ///< Space, left Shift, gamepad LT or RB.
+    bool heal = false;              ///< E, or gamepad X/Square.
 };
 
 /// Adds this frame's presses to `presses`. Call it once per frame: a frame that runs no fixed step keeps

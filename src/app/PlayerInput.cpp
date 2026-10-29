@@ -53,24 +53,90 @@ float ButtonAxis(int negativeButton, int positiveButton) {
     return axis;
 }
 
+Vec2 ReadPadMove() {
+    if (!IsGamepadAvailable(kGamepad)) {
+        return {};
+    }
+    const Vec2 raw{GetGamepadAxisMovement(kGamepad, GAMEPAD_AXIS_LEFT_X),
+                   GetGamepadAxisMovement(kGamepad, GAMEPAD_AXIS_LEFT_Y)};
+    const Vec2 stick = ApplyRadialDeadzone(raw, kStickDeadzone);
+    // Some players move with the d-pad, as in older arcade brawlers. It works like the keyboard.
+    const Vec2 dpad{ButtonAxis(GAMEPAD_BUTTON_LEFT_FACE_LEFT, GAMEPAD_BUTTON_LEFT_FACE_RIGHT),
+                    ButtonAxis(GAMEPAD_BUTTON_LEFT_FACE_UP, GAMEPAD_BUTTON_LEFT_FACE_DOWN)};
+    return stick + dpad;
+}
+
+Vec2 ReadKeyMove() {
+    return Vec2{KeyAxis(KEY_A, KEY_LEFT, KEY_D, KEY_RIGHT), KeyAxis(KEY_W, KEY_UP, KEY_S, KEY_DOWN)};
+}
+
 } // namespace
 
 Vec2 ReadMoveInput() {
-    const Vec2 keys{KeyAxis(KEY_A, KEY_LEFT, KEY_D, KEY_RIGHT), KeyAxis(KEY_W, KEY_UP, KEY_S, KEY_DOWN)};
+    // All devices add up. StepMovement clamps the sum to length 1, so using two at once is never faster.
+    return ReadKeyMove() + ReadPadMove();
+}
 
-    Vec2 stick;
-    Vec2 dpad;
+Vec2 ReadLookStick() {
+    if (!IsGamepadAvailable(kGamepad)) {
+        return {};
+    }
+    const Vec2 raw{GetGamepadAxisMovement(kGamepad, GAMEPAD_AXIS_RIGHT_X),
+                   GetGamepadAxisMovement(kGamepad, GAMEPAD_AXIS_RIGHT_Y)};
+    return ApplyRadialDeadzone(raw, kStickDeadzone);
+}
+
+std::optional<InputDevice> DetectActiveInputDevice(Vec2 currentMousePos, Vec2 lastMousePos) {
     if (IsGamepadAvailable(kGamepad)) {
-        const Vec2 raw{GetGamepadAxisMovement(kGamepad, GAMEPAD_AXIS_LEFT_X),
-                       GetGamepadAxisMovement(kGamepad, GAMEPAD_AXIS_LEFT_Y)};
-        stick = ApplyRadialDeadzone(raw, kStickDeadzone);
-        // Some players move with the d-pad, as in older arcade brawlers. It works like the keyboard.
-        dpad = {ButtonAxis(GAMEPAD_BUTTON_LEFT_FACE_LEFT, GAMEPAD_BUTTON_LEFT_FACE_RIGHT),
-                ButtonAxis(GAMEPAD_BUTTON_LEFT_FACE_UP, GAMEPAD_BUTTON_LEFT_FACE_DOWN)};
+        if (LengthSquared(ReadPadMove()) > 0.0f || LengthSquared(ReadLookStick()) > 0.0f) {
+            return InputDevice::Gamepad;
+        }
+        if (GetGamepadButtonPressed() != GAMEPAD_BUTTON_UNKNOWN) {
+            return InputDevice::Gamepad;
+        }
+        if (IsGamepadButtonDown(kGamepad, GAMEPAD_BUTTON_RIGHT_TRIGGER_2) ||
+            IsGamepadButtonDown(kGamepad, GAMEPAD_BUTTON_LEFT_TRIGGER_2) ||
+            GetGamepadAxisMovement(kGamepad, GAMEPAD_AXIS_RIGHT_TRIGGER) > 0.15f ||
+            GetGamepadAxisMovement(kGamepad, GAMEPAD_AXIS_LEFT_TRIGGER) > 0.15f) {
+            return InputDevice::Gamepad;
+        }
+        constexpr int kCheckedButtons[] = {
+            GAMEPAD_BUTTON_RIGHT_FACE_UP,
+            GAMEPAD_BUTTON_RIGHT_FACE_RIGHT,
+            GAMEPAD_BUTTON_RIGHT_FACE_DOWN,
+            GAMEPAD_BUTTON_RIGHT_FACE_LEFT,
+            GAMEPAD_BUTTON_LEFT_TRIGGER_1,
+            GAMEPAD_BUTTON_RIGHT_TRIGGER_1,
+            GAMEPAD_BUTTON_MIDDLE_RIGHT,
+        };
+        for (const int button : kCheckedButtons) {
+            if (IsGamepadButtonDown(kGamepad, button)) {
+                return InputDevice::Gamepad;
+            }
+        }
     }
 
-    // All devices add up. StepMovement clamps the sum to length 1, so using two at once is never faster.
-    return keys + stick + dpad;
+    if (LengthSquared(currentMousePos - lastMousePos) > 4.0f) {
+        return InputDevice::KeyboardMouse;
+    }
+    if (IsMouseButtonDown(MOUSE_BUTTON_LEFT) || IsMouseButtonDown(MOUSE_BUTTON_RIGHT) ||
+        IsMouseButtonDown(MOUSE_BUTTON_MIDDLE) || GetMouseWheelMove() != 0.0f) {
+        return InputDevice::KeyboardMouse;
+    }
+    if (LengthSquared(ReadKeyMove()) > 0.0f) {
+        return InputDevice::KeyboardMouse;
+    }
+    constexpr int kCheckedKeys[] = {
+        KEY_SPACE, KEY_LEFT_SHIFT, KEY_E,      KEY_Q,     KEY_ONE,      KEY_TWO,
+        KEY_ESCAPE, KEY_ENTER,     KEY_KP_ENTER, KEY_BACKSPACE, KEY_R,
+    };
+    for (const int key : kCheckedKeys) {
+        if (IsKeyDown(key) || IsKeyPressed(key)) {
+            return InputDevice::KeyboardMouse;
+        }
+    }
+
+    return std::nullopt;
 }
 
 Vec2 ReadAimPoint() {
@@ -98,21 +164,38 @@ void SetCursorHidden(bool hidden) {
 }
 
 bool ReadFireHeld() {
-    return IsMouseButtonDown(MOUSE_BUTTON_LEFT);
+    const bool mouseFire = IsMouseButtonDown(MOUSE_BUTTON_LEFT);
+    const bool padFire = IsGamepadAvailable(kGamepad) &&
+                         (IsGamepadButtonDown(kGamepad, GAMEPAD_BUTTON_RIGHT_TRIGGER_2) ||
+                          GetGamepadAxisMovement(kGamepad, GAMEPAD_AXIS_RIGHT_TRIGGER) > 0.15f);
+    return mouseFire || padFire;
 }
 
 void CollectButtonPresses(ButtonPresses& presses) {
-    presses.fire = presses.fire || IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
+    const bool pad = IsGamepadAvailable(kGamepad);
+    const auto padPressed = [pad](int button) { return pad && IsGamepadButtonPressed(kGamepad, button); };
+
+    // Fire: left mouse button or RT.
+    presses.fire = presses.fire || IsMouseButtonPressed(MOUSE_BUTTON_LEFT) ||
+                   padPressed(GAMEPAD_BUTTON_RIGHT_TRIGGER_2);
+
     if (IsKeyPressed(KEY_ONE)) {
         presses.weaponSlot = 0;
     }
     if (IsKeyPressed(KEY_TWO)) {
         presses.weaponSlot = 1;
     }
-    // With two guns, either wheel direction means "the other gun".
-    presses.cycleWeapon = presses.cycleWeapon || IsKeyPressed(KEY_Q) || GetMouseWheelMove() != 0.0f;
-    presses.dash = presses.dash || IsKeyPressed(KEY_SPACE) || IsKeyPressed(KEY_LEFT_SHIFT);
-    presses.heal = presses.heal || IsKeyPressed(KEY_E);
+
+    // With two guns, either wheel direction or Y / Triangle means "the other gun".
+    presses.cycleWeapon = presses.cycleWeapon || IsKeyPressed(KEY_Q) || GetMouseWheelMove() != 0.0f ||
+                          padPressed(GAMEPAD_BUTTON_RIGHT_FACE_UP);
+
+    // Dash: Space, left Shift, LT or RB.
+    presses.dash = presses.dash || IsKeyPressed(KEY_SPACE) || IsKeyPressed(KEY_LEFT_SHIFT) ||
+                   padPressed(GAMEPAD_BUTTON_RIGHT_TRIGGER_1) || padPressed(GAMEPAD_BUTTON_LEFT_TRIGGER_2);
+
+    // Heal: E, or X / Square.
+    presses.heal = presses.heal || IsKeyPressed(KEY_E) || padPressed(GAMEPAD_BUTTON_RIGHT_FACE_LEFT);
 }
 
 MenuInput ReadMenuKeys() {

@@ -18,6 +18,7 @@ add_executable(horde_tests
     core/FlasksTests.cpp
     core/FollowCameraTests.cpp
     core/FrenzyTests.cpp
+    core/GamepadAimTests.cpp
     core/HealthTests.cpp
     core/HitStopTests.cpp
     core/ImpactFeelTests.cpp

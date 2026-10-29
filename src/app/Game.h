@@ -9,6 +9,7 @@
 #include "app/render/Hud.h"
 #include "app/render/MenuDraw.h"
 #include "core/FixedTimestep.h"
+#include "core/GamepadAim.h"
 #include "core/HitStop.h"
 #include "core/Menu.h"
 #include "core/ParticleEmitter.h"
@@ -91,6 +92,8 @@ private:
     MenuPage _openedPage = MenuPage::None; ///< The settings or the controls, over the title or the pause.
     float _menuSinceMoved = 0.0f; ///< Real seconds since the selection last moved, for the marks to slide.
     Vec2 _lastMouse;       ///< The mouse last frame: only a mouse that moves takes the selection.
+    InputDevice _inputDevice = InputDevice::KeyboardMouse;
+    GamepadAim _gamepadAim;
     Backdrop _backdrop;    ///< The blurred still behind the pause menu.
     bool _quit = false;    ///< Set by the title's Quit.
 

@@ -32,7 +32,7 @@ Before the steps, `Run` also reads button presses that are events rather than he
 
 ### Input becomes commands
 
-The simulation never reads a key or the mouse. Every step, `Game::Update` turns the hardware into a `PlayerCommands` (`src/core/PlayerCommands.h`): the movement input, the world point the mouse aims at, the fire button, and weapon switches. Tests drive the world with the same struct, and a gamepad will fill it later without the rules changing. See [Aiming and weapons](WEAPONS.md).
+The simulation never reads a key or the mouse. Every step, `Game::Update` turns the hardware into a `PlayerCommands` (`src/core/PlayerCommands.h`): the movement input, the world point the mouse or right stick aims at, the fire button, and weapon switches. Tests drive the world with the same struct, and a gamepad fills it without the rules changing. See [Aiming and weapons](WEAPONS.md).
 
 ### The world
 
@@ -101,7 +101,7 @@ Game objects are plain structs (components) that hold data, and free functions (
 ## Tests
 
 - `tests/core/FixedTimestepTests.cpp`: exact steps, accumulation of short frames, the remainder of long frames (`Alpha`), the clamp on huge frames, negative frame times and the 60 Hz default.
-- `tests/core/Vec2Tests.cpp`, `MovementTests.cpp`, `FacingTests.cpp`, `ArenaTests.cpp` and `AnalogInputTests.cpp`: see [Movement](MOVEMENT.md#tests).
+- `tests/core/Vec2Tests.cpp`, `MovementTests.cpp`, `FacingTests.cpp`, `ArenaTests.cpp`, `AnalogInputTests.cpp` and `GamepadAimTests.cpp`: see [Movement](MOVEMENT.md#tests) and gamepad aim assist tests.
 - `tests/core/FollowCameraTests.cpp`: see [Camera](CAMERA.md#tests).
 - `tests/core/ChaseTests.cpp` and `WorldTests.cpp`: see [Enemies](ENEMIES.md#tests).
 - `tests/core/AttackChoiceTests.cpp`, `BossTests.cpp`, `BossChargeTests.cpp`, `BossComboTests.cpp`, `BossHairRingTests.cpp`, `BossLeapTests.cpp`, `BossVolleyTests.cpp`, `FrenzyTests.cpp`, `PhaseTwoTests.cpp`, `ShockwaveTests.cpp` and `SummonTests.cpp`: see [The boss](BOSS.md#tests). The boss tests share `PredictableBoss.h`, a boss without its chance.

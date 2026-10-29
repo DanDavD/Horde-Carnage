@@ -24,6 +24,7 @@
 #include "app/render/Palette.h"
 #include "app/render/View.h"
 #include "app/render/WorldDraw.h"
+#include "core/GamepadAim.h"
 #include "core/ImpactFeel.h"
 #include "core/ScreenFit.h"
 
@@ -81,6 +82,7 @@ Game::Game(bool windowed)
     SetExitKey(KEY_NULL);
     ReturnToTitle(_session);
     ResetHealthTrails();
+    _lastMouse = AimInGame(CurrentScreenFit());
 }
 
 Game::~Game() {
@@ -104,8 +106,13 @@ void Game::Run() {
 }
 
 void Game::Frame() {
+    const Vec2 mouse = AimInGame(CurrentScreenFit());
+    if (const auto device = DetectActiveInputDevice(mouse, _lastMouse)) {
+        _inputDevice = *device;
+    }
     // Key presses are read once per frame, not per fixed step: a frame with no step would miss them.
     HandleMenus();
+    _lastMouse = mouse;
     if (_session.state == SessionState::Playing) {
         CollectButtonPresses(_pendingPresses);
     } else {
@@ -214,7 +221,6 @@ void Game::HandleMenus() {
     if (mouse != _lastMouse && under) {
         input.hovered = under->item;
     }
-    _lastMouse = mouse;
     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && under) {
         input.hovered = under->item;
         if (under->lowerArrow) {
@@ -397,6 +403,7 @@ void Game::ForgetLastFight() {
     _hitStop = HitStop{};
     _shake = ScreenShake{};
     _pendingPresses = {};
+    _gamepadAim = GamepadAim{};
 }
 
 void Game::Update(float dt) {
@@ -405,11 +412,22 @@ void Game::Update(float dt) {
     //
     // The mouse is turned into a world point with the camera as of the last step. The camera drawn on
     // screen is a fraction of a step behind that, which is far below a pixel of aiming error.
-    const Camera2D camera = ToRaylibCamera(_session.world.camera, 1.0f);
-    const Vec2 aim = AimInGame(CurrentScreenFit());
-    const PlayerCommands commands{.move = ReadMoveInput(),
-                                  .aimAt = FromRaylib(GetScreenToWorld2D(ToRaylib(aim), camera)),
-                                  .fireHeld = ReadFireHeld(),
+    const Vec2 move = ReadMoveInput();
+    const bool fireHeld = ReadFireHeld();
+
+    Vec2 worldAim{};
+    if (_inputDevice == InputDevice::Gamepad) {
+        worldAim = StepGamepadAim(_gamepadAim, _session.world, ReadLookStick(), move,
+                                  fireHeld || _pendingPresses.fire);
+    } else {
+        const Camera2D camera = ToRaylibCamera(_session.world.camera, 1.0f);
+        const Vec2 mouseInGame = AimInGame(CurrentScreenFit());
+        worldAim = FromRaylib(GetScreenToWorld2D(ToRaylib(mouseInGame), camera));
+    }
+
+    const PlayerCommands commands{.move = move,
+                                  .aimAt = worldAim,
+                                  .fireHeld = fireHeld,
                                   .firePressed = _pendingPresses.fire,
                                   .selectSlot = _pendingPresses.weaponSlot,
                                   .cycleWeapon = _pendingPresses.cycleWeapon,
@@ -547,7 +565,17 @@ void Game::DrawScene(const ScreenFit& fit, float alpha, bool withHud) const {
     }
 #endif
     if (withHud) {
-        DrawHud(world, _trails, _session.attempt, playing, AimInGame(fit), _art);
+        Vec2 screenAim{};
+        if (_inputDevice == InputDevice::Gamepad) {
+            const Camera2D camera = ToRaylibCamera(world.camera, alpha);
+            const Vec2 playerPos = Lerp(world.player.motion.previousPosition, world.player.motion.position, alpha);
+            const Vec2 worldAim = GamepadAimPoint(playerPos, {}, _gamepadAim.direction, kGamepadCrosshairDistance);
+            const Vector2 screenVec = GetWorldToScreen2D(ToRaylib(worldAim), camera);
+            screenAim = Vec2{screenVec.x, screenVec.y};
+        } else {
+            screenAim = AimInGame(fit);
+        }
+        DrawHud(world, _trails, _session.attempt, playing, screenAim, _art);
     }
     EndMode2D();
 }

@@ -10,6 +10,7 @@ add_library(horde_core STATIC
     core/FixedTimestep.cpp
     core/Flasks.cpp
     core/FollowCamera.cpp
+    core/GamepadAim.cpp
     core/Health.cpp
     core/HitStop.cpp
     core/ImpactFeel.cpp

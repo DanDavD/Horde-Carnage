@@ -40,7 +40,7 @@ This is day 7 of 15, and the boss fight is in progress. Progress is tracked in t
 - Bodies push each other apart instead of stacking. You can shove a hairball out of your way but not the boss, and a crowd slows you down. See [Collisions](docs/COLLISIONS.md).
 - A health bar. A touch of the boss takes 20 of your 100 hit points (a hairball's takes 10), and after a hit you blink and cannot be hurt for 0.8 seconds. See [Health](docs/HEALTH.md).
 - A fight that ends one of two ways. "YOU DIED" shows your attempt number, what killed you and when, and how much health the boss kept; "VICTORY" shows the attempt that won, the length of the fight and your accuracy. Both fade in, then a button starts a fresh fight. The attempt count survives every retry. See [Game flow](docs/GAME_FLOW.md).
-- Aiming with the mouse, independent of where you walk, and two guns: a semi-automatic pistol (one shot per click) and an automatic SMG (hold to fire). A panel shows the gun in hand. See [Aiming and weapons](docs/WEAPONS.md).
+- Aiming with the mouse or the right stick (with a fixed-distance crosshair and soft aim assist toward the boss and her children), independent of where you walk, and two guns: a semi-automatic pistol (one shot per click) and an automatic SMG (hold to fire). Keyboard and gamepad work together without switching modes. A panel shows the gun in hand. See [Aiming and weapons](docs/WEAPONS.md).
 - Bullets that fly and hit the first body in their path. A hairball flashes white and gets knocked back; the boss only flashes, it is too heavy to push. See [Bullets and hits](docs/BULLETS.md).
 - Hairballs, bullets, the boss's strands, its shockwaves and the marks of its Summon live in fixed object pools, so the game never allocates memory while you play. See [Object pool](docs/OBJECT_POOL.md).
 - A dash that covers about four body widths in 0.12 s, passes through enemies and makes you untouchable while it lasts. See [Player abilities](docs/ABILITIES.md).
@@ -56,7 +56,7 @@ This is day 7 of 15, and the boss fight is in progress. Progress is tracked in t
 - Always fullscreen, at the monitor's own resolution and refresh rate, drawn sharp at that resolution, with black bars on screens that are not 16:9 so everyone sees the same arena. Settings > Display, or `--windowed` for one run, gives a window instead. See [Screen and fullscreen](docs/SCREEN.md).
 - Warnings are errors for the project's own code (`/W4 /WX` on MSVC).
 
-**Still to do:** an ambience and music, gamepad aiming, and maybe the numbers in JSON. See the [roadmap](docs/ROADMAP.md) for the order, and for the difficulty I am aiming for.
+**Still to do:** an ambience and music, gamepad prompts and stick menus, and maybe the numbers in JSON. See the [roadmap](docs/ROADMAP.md) for the order, and for the difficulty I am aiming for.
 
 ## Tech stack
 
@@ -92,11 +92,11 @@ You can also open the folder in Visual Studio (*File > Open > Folder*). It reads
 | Action | Keyboard and mouse | Gamepad |
 |---|---|---|
 | Move | `WASD` or the arrow keys | Left stick or d-pad |
-| Aim | Mouse | Not yet |
-| Fire | Left click (hold with the SMG) | Not yet |
-| Switch gun | `Q`, `1`, `2` or the mouse wheel | Not yet |
-| Dash | `Space` or left `Shift` | Not yet |
-| Drink a flask | `E` | Not yet |
+| Aim | Mouse | Right stick |
+| Fire | Left click (hold with the SMG) | `RT` (hold with the SMG) |
+| Switch gun | `Q`, `1`, `2` or the mouse wheel | `Y` / Triangle |
+| Dash | `Space` or left `Shift` | `LT` or `RB` |
+| Drink a flask | `E` | `X` / Square |
 | Move through a menu | `W`, `S`, up and down, or the mouse | d-pad |
 | Change a setting | `A`, `D`, left and right, or a click on its line or arrows | d-pad left and right |
 | Choose | `Enter`, `Space` or a click | `A` |
