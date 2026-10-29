@@ -72,7 +72,7 @@ src/app/render/
   DebugOverlay  The F1 overlay, compiled into Debug builds only
 ```
 
-Each file keeps its own sizes and helpers in an anonymous namespace; only what another file needs is in its header (for example `ShieldColor`, which the boss and the HUD share). `Draw` calls `DrawWorld` inside the world camera, and `DrawVignette`, `DrawHud` and `DrawEndScreen` inside the screen camera. Sound lives next to it, in `src/app/audio/SoundBank`: every sound is synthesized once at start-up and played from the world's events (see [Audio](AUDIO.md)). The player's settings are read before the window opens and saved on every change by `src/app/SettingsStore` (see [Settings](SETTINGS.md)). `Game` owns the one `Art`, loaded after the window opens and unloaded before it closes, and hands it to the drawing. How the game looks, and why, is in [Art direction](ART.md).
+Each file keeps its own sizes and helpers in an anonymous namespace; only what another file needs is in its header (for example `ShieldColor`, which the boss and the HUD share). `Draw` calls `DrawWorld` inside the world camera, and `DrawVignette`, `DrawHud` and `DrawEndScreen` inside the screen camera. Sound lives next to it, in `src/app/audio/SoundBank`: every sound is synthesized once at start-up and played from the world's events (see [Audio](AUDIO.md)). The boss's theme is in `src/app/audio/MusicPlayer`: composed once at start-up, it reads the session every frame and refills one raylib stream with its layers mixed (see [Music](MUSIC.md)). The player's settings are read before the window opens and saved on every change by `src/app/SettingsStore` (see [Settings](SETTINGS.md)). `Game` owns the one `Art`, loaded after the window opens and unloaded before it closes, and hands it to the drawing. How the game looks, and why, is in [Art direction](ART.md).
 
 ### Components and systems
 
@@ -109,6 +109,7 @@ Game objects are plain structs (components) that hold data, and free functions (
 - `tests/core/RandomTests.cpp`: see [Random numbers](RANDOM.md#tests).
 - `tests/core/WorldEventTests.cpp`, `HitStopTests.cpp`, `ScreenShakeTests.cpp`, `ImpactFeelTests.cpp`, `ParticleTests.cpp`, `ParticleEmitterTests.cpp` and `TrailingBarTests.cpp`: see [Game feel](GAME_FEEL.md#tests).
 - `tests/core/SynthTests.cpp` and `SoundCueTests.cpp`: see [Audio](AUDIO.md#tests).
+- `tests/core/SequencerTests.cpp`, `BossThemeTests.cpp`, `MusicDirectorTests.cpp` and `MusicMixerTests.cpp`: see [Music](MUSIC.md#tests).
 - `tests/core/ScreenFitTests.cpp`: see [Screen and fullscreen](SCREEN.md#tests).
 - `tests/core/StoneFloorTests.cpp`: see [Art direction](ART.md#tests).
 - `tests/core/ShieldTests.cpp`: see [The boss's shield](SHIELD.md#tests).

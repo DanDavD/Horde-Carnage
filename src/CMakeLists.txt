@@ -3,6 +3,7 @@ add_library(horde_core STATIC
     core/Arena.cpp
     core/AttackChoice.cpp
     core/Boss.cpp
+    core/BossTheme.cpp
     core/Chase.cpp
     core/Collision.cpp
     core/Dash.cpp
@@ -20,12 +21,15 @@ add_library(horde_core STATIC
     core/Menu.cpp
     core/MenuRepeat.cpp
     core/Movement.cpp
+    core/MusicDirector.cpp
+    core/MusicMixer.cpp
     core/Particle.cpp
     core/ParticleEmitter.cpp
     core/Projectile.cpp
     core/Random.cpp
     core/ScreenFit.cpp
     core/ScreenShake.cpp
+    core/Sequencer.cpp
     core/Session.cpp
     core/Settings.cpp
     core/Shield.cpp
@@ -45,6 +49,7 @@ horde_set_warnings(horde_core)
 add_executable(HordeCarnage
     main.cpp
     app/Game.cpp
+    app/audio/MusicPlayer.cpp
     app/audio/SoundBank.cpp
     app/PlayerInput.cpp
     app/SettingsStore.cpp

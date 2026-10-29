@@ -6,6 +6,7 @@
 #include <raylib.h>
 
 #include "app/RaylibConvert.h"
+#include "core/BossTheme.h"
 #include "core/Loadout.h"
 
 #ifndef NDEBUG
@@ -105,14 +106,15 @@ void DrawDebugWorld(const Player& player, const FollowCamera& camera, float alph
 // body does, where the camera is, how many enemies and projectiles there are, the player's health window,
 // and what the boss is doing.
 void DrawDebugHud(const World& world, Vec2 moveInput, std::size_t particleCount,
-                  std::optional<int> gamepadSlot, GamepadType gamepadType, const char* gamepadName) {
+                  std::optional<int> gamepadSlot, GamepadType gamepadType, const char* gamepadName,
+                  const MusicPlayer& music) {
     const Player& player = world.player;
     const FollowCamera& camera = world.camera;
     const Motion& motion = player.motion;
     constexpr int kX = 10;
     constexpr int kY = 80; // Below the health and dash bars.
     constexpr int kLine = 20;
-    DrawRectangle(kX - 4, kY - 4, 460, 18 * kLine + 8, Fade(BLACK, 0.6f));
+    DrawRectangle(kX - 4, kY - 4, 460, 19 * kLine + 8, Fade(BLACK, 0.6f));
     DrawText(TextFormat("input  %5.2f %5.2f  len %4.2f", moveInput.x, moveInput.y, Length(moveInput)), kX, kY,
              18, RAYWHITE);
     DrawText(TextFormat("speed  %5.0f / %.0f", Length(motion.velocity), player.stats.maxSpeed), kX, kY + kLine, 18,
@@ -154,6 +156,20 @@ void DrawDebugHud(const World& world, Vec2 moveInput, std::size_t particleCount,
     } else {
         DrawText("pad    none", kX, kY + 17 * kLine, 18, RAYWHITE);
     }
+    // What the music is playing: the volume, each layer (pulse, hymn, wrath, desperation, hook), the bar, and
+    // a stinger while one plays.
+    const MusicMixer& mixer = music.mixer;
+    const std::size_t barFrames = std::max<std::size_t>(music.track.loopFrames / kBossThemeBars, 1);
+    const std::size_t stingerFrames = mixer.stinger == MusicStinger::Victory ? music.track.victory.size()
+                                      : mixer.stinger == MusicStinger::Defeat ? music.track.defeat.size()
+                                                                              : 0;
+    const char* stinger = mixer.stingerPosition >= stingerFrames        ? "-"
+                          : mixer.stinger == MusicStinger::Victory ? "victory"
+                                                                    : "defeat";
+    DrawText(TextFormat("music  %.2f p%.1f h%.1f w%.1f d%.1f k%.1f bar %d %s %.2f", mixer.volume, mixer.gains[0],
+                        mixer.gains[1], mixer.gains[2], mixer.gains[3], mixer.gains[4],
+                        static_cast<int>(mixer.position / barFrames) + 1, stinger, mixer.stingerGain),
+             kX, kY + 18 * kLine, 18, music.ready ? ORANGE : GRAY);
 }
 
 } // namespace horde

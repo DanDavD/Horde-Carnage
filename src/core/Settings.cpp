@@ -48,13 +48,26 @@ std::string_view Trimmed(std::string_view text) {
     return text.substr(first, last - first + 1);
 }
 
+// A whole number from 0 to `kMaxVolume`, brought back into range; anything else leaves `volume` as it was.
+void ParseVolume(std::string_view value, int& volume) {
+    int read = 0;
+    const auto [end, error] = std::from_chars(value.data(), value.data() + value.size(), read);
+    if (error == std::errc{} && end == value.data() + value.size()) {
+        volume = std::clamp(read, 0, kMaxVolume);
+    }
+}
+
+// From 0 to 1 at full, squared: the ear hears loudness on a log scale.
+float VolumeCurve(int volume) {
+    const float level = static_cast<float>(std::clamp(volume, 0, kMaxVolume)) / kMaxVolume;
+    return level * level;
+}
+
 void ParseLine(std::string_view key, std::string_view value, Settings& settings) {
     if (key == "volume") {
-        int volume = 0;
-        const auto [end, error] = std::from_chars(value.data(), value.data() + value.size(), volume);
-        if (error == std::errc{} && end == value.data() + value.size()) {
-            settings.masterVolume = std::clamp(volume, 0, kMaxVolume);
-        }
+        ParseVolume(value, settings.masterVolume);
+    } else if (key == "music") {
+        ParseVolume(value, settings.musicVolume);
     } else if (key == "shake") {
         ParseName(value, kShakeNames, settings.shake);
     } else if (key == "display") {
@@ -74,6 +87,9 @@ bool AdjustSetting(Settings& settings, Setting setting, int step) {
     case Setting::MasterVolume:
         settings.masterVolume = std::clamp(settings.masterVolume + step, 0, kMaxVolume);
         return settings.masterVolume != before.masterVolume;
+    case Setting::MusicVolume:
+        settings.musicVolume = std::clamp(settings.musicVolume + step, 0, kMaxVolume);
+        return settings.musicVolume != before.musicVolume;
     case Setting::ScreenShake:
         settings.shake = Cycled(settings.shake, step, static_cast<int>(kShakeNames.size()));
         return settings.shake != before.shake;
@@ -89,8 +105,11 @@ bool AdjustSetting(Settings& settings, Setting setting, int step) {
 }
 
 float MasterGain(const Settings& settings) {
-    const float level = static_cast<float>(std::clamp(settings.masterVolume, 0, kMaxVolume)) / kMaxVolume;
-    return kFullGain * level * level;
+    return kFullGain * VolumeCurve(settings.masterVolume);
+}
+
+float MusicGain(const Settings& settings) {
+    return VolumeCurve(settings.musicVolume);
 }
 
 float ShakeAmount(ShakeLevel level) {
@@ -124,6 +143,8 @@ std::string SettingValueText(const Settings& settings, Setting setting) {
     switch (setting) {
     case Setting::MasterVolume:
         return std::to_string(settings.masterVolume);
+    case Setting::MusicVolume:
+        return std::to_string(settings.musicVolume);
     case Setting::ScreenShake:
         return kShakeLabels[static_cast<std::size_t>(settings.shake)];
     case Setting::Display:
@@ -137,6 +158,7 @@ std::string SettingValueText(const Settings& settings, Setting setting) {
 std::string FormatSettings(const Settings& settings) {
     std::string text;
     text += "volume=" + std::to_string(settings.masterVolume) + "\n";
+    text += "music=" + std::to_string(settings.musicVolume) + "\n";
     text += "shake=" + std::string(kShakeNames[static_cast<std::size_t>(settings.shake)]) + "\n";
     text += std::string("display=") + (settings.fullscreen ? "fullscreen" : "windowed") + "\n";
     text += "framerate=" + std::string(kFrameRateNames[static_cast<std::size_t>(settings.frameRate)]) + "\n";

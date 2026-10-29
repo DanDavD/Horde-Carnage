@@ -3,6 +3,7 @@
 #include <optional>
 
 #include "app/PlayerInput.h"
+#include "app/audio/MusicPlayer.h"
 #include "app/audio/SoundBank.h"
 #include "app/render/Art.h"
 #include "app/render/Backdrop.h"
@@ -56,7 +57,7 @@ private:
     void GoBack(MenuPage page);
     /// Changes one setting by `step`, puts it into effect and saves it.
     void ChangeSetting(Setting setting, int step);
-    /// Puts the volume and the frame rate of `_settings` into effect.
+    /// Puts the volumes and the frame rate of `_settings` into effect.
     void ApplySettings();
     /// Makes the window fullscreen or not, as `_settings` says.
     void ApplyDisplay();
@@ -88,6 +89,7 @@ private:
     ScreenShake _shake;
     ParticleEmitter _particles;
     SoundBank _sounds; ///< Loaded once the audio device is open, unloaded before it closes.
+    MusicPlayer _music; ///< The same.
     Random _soundRandom; ///< For the sounds' small changes of pitch and volume, apart from the fight's.
     HealthTrails _trails; ///< Behind the health bars. Kept here because only the HUD reads them.
     Settings _settings;    ///< Loaded before the window opens, saved on every change.

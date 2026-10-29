@@ -14,6 +14,7 @@ enum class FrameRateCap { VSync, Fps60, Fps120, Fps144, Unlimited };
 /// What the player can change in the settings screen. Kept between runs.
 struct Settings {
     int masterVolume = 10; ///< From 0 (silent) to `kMaxVolume`.
+    int musicVolume = 10;  ///< The music alone, under the master volume, from 0 to `kMaxVolume`.
     ShakeLevel shake = ShakeLevel::Full;
     bool fullscreen = true;
     FrameRateCap frameRate = FrameRateCap::VSync;
@@ -22,7 +23,7 @@ struct Settings {
 inline constexpr int kMaxVolume = 10;
 
 /// One line of the settings screen that holds a value.
-enum class Setting { MasterVolume, ScreenShake, Display, FrameRate };
+enum class Setting { MasterVolume, MusicVolume, ScreenShake, Display, FrameRate };
 
 /// Changes `setting` by `step` (-1 or 1). The volume stops at both ends, so holding a key never jumps from
 /// full to silent; the other settings wrap round, since each is a short list of choices. Returns whether
@@ -33,6 +34,10 @@ bool AdjustSetting(Settings& settings, Setting setting, int step);
 /// log scale: with a straight line, the top half of the slider would sound almost the same. Full volume is
 /// under 1, so the fight's loudest moments, mixed together, do not clip.
 [[nodiscard]] float MasterGain(const Settings& settings);
+
+/// The gain of the music under the master volume: squared like it, from 0 to 1 at full, so the master volume's
+/// headroom is not taken twice.
+[[nodiscard]] float MusicGain(const Settings& settings);
 
 /// How much of the screen shake is shown: 0, a half, or all of it.
 [[nodiscard]] float ShakeAmount(ShakeLevel level);

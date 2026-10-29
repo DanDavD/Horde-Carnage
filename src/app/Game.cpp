@@ -75,8 +75,9 @@ Game::Game(bool windowed)
     // Every sound is synthesized here, once, in a few hundredths of a second. Without an audio device the
     // game still runs, silent.
     InitAudioDevice();
-    ApplySettings();
     _sounds = LoadSoundBank();
+    _music = LoadMusicPlayer();
+    ApplySettings();
     _backdrop = LoadBackdrop();
     // Esc pauses the fight instead of closing the game; the title's Quit and the window's close button do.
     SetExitKey(KEY_NULL);
@@ -87,6 +88,7 @@ Game::Game(bool windowed)
 
 Game::~Game() {
     UnloadBackdrop(_backdrop);
+    UnloadMusicPlayer(_music);
     UnloadSoundBank(_sounds);
     CloseAudioDevice();
     UnloadArt(_art);
@@ -197,6 +199,8 @@ void Game::Frame() {
         FeelEvents();
     }
     FeelEvents();
+    // The music follows the fight in real time: a hit stop slows the fight, not the band.
+    UpdateMusicPlayer(_music, _session, frameSeconds);
     // The shake is only a view of the fight, so it moves on with the frames at full speed, which keeps it
     // smooth on a fast monitor and keeps it shaking through a hit stop.
     if (!held) {
@@ -407,6 +411,7 @@ void Game::ChangeSetting(Setting setting, int step) {
 
 void Game::ApplySettings() {
     SetMasterVolume(MasterGain(_settings));
+    SetMusicPlayerVolume(_music, MusicGain(_settings));
 #ifndef __EMSCRIPTEN__
     // In a browser the page draws once per refresh of the screen, whatever is asked.
     if (_settings.frameRate == FrameRateCap::VSync) {
@@ -607,7 +612,7 @@ void Game::DrawScene(const ScreenFit& fit, float alpha, bool withHud) const {
 #ifndef NDEBUG
     if (_showDebugOverlay) {
         DrawDebugHud(world, _lastMoveInput, _particles.particles.Size(), _gamepadConnection.activeSlot,
-                     _gamepadType, ReadGamepadName(_gamepadConnection.activeSlot));
+                     _gamepadType, ReadGamepadName(_gamepadConnection.activeSlot), _music);
     }
 #endif
     if (withHud) {
