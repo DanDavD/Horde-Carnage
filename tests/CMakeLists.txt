@@ -9,6 +9,7 @@ add_executable(horde_tests
     core/BossHairRingTests.cpp
     core/BossLeapTests.cpp
     core/BossTests.cpp
+    core/BossThemeTests.cpp
     core/BossVolleyTests.cpp
     core/ChaseTests.cpp
     core/CollisionTests.cpp
@@ -28,6 +29,8 @@ add_executable(horde_tests
     core/MenuRepeatTests.cpp
     core/MenuTests.cpp
     core/MovementTests.cpp
+    core/MusicDirectorTests.cpp
+    core/MusicMixerTests.cpp
     core/ObjectPoolTests.cpp
     core/ParticleEmitterTests.cpp
     core/ParticleTests.cpp
@@ -36,6 +39,7 @@ add_executable(horde_tests
     core/RandomTests.cpp
     core/ScreenFitTests.cpp
     core/ScreenShakeTests.cpp
+    core/SequencerTests.cpp
     core/SessionTests.cpp
     core/SettingsTests.cpp
     core/SummonTests.cpp

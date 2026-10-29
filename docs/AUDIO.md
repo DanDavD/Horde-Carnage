@@ -2,7 +2,7 @@
 
 ## What it is
 
-Every sound in the fight is made in code, like the art: a small synthesizer builds each one from a recipe when the game starts. Nothing is recorded or downloaded, so there are no sound files to ship and no licenses to track. The sounds come from the same events as the hit stop, the shake and the particles (see [Game feel](GAME_FEEL.md)), so the rules never play a sound themselves.
+Every sound in the fight is made in code, like the art: a small synthesizer builds each one from a recipe when the game starts. Nothing is recorded or downloaded, so there are no sound files to ship and no licenses to track. The sounds come from the same events as the hit stop, the shake and the particles (see [Game feel](GAME_FEEL.md)), so the rules never play a sound themselves. The boss's theme is made by the same synthesizer, note by note; it has its own doc, [Music](MUSIC.md).
 
 There are 25 sounds: two for the menus (a dry tick to move, a low knock to choose), and 23 for the fight: the two guns, the shield (a ping when a bullet bounces off the Shell, a knock when the shield soaks one up, and glass when it breaks), the boss's flesh, a hairball bursting, the dash, the flask, three hits on the player (a hit, a heavy hit and the death), the boss's landing, her crash into a wall, her roar, her collapse when the first bar runs out and her death, a strand being spat, and a warning for each of her five attacks.
 
@@ -16,7 +16,7 @@ The code:
 
 ## How it works
 
-**A recipe.** A sound is up to four layers mixed. Each layer is a waveform (sine, square, saw, triangle or noise) whose pitch slides from one frequency to another, under an envelope that waits, rises and then dies away exponentially. A layer can waver in pitch (vibrato) and run through a low-pass filter that sweeps, which is what turns white noise into a crack, a thump or a whoosh. The mix is pushed through a soft clip (`tanh`) for grit, scaled to a peak of 0.89, and faded out over its last 4 ms so it never ends in a click. The noise comes from a PCG32 seeded per recipe, so a sound is the same on every launch.
+**A recipe.** A sound is up to four layers mixed. Each layer is a waveform (sine, square, saw, triangle or noise) whose pitch slides from one frequency to another, under an envelope that waits, rises and then dies away exponentially. A layer can waver in pitch (vibrato) and run through a low-pass filter that sweeps, which is what turns white noise into a crack, a thump or a whoosh, and through a high-pass that thins out its lows before the clip (only the music's guitar uses it). The mix is pushed through a soft clip (`tanh`) for grit, scaled to a peak of 0.89, and faded out over its last 4 ms so it never ends in a click. The noise comes from a PCG32 seeded per recipe, so a sound is the same on every launch.
 
 Most sounds are a few of the same blocks:
 
@@ -55,7 +55,7 @@ Most sounds are a few of the same blocks:
 
 ## Tests
 
-- `tests/core/SynthTests.cpp`: a sound lasts its length, peaks at 0.89 and ends in silence; a 440 Hz sine crosses zero 440 times a second, and a slide ends on its last pitch; the envelope waits for its delay and dies away; a low-pass takes the hiss out of noise; the same recipe always makes the same samples and another seed other noise; a recipe with no length or no layers is silence; drive clips the wave and it still fits in full scale.
+- `tests/core/SynthTests.cpp`: a sound lasts its length, peaks at 0.89 and ends in silence; a 440 Hz sine crosses zero 440 times a second, and a slide ends on its last pitch; the envelope waits for its delay and dies away; a low-pass takes the hiss out of noise; a high-pass thins out a low tone and lets a high one through; the same recipe always makes the same samples and another seed other noise; a recipe with no length or no layers is silence; drive clips the wave and it still fits in full scale.
 - `tests/core/SoundCueTests.cpp`: every event makes a sound; each gun sounds like itself and a heavy hit like a heavy hit; a bounce pings and a soaked-up bullet knocks; every attack warns with its own sound; bullets on the boss are quieter than the hits that matter; each play wanders a little and never far; every recipe makes a short sound that peaks between 0.5 and 0.9; a sound leans to the side it comes from and fades off screen.
 - `tests/core/WorldEventTests.cpp`: an attack's start is recorded once, with its kind; a Hair Ring records how many strands it spat; a finished drink records the health it gave back.
 

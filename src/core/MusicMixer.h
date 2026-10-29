@@ -1,0 +1,35 @@
+#pragma once
+
+#include <array>
+#include <cstddef>
+#include <span>
+
+#include "core/MusicDirector.h"
+#include "core/MusicTrack.h"
+
+namespace horde {
+
+struct MusicMixerStats {
+    float stemInSeconds = 0.6f;  ///< A layer takes this long to come all the way in.
+    float stemOutSeconds = 1.5f; ///< And this long to go all the way out: the music winds down slower than it builds.
+};
+
+/// Plays the layers of a track together, from one position, so they can never drift apart, and moves each
+/// layer's gain toward its cue a sample at a time, so a change is a fade and never a click.
+struct MusicMixer {
+    MusicMixerStats stats;
+    std::size_t position = 0; ///< The frame of the loop that plays next.
+    std::array<float, kMusicStemCount> gains{};
+    float volume = 0.0f;
+    MusicCue cue; ///< Where the gains and the volume are heading.
+};
+
+/// Points the mixer at `cue`. A restart goes back to the first frame of the loop, with the layers already at
+/// their levels.
+void CueMusic(MusicMixer& mixer, const MusicCue& cue);
+
+/// Fills `out` with the next frames of `track`, mono, and moves the position and the gains on. The loop wraps
+/// round seamlessly. The output never leaves -1 to 1.
+void MixMusic(MusicMixer& mixer, const MusicTrack& track, std::span<float> out);
+
+} // namespace horde

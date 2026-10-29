@@ -52,6 +52,29 @@ TEST_CASE("a sound lasts its length, peaks just under full scale and ends in sil
     CHECK(samples.back() == doctest::Approx(0.0f));
 }
 
+TEST_CASE("a high-pass thins out a low tone and lets a high one through") {
+    // A 60 Hz tone under a 3000 Hz one. Averaging ten samples, one period of the high tone at 30 kHz, leaves
+    // only the low one, whose height is then measured.
+    const auto lowTone = [](float highPassHz) {
+        SoundRecipe recipe{.seconds = 0.5f};
+        recipe.layers[0] = {.waveform = Waveform::Sine, .fromHz = 60.0f, .toHz = 60.0f, .decay = 10.0f,
+                            .highPassHz = highPassHz};
+        recipe.layers[1] = {.waveform = Waveform::Sine, .fromHz = 3000.0f, .toHz = 3000.0f, .decay = 10.0f};
+        recipe.layerCount = 2;
+        const std::vector<float> samples = horde::Synthesize(recipe, 30000);
+        float peak = 0.0f;
+        for (std::size_t i = 7500; i + 10 < samples.size(); ++i) {
+            float sum = 0.0f;
+            for (std::size_t j = i; j < i + 10; ++j) {
+                sum += samples[j];
+            }
+            peak = std::max(peak, std::abs(sum / 10.0f));
+        }
+        return peak;
+    };
+    CHECK(lowTone(1200.0f) < 0.25f * lowTone(0.0f));
+}
+
 TEST_CASE("a sine plays at its pitch, and a slide ends at its last pitch") {
     const SynthLayer tone{.waveform = Waveform::Sine, .fromHz = 440.0f, .toHz = 440.0f, .decay = 10.0f};
     const std::vector<float> steady = horde::Synthesize(OneLayer(tone, 1.0f));

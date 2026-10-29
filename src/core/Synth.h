@@ -32,6 +32,9 @@ struct SynthLayer {
     /// A low-pass filter on the layer that sweeps from `lowPassFromHz` to `lowPassToHz`. 0 leaves it open.
     float lowPassFromHz = 0.0f;
     float lowPassToHz = 0.0f;
+    /// A high-pass filter that thins out what is under it, before the mix is clipped: a distorted guitar stays
+    /// tight instead of turning to mud. 0 leaves it off.
+    float highPassHz = 0.0f;
 };
 
 /// The most layers a sound can stack.

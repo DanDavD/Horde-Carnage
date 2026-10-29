@@ -58,6 +58,10 @@ void Render(const SynthLayer& layer, std::vector<float>& mix, float seconds, int
     const float sweep = layer.sweepSeconds > 0.0f ? layer.sweepSeconds : seconds;
     float phase = 0.0f;
     float filtered = 0.0f;
+    // The high-pass keeps what the input changed by since the last sample, and lets the rest leak away.
+    const float keep = layer.highPassHz > 0.0f ? 1.0f / (1.0f + kTwoPi * layer.highPassHz * dt) : 0.0f;
+    float lastInput = 0.0f;
+    float highPassed = 0.0f;
     for (std::size_t i = 0; i < mix.size(); ++i) {
         const float t = static_cast<float>(i) * dt;
         const float progress = std::min(t / sweep, 1.0f);
@@ -75,6 +79,11 @@ void Render(const SynthLayer& layer, std::vector<float>& mix, float seconds, int
             const float share = 1.0f - std::exp(-kTwoPi * cutoff * dt);
             filtered += share * (sample - filtered);
             sample = filtered;
+        }
+        if (layer.highPassHz > 0.0f) {
+            highPassed = keep * (highPassed + sample - lastInput);
+            lastInput = sample;
+            sample = highPassed;
         }
         mix[i] += sample * layer.gain * Envelope(layer, t);
     }
