@@ -96,10 +96,10 @@ float Tatter(float fromTrail) {
 
 // The way the cape trails: behind the back when standing, behind the movement when running, turning
 // between the two the short way round.
-float TrailAngle(const Player& player, float seconds) {
+float TrailAngle(const Player& player, Vec2 facing, float seconds) {
     const Vec2 velocity = player.motion.velocity;
     const float speed = std::min(Length(velocity) / player.stats.maxSpeed, 1.0f);
-    const float back = Angle(player.facing * -1.0f);
+    const float back = Angle(facing * -1.0f);
     float behind = back;
     if (speed > 0.01f) {
         const float turn = std::remainder(Angle(velocity * -1.0f) - back, 2.0f * kPi);
@@ -137,7 +137,7 @@ void DrawDrinkRing(const Player& player, Vec2 position) {
 
 } // namespace
 
-void DrawPlayer(const Player& player, float seconds, float alpha) {
+void DrawPlayer(const Player& player, float seconds, float alpha, std::optional<Vec2> aimDirection) {
     // Drawn between the last two fixed steps, so movement is smooth above 60 Hz.
     const Vec2 position = Lerp(player.motion.previousPosition, player.motion.position, alpha);
     const Health& health = player.health;
@@ -154,13 +154,14 @@ void DrawPlayer(const Player& player, float seconds, float alpha) {
     const Color edge = paint(kCapeEdge);
 
     const float r = player.radius;
-    const Vec2 facing = player.facing;
+    const Vec2 facing =
+        (aimDirection && LengthSquared(*aimDirection) > 1e-6f) ? Normalized(*aimDirection) : player.facing;
     const Vec2 side{-facing.y, facing.x}; // The hunter's right.
     const auto at = [&](float forward, float right) { return position + facing * (r * forward) + side * (r * right); };
 
     // The cape: the round body, with a torn tail that trails behind it. A dead hunter's cape lies still.
     const float speed = std::min(Length(player.motion.velocity) / player.stats.maxSpeed, 1.0f);
-    const float trail = TrailAngle(player, dead ? 0.0f : seconds);
+    const float trail = TrailAngle(player, facing, dead ? 0.0f : seconds);
     const float tail = r * (kCapeTail + kCapeFlare * speed);
     const auto cape = [&](float extra) {
         return [&, extra](float angle) {

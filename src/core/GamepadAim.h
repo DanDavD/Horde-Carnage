@@ -21,7 +21,8 @@ struct AimAssistStats {
 
 /// Persistent aim heading for a gamepad across fixed steps.
 struct GamepadAim {
-    Vec2 direction{0.0f, -1.0f}; ///< Unit aim vector; starts pointing north toward the Matriarch.
+    Vec2 direction{0.0f, -1.0f};    ///< Unit aim vector; starts pointing north toward the Matriarch.
+    Vec2 rawDirection{0.0f, -1.0f}; ///< Unassisted heading, kept so held fire does not compound aim assist.
 };
 
 /// Softly deflects an aim direction toward the best candidate among `targets`.

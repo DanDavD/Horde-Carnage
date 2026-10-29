@@ -24,6 +24,7 @@
 #include "app/render/Palette.h"
 #include "app/render/View.h"
 #include "app/render/WorldDraw.h"
+#include "core/Facing.h"
 #include "core/GamepadAim.h"
 #include "core/ImpactFeel.h"
 #include "core/ScreenFit.h"
@@ -449,23 +450,25 @@ void Game::Update(float dt) {
     // Reading the hardware is the only part of a step that lives in the app. The rules are all in
     // StepSession and StepWorld.
     //
-    // The mouse is turned into a world point with the camera as of the last step. The camera drawn on
-    // screen is a fraction of a step behind that, which is far below a pixel of aiming error.
+    // Mouse aim is sent as its screen offset from the view center and resolved inside StepWorld against the
+    // camera center of this same step, and gamepad aim is sent as a unit direction, so strafing sideways never
+    // bends shots away from the crosshair.
     const Vec2 move = ReadMoveInput(_gamepadConnection.activeSlot);
     const bool fireHeld = ReadFireHeld(_gamepadConnection.activeSlot);
 
-    Vec2 worldAim{};
+    std::optional<Vec2> aimInView;
+    std::optional<Vec2> aimDirection;
     if (_inputDevice == InputDevice::Gamepad) {
-        worldAim = StepGamepadAim(_gamepadAim, _session.world, ReadLookStick(_gamepadConnection.activeSlot),
-                                  move, fireHeld || _pendingPresses.fire);
+        (void)StepGamepadAim(_gamepadAim, _session.world, ReadLookStick(_gamepadConnection.activeSlot), move,
+                             fireHeld || _pendingPresses.fire);
+        aimDirection = _gamepadAim.direction;
     } else {
-        const Camera2D camera = ToRaylibCamera(_session.world.camera, 1.0f);
-        const Vec2 mouseInGame = AimInGame(CurrentScreenFit());
-        worldAim = FromRaylib(GetScreenToWorld2D(ToRaylib(mouseInGame), camera));
+        aimInView = AimInGame(CurrentScreenFit()) - kViewSize * 0.5f;
     }
 
     const PlayerCommands commands{.move = move,
-                                  .aimAt = worldAim,
+                                  .aimInView = aimInView,
+                                  .aimDirection = aimDirection,
                                   .fireHeld = fireHeld,
                                   .firePressed = _pendingPresses.fire,
                                   .selectSlot = _pendingPresses.weaponSlot,
@@ -587,6 +590,31 @@ void Game::DrawScene(const ScreenFit& fit, float alpha, bool withHud) const {
 
     const World& world = _session.world;
     const bool playing = _session.state == SessionState::Playing;
+    const InputPromptStyle prompts = CurrentPromptStyle();
+    const Vec2 playerPos = Lerp(world.player.motion.previousPosition, world.player.motion.position, alpha);
+
+    Vec2 screenAim{};
+    std::optional<Vec2> liveFacing;
+    if (withHud) {
+        if (prompts.device == InputDevice::Gamepad) {
+            const Camera2D camera = ToRaylibCamera(world.camera, alpha);
+            const Vec2 worldAim = GamepadAimPoint(playerPos, {}, _gamepadAim.direction, kGamepadCrosshairDistance);
+            const Vector2 screenVec = GetWorldToScreen2D(ToRaylib(worldAim), camera);
+            screenAim = Vec2{screenVec.x, screenVec.y};
+            if (playing) {
+                liveFacing = _gamepadAim.direction;
+            }
+        } else {
+            screenAim = AimInGame(fit);
+            if (playing) {
+                const Vec2 viewCenter = Lerp(world.camera.previousCenter, world.camera.center, alpha);
+                const Vec2 worldAim = viewCenter + (screenAim - kViewSize * 0.5f);
+                Vec2 facing = world.player.facing;
+                AimFacing(facing, playerPos, worldAim);
+                liveFacing = facing;
+            }
+        }
+    }
 
     // The world camera, scaled and moved onto the screen with the rest of the game, and shaken. The HUD
     // below is not shaken, so the bars stay readable through the hardest hit.
@@ -597,7 +625,7 @@ void Game::DrawScene(const ScreenFit& fit, float alpha, bool withHud) const {
     BeginMode2D(WorldCamera(world.camera, alpha, fit, shake));
     // The boss's death plays out over the victory; a boss that is not dead ignores it.
     const float bossSinceDied = _session.state == SessionState::Victory ? _session.stateSeconds : kBossDeathSeconds;
-    DrawWorld(world, _particles.particles, alpha, _art, bossSinceDied);
+    DrawWorld(world, _particles.particles, alpha, _art, bossSinceDied, playing, liveFacing);
 #ifndef NDEBUG
     if (_showDebugOverlay) {
         DrawDebugWorld(world.player, world.camera, alpha);
@@ -616,17 +644,6 @@ void Game::DrawScene(const ScreenFit& fit, float alpha, bool withHud) const {
     }
 #endif
     if (withHud) {
-        const InputPromptStyle prompts = CurrentPromptStyle();
-        Vec2 screenAim{};
-        if (prompts.device == InputDevice::Gamepad) {
-            const Camera2D camera = ToRaylibCamera(world.camera, alpha);
-            const Vec2 playerPos = Lerp(world.player.motion.previousPosition, world.player.motion.position, alpha);
-            const Vec2 worldAim = GamepadAimPoint(playerPos, {}, _gamepadAim.direction, kGamepadCrosshairDistance);
-            const Vector2 screenVec = GetWorldToScreen2D(ToRaylib(worldAim), camera);
-            screenAim = Vec2{screenVec.x, screenVec.y};
-        } else {
-            screenAim = AimInGame(fit);
-        }
         DrawHud(world, _trails, _session.attempt, playing, screenAim, prompts, _art);
     }
     EndMode2D();

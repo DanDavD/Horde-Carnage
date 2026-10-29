@@ -178,7 +178,8 @@ void DrawHairBody(Vec2 position, float radius, const HairStyle& style, const Hai
             continue;
         }
         BeginBlendMode(BLEND_ADDITIVE);
-        DrawGlow(art, eye, r * kEyeGlowSize, Fade(style.eye, kEyeGlowStrength));
+        DrawGlow(art, eye, r * kEyeGlowSize * (0.7f + 0.3f * style.eyeGlow),
+                 Fade(style.eye, std::min(kEyeGlowStrength * style.eyeGlow, 1.0f)));
         EndBlendMode();
         // Tilted so the inner corners point down toward the mouth, which reads as a scowl.
         const Vec2 axis = Rotated(side, which * kSlitTilt);
@@ -187,6 +188,13 @@ void DrawHairBody(Vec2 position, float radius, const HairStyle& style, const Hai
         const float height = r * kSlitHeight * style.eyeSize;
         DrawOrientedEllipse(eye, axis, length + outline * 0.5f, height + outline * 0.5f, edge);
         DrawOrientedEllipse(eye, axis, length, height, style.eye);
+        if (style.eyeGlow > 1.0f) {
+            const float flare = std::min((style.eyeGlow - 1.0f) * 0.45f, 1.0f);
+            BeginBlendMode(BLEND_ADDITIVE);
+            DrawGlow(art, eye, r * kEyeGlowSize * 0.7f, Fade(style.eye, 0.55f * flare));
+            DrawOrientedEllipse(eye, axis, length * 0.72f, height * 0.72f, Fade(WHITE, 0.45f * flare));
+            EndBlendMode();
+        }
         DrawOrientedEllipse(eye, pupil, height * 0.85f, length * 0.16f, kPupil);
     }
 }

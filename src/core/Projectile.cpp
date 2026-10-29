@@ -3,7 +3,7 @@
 namespace horde {
 
 Projectile LaunchProjectile(Vec2 origin, Vec2 direction, float speed, float range) {
-    Projectile projectile{.motion = MotionAt(origin)};
+    Projectile projectile{.motion = MotionAt(origin), .origin = origin};
     projectile.motion.velocity = direction * speed;
     // Range as a lifetime: at constant speed the two are the same, and a timer is one subtraction a step.
     projectile.secondsLeft = range / speed;

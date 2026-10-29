@@ -38,6 +38,11 @@ struct FollowCamera {
 [[nodiscard]] FollowCamera FollowCameraAt(Vec2 target, Vec2 viewSize, const Arena& arena,
                                           const FollowCameraStats& stats = {});
 
+/// Where `camera.center` lands after one fixed step of `dt` seconds toward `target` plus look-ahead,
+/// without mutating `camera`. Used when aiming through a screen-space crosshair before the camera steps.
+[[nodiscard]] Vec2 NextFollowCameraCenter(const FollowCamera& camera, Vec2 target, Vec2 targetVelocity,
+                                          const Arena& arena, float dt);
+
 /// Moves the camera one fixed step of `dt` seconds toward `target` plus a look-ahead along `targetVelocity`.
 void StepFollowCamera(FollowCamera& camera, Vec2 target, Vec2 targetVelocity, const Arena& arena, float dt);
 

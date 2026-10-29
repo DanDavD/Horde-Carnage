@@ -12,6 +12,7 @@
 #include "app/render/PlayerDraw.h"
 #include "app/render/Shapes.h"
 #include "app/render/View.h"
+#include "core/LaserSight.h"
 
 namespace horde {
 
@@ -26,8 +27,11 @@ constexpr float kClumpSpinRate = 0.06f;
 constexpr float kMarkerRadius = 18.0f;
 constexpr float kMarkerRimStart = 2.5f;
 // A bullet is drawn as a short streak behind its head, so its direction reads even in a still frame.
-constexpr float kBulletStreak = 14.0f;
+constexpr float kBulletStreak = 16.0f;
 constexpr float kBulletWidth = 4.0f;
+constexpr float kLaserGlowWidth = 5.0f;
+constexpr float kLaserBeamWidth = 2.0f;
+constexpr float kLaserCoreWidth = 1.0f;
 
 // A dark pit the size of a hairball, with a red rim that closes in on it: when the rim reaches the pit, the
 // hairball comes out.
@@ -49,9 +53,43 @@ void DrawShockwave(const Shockwave& wave) {
              Fade(kShockwave, (wave.spent ? 0.25f : 0.9f) * (0.3f + 0.7f * left)));
 }
 
+// A thin crimson sight from the gun barrel along the aim line. It terminates on the nearest living target
+// or wall, and in open space spans the exact range of the equipped gun (750 on pistol, 600 on SMG) with a
+// distinct range pip at its tip so the player reads weapon reach directly on the floor.
+void DrawLaserSight(const LaserSight& sight, const Art& art) {
+    const Vec2 delta = sight.end - sight.start;
+    if (LengthSquared(delta) <= 0.25f) {
+        return;
+    }
+    const bool stopped = sight.hitsTarget || sight.hitsWall;
+
+    BeginBlendMode(BLEND_ADDITIVE);
+    DrawLineEx(ToRaylib(sight.start), ToRaylib(sight.end), kLaserGlowWidth, Fade(kLaserSight, 0.16f));
+    if (stopped) {
+        DrawGlow(art, sight.end, sight.hitsTarget ? 16.0f : 11.0f,
+                 Fade(kLaserSight, sight.hitsTarget ? 0.55f : 0.32f));
+    } else {
+        DrawGlow(art, sight.end, 8.0f, Fade(kLaserSight, 0.28f));
+    }
+    EndBlendMode();
+
+    DrawLineEx(ToRaylib(sight.start), ToRaylib(sight.end), kLaserBeamWidth, Fade(kLaserSight, 0.68f));
+    DrawLineEx(ToRaylib(sight.start), ToRaylib(sight.end), kLaserCoreWidth, Fade(kLaserCore, 0.5f));
+    if (stopped) {
+        const float dotRadius = sight.hitsTarget ? 3.2f : 2.3f;
+        DrawCircleV(ToRaylib(sight.end), dotRadius, kLaserSight);
+        DrawCircleV(ToRaylib(sight.end), dotRadius * 0.5f, kLaserCore);
+    } else {
+        DrawCircleV(ToRaylib(sight.end), 2.0f, Fade(kLaserSight, 0.85f));
+        DrawCircleV(ToRaylib(sight.end), 1.0f, Fade(kLaserCore, 0.75f));
+    }
+}
+
 void DrawBullet(const Projectile& bullet, float alpha) {
     const Vec2 head = Lerp(bullet.motion.previousPosition, bullet.motion.position, alpha);
-    const Vec2 tail = head - Normalized(bullet.motion.velocity) * kBulletStreak;
+    const Vec2 direction = Normalized(bullet.motion.velocity);
+    const float travelled = std::max(Dot(head - bullet.origin, direction), 0.0f);
+    const Vec2 tail = head - direction * std::min(kBulletStreak, travelled);
     DrawLineEx(ToRaylib(tail), ToRaylib(head), kBulletWidth, kBullet);
     DrawCircleV(ToRaylib(head), bullet.radius, kBullet);
 }
@@ -82,9 +120,10 @@ void DrawHairStrand(const Projectile& strand, float alpha) {
 } // namespace
 
 void DrawWorld(const World& world, const ParticlePool& particles, float alpha, const Art& art,
-               float bossSinceDied) {
+               float bossSinceDied, bool showAimSight, std::optional<Vec2> aimDirection) {
     const Player& player = world.player;
     const Vec2 playerPosition = Lerp(player.motion.previousPosition, player.motion.position, alpha);
+    const Vec2 bossPosition = Lerp(world.boss.motion.previousPosition, world.boss.motion.position, alpha);
     const bool bossAirborne = IsAirborne(world.boss);
 
     DrawFloor(world.arena, art);
@@ -92,7 +131,6 @@ void DrawWorld(const World& world, const ParticlePool& particles, float alpha, c
     // Shadows go on the floor before the light, so they sink into the dark with it. A boss in the air has
     // the Leap's own shadow instead.
     if (!bossAirborne) {
-        const Vec2 bossPosition = Lerp(world.boss.motion.previousPosition, world.boss.motion.position, alpha);
         DrawBodyShadow(bossPosition, world.boss.radius, playerPosition, art);
     }
     for (const Enemy& enemy : world.enemies) {
@@ -124,6 +162,11 @@ void DrawWorld(const World& world, const ParticlePool& particles, float alpha, c
         DrawHairball(enemy, playerPosition, world.boss.summon.spitWarningSeconds, world.elapsedSeconds, alpha,
                      art);
     }
+    if (showAimSight) {
+        if (const std::optional<LaserSight> sight = TraceWorldLaserSight(world, alpha, aimDirection)) {
+            DrawLaserSight(*sight, art);
+        }
+    }
     for (const Projectile& bullet : world.bullets) {
         DrawBullet(bullet, alpha);
     }
@@ -131,7 +174,7 @@ void DrawWorld(const World& world, const ParticlePool& particles, float alpha, c
         DrawHairStrand(strand, alpha);
     }
     // The player is drawn after every body on the floor, so it is never hidden under a crowd.
-    DrawPlayer(player, world.elapsedSeconds, alpha);
+    DrawPlayer(player, world.elapsedSeconds, alpha, aimDirection);
     DrawOverbodyParticles(particles, art);
     if (bossAirborne) {
         DrawBoss(world.boss, playerPosition, world.elapsedSeconds, alpha, art, bossSinceDied);

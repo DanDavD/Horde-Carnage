@@ -19,6 +19,7 @@ struct Projectile {
     /// What a hit on the player counts as, for the death screen. Only the boss's strands hit the player, so
     /// bullets leave it as it is.
     DamageSource source = DamageSource::HairRing;
+    Vec2 origin; ///< Where it left from, so a drawn streak never reaches behind the muzzle.
 };
 
 /// A projectile leaving `origin` in `direction` (length 1) at `speed`, that flies `range` units at most.

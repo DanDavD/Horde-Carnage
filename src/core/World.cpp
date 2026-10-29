@@ -88,6 +88,13 @@ void StartDashIfAsked(World& world, const PlayerCommands& commands) {
     Vec2 direction = player.facing;
     if (LengthSquared(commands.move) > 0.0f) {
         direction = commands.move;
+    } else if (commands.aimDirection && LengthSquared(*commands.aimDirection) > 0.0f) {
+        direction = *commands.aimDirection;
+    } else if (commands.aimInView) {
+        const Vec2 aimAt = world.camera.center + *commands.aimInView;
+        if (LengthSquared(aimAt - player.motion.position) > 1.0f) {
+            direction = aimAt - player.motion.position;
+        }
     } else if (commands.aimAt && LengthSquared(*commands.aimAt - player.motion.position) > 1.0f) {
         direction = *commands.aimAt - player.motion.position;
     }
@@ -525,6 +532,23 @@ Vec2 CameraFocus(const World& world) {
     return player + ClampLength(towardBoss, kMaxBossFramingOffset);
 }
 
+// Aim after moving and after collisions, so the gun points from where the player actually ended the step,
+// and a screen-space mouse offset resolves against the camera center of this same step instead of the last.
+void AimPlayer(World& world, const PlayerCommands& commands, float dt) {
+    Player& player = world.player;
+    if (commands.aimDirection) {
+        UpdateFacing(player.facing, *commands.aimDirection);
+    } else if (commands.aimInView) {
+        const Vec2 nextCamera =
+            NextFollowCameraCenter(world.camera, CameraFocus(world), player.motion.velocity, world.arena, dt);
+        AimFacing(player.facing, player.motion.position, nextCamera + *commands.aimInView);
+    } else if (commands.aimAt) {
+        AimFacing(player.facing, player.motion.position, *commands.aimAt);
+    } else {
+        UpdateFacing(player.facing, commands.move);
+    }
+}
+
 } // namespace
 
 World CreateWorld(const Arena& arena, Vec2 viewSize, std::uint64_t seed) {
@@ -549,14 +573,6 @@ void StepWorld(World& world, const PlayerCommands& commands, float dt) {
     StartDrinkIfAsked(player, commands);
     DrinkFlasks(world, dt);
     MovePlayer(player, commands.move, dt);
-
-    // Aim after moving, so the gun points from where the player is now, not from a step ago.
-    if (commands.aimAt) {
-        AimFacing(player.facing, player.motion.position, *commands.aimAt);
-    } else {
-        UpdateFacing(player.facing, commands.move);
-    }
-    HandleWeapons(world, commands, dt);
     StepEnemies(world, dt);
     const BossActions actions =
         StepBoss(world.boss, player.motion, player.radius, world.arena, world.random, dt);
@@ -597,6 +613,11 @@ void StepWorld(World& world, const PlayerCommands& commands, float dt) {
         SeparateEveryone(world);
         ConfineEveryone(world);
     }
+
+    // Aim and fire once every body is in its final spot for this step, so a bullet leaves from the real
+    // muzzle straight through the crosshair that this step's camera will show.
+    AimPlayer(world, commands, dt);
+    HandleWeapons(world, commands, dt);
 
     // Bullets test against where the bodies ended this step. A hairball killed now is removed before it
     // can touch the player.

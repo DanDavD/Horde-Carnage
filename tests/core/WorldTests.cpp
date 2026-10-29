@@ -572,3 +572,54 @@ TEST_CASE("the flasks run out after three drinks") {
     CHECK(player.flasks.charges == 0);
     CHECK(player.health.current == 10);
 }
+
+TEST_CASE("shots aimed through the screen crosshair fly straight through it while strafing and reversing") {
+    World world = horde::CreateWorld(kArena, kView);
+    Step(world, PlayerCommands{.selectSlot = 1}, 1);
+
+    const Vec2 aimOffset{45.0f, -210.0f};
+    int seenShots = world.shotsFired;
+    for (int step = 0; step < 90; ++step) {
+        const float dirX = (step < 30 || step >= 60) ? 1.0f : -1.0f;
+        Step(world, PlayerCommands{.move = {dirX, 0.0f}, .aimInView = aimOffset, .fireHeld = true}, 1);
+        if (world.shotsFired > seenShots) {
+            seenShots = world.shotsFired;
+            const auto newestIt = std::max_element(
+                world.bullets.begin(), world.bullets.end(),
+                [](const horde::Projectile& a, const horde::Projectile& b) { return a.secondsLeft < b.secondsLeft; });
+            REQUIRE(newestIt != world.bullets.end());
+            const horde::Projectile& newest = *newestIt;
+            const Vec2 dir = horde::Normalized(newest.motion.velocity);
+            const Vec2 crosshairWorld = world.camera.center + aimOffset;
+            const Vec2 toCrosshair = crosshairWorld - newest.origin;
+            const float sidewaysError = std::abs(toCrosshair.x * dir.y - toCrosshair.y * dir.x);
+            CHECK(sidewaysError < 0.02f);
+            CHECK(horde::Dot(toCrosshair, dir) > 0.0f);
+        }
+    }
+    CHECK(seenShots >= 14);
+}
+
+TEST_CASE("shots aimed with a twin-stick direction keep that exact heading while strafing horizontally") {
+    World world = PlayerAlone();
+    Step(world, PlayerCommands{.selectSlot = 1}, 1);
+
+    const Vec2 stickAim = horde::Normalized(Vec2{0.28f, -1.0f});
+    int seenShots = world.shotsFired;
+    for (int step = 0; step < 36; ++step) {
+        const float dirX = step < 18 ? 1.0f : -1.0f;
+        Step(world, PlayerCommands{.move = {dirX, 0.0f}, .aimDirection = stickAim, .fireHeld = true}, 1);
+        if (world.shotsFired > seenShots) {
+            seenShots = world.shotsFired;
+            const auto newestIt = std::max_element(
+                world.bullets.begin(), world.bullets.end(),
+                [](const horde::Projectile& a, const horde::Projectile& b) { return a.secondsLeft < b.secondsLeft; });
+            REQUIRE(newestIt != world.bullets.end());
+            const horde::Projectile& newest = *newestIt;
+            const Vec2 dir = horde::Normalized(newest.motion.velocity);
+            CHECK(dir.x == doctest::Approx(stickAim.x).epsilon(0.0001));
+            CHECK(dir.y == doctest::Approx(stickAim.y).epsilon(0.0001));
+        }
+    }
+    CHECK(seenShots >= 5);
+}

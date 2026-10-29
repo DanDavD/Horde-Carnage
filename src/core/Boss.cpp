@@ -439,6 +439,20 @@ void EnterFrenzy(Boss& boss) {
     boss.summon.placement.count = frenzy.summonCount;
 }
 
+float SummonThreat(const Boss& boss, float distance) {
+    const AttackChoiceStats& choice = boss.choice;
+    if (IsDead(boss.health) || IsTransforming(boss) || choice.summon.farWeight <= 0.0f ||
+        choice.summon.farWeight <= choice.summon.midWeight) {
+        return 0.0f;
+    }
+    const float midDistance = 0.5f * (choice.nearDistance + choice.farDistance);
+    if (choice.farDistance <= midDistance) {
+        return distance >= choice.farDistance ? 1.0f : 0.0f;
+    }
+    const float t = std::clamp((distance - midDistance) / (choice.farDistance - midDistance), 0.0f, 1.0f);
+    return t * t * (3.0f - 2.0f * t);
+}
+
 bool IsStaggered(const Boss& boss) {
     return boss.staggerSeconds > 0.0f;
 }

@@ -65,12 +65,11 @@ inline constexpr Color kHealth{158, 30, 34, 255};
 inline constexpr Color kVictoryGold{230, 185, 95, 255};
 inline constexpr Color kStunStar{255, 225, 130, 255};
 // Paler and redder than the boss's body, so a strand reads against the dark floor and as something that
-// hurts. The gap lane is the one pale, safe thing in the warning.
+// hurts.
 inline constexpr Color kStrand{225, 130, 110, 255};
 inline constexpr Color kShell{95, 155, 255, 255};
 inline constexpr Color kBarrier{255, 150, 50, 255};
 inline constexpr Color kExposed{235, 235, 240, 255};
-inline constexpr Color kRingLane{205, 205, 220, 255};
 // The shockwave is dust thrown up by the landing, red where it still hurts.
 inline constexpr Color kShockwave{230, 120, 95, 255};
 inline constexpr Color kBossEyeEnraged{255, 60, 50, 255};
@@ -82,6 +81,8 @@ inline constexpr Color kBarHurt{228, 128, 112, 255};
 inline constexpr Color kBarTrail{214, 176, 112, 255};
 inline constexpr Color kMuzzleFlash{255, 220, 120, 255};
 inline constexpr Color kCrosshair{236, 228, 210, 255};
+inline constexpr Color kLaserSight{235, 58, 52, 255};
+inline constexpr Color kLaserCore{255, 204, 190, 255};
 inline constexpr Color kBullet{255, 230, 140, 255};
 inline constexpr Color kFlask{245, 150, 45, 255};
 inline constexpr Color kHitFlash{255, 255, 255, 255};
