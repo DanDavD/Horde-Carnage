@@ -163,24 +163,23 @@ TEST_CASE("assist aim in world targets the boss and minions while alive") {
     }
 }
 
-TEST_CASE("stepping gamepad aim keeps twin-stick aim independent of movement and holds heading while firing") {
+TEST_CASE("only the right stick aims: the left stick never turns the aim, firing or not") {
     const horde::World world = horde::CreateWorld(horde::kBossArena, kView, 456);
     const horde::Vec2 playerPos = world.player.motion.position;
     horde::GamepadAim aim;
 
-    // Right stick north while running south: aims north at the boss, not south with the feet.
-    const horde::Vec2 kitingAim = horde::StepGamepadAim(aim, world, {0.0f, -1.0f}, {0.0f, 1.0f}, true);
-    CHECK(doctest::Approx(kitingAim.x).epsilon(kTolerance) == playerPos.x);
-    CHECK(doctest::Approx(kitingAim.y).epsilon(kTolerance) == playerPos.y - horde::kGamepadCrosshairDistance);
+    // Right stick north: aims north at the boss.
+    const horde::Vec2 north = horde::StepGamepadAim(aim, world, {0.0f, -1.0f}, true);
+    CHECK(doctest::Approx(north.x).epsilon(kTolerance) == playerPos.x);
+    CHECK(doctest::Approx(north.y).epsilon(kTolerance) == playerPos.y - horde::kGamepadCrosshairDistance);
 
-    // Letting go of the right stick while still holding RT and running south keeps shooting north.
-    const horde::Vec2 heldFireAim = horde::StepGamepadAim(aim, world, {}, {0.0f, 1.0f}, true);
-    CHECK(doctest::Approx(heldFireAim.y).epsilon(kTolerance) == playerPos.y - horde::kGamepadCrosshairDistance);
-
-    // Releasing RT as well lets the hunter turn naturally with movement, without magnetizing sideways.
-    const horde::Vec2 runningEastAim = horde::StepGamepadAim(aim, world, {}, {1.0f, 0.0f}, false);
-    CHECK(doctest::Approx(runningEastAim.x).epsilon(kTolerance) == playerPos.x + horde::kGamepadCrosshairDistance);
-    CHECK(doctest::Approx(runningEastAim.y).epsilon(kTolerance) == playerPos.y);
+    // Letting go of the right stick, firing or not, keeps aiming north however the hunter walks: the left
+    // stick is not even an input of the aim.
+    const horde::Vec2 held = horde::StepGamepadAim(aim, world, {}, true);
+    CHECK(doctest::Approx(held.y).epsilon(kTolerance) == playerPos.y - horde::kGamepadCrosshairDistance);
+    const horde::Vec2 idle = horde::StepGamepadAim(aim, world, {}, false);
+    CHECK(doctest::Approx(idle.x).epsilon(kTolerance) == north.x);
+    CHECK(doctest::Approx(idle.y).epsilon(kTolerance) == north.y);
 }
 
 TEST_CASE("holding fire with right stick released does not compound aim assist across steps") {
@@ -189,11 +188,11 @@ TEST_CASE("holding fire with right stick released does not compound aim assist a
     const float offAngle = 10.0f * (kPi / 180.0f);
     const horde::Vec2 stick{std::sin(offAngle), -std::cos(offAngle)};
 
-    (void)horde::StepGamepadAim(aim, world, stick, {}, true);
+    (void)horde::StepGamepadAim(aim, world, stick, true);
     const horde::Vec2 initialAssisted = aim.direction;
 
     for (int i = 0; i < 120; ++i) {
-        (void)horde::StepGamepadAim(aim, world, {}, {-1.0f, 0.0f}, true);
+        (void)horde::StepGamepadAim(aim, world, {}, true);
     }
     CHECK(doctest::Approx(aim.direction.x).epsilon(kTolerance) == initialAssisted.x);
     CHECK(doctest::Approx(aim.direction.y).epsilon(kTolerance) == initialAssisted.y);

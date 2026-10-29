@@ -459,7 +459,7 @@ void Game::Update(float dt) {
     std::optional<Vec2> aimInView;
     std::optional<Vec2> aimDirection;
     if (_inputDevice == InputDevice::Gamepad) {
-        (void)StepGamepadAim(_gamepadAim, _session.world, ReadLookStick(_gamepadConnection.activeSlot), move,
+        (void)StepGamepadAim(_gamepadAim, _session.world, ReadLookStick(_gamepadConnection.activeSlot),
                              fireHeld || _pendingPresses.fire);
         aimDirection = _gamepadAim.direction;
     } else {

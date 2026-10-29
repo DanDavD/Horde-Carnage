@@ -90,16 +90,13 @@ Vec2 GamepadAimPoint(Vec2 playerPosition, Vec2 stickDirection, Vec2 fallbackDire
     return playerPosition + direction * crosshairDistance;
 }
 
-Vec2 StepGamepadAim(GamepadAim& aim, const World& world, Vec2 rightStick, Vec2 moveInput, bool firing,
+Vec2 StepGamepadAim(GamepadAim& aim, const World& world, Vec2 rightStick, bool firing,
                     const AimAssistStats& stats) {
     if (LengthSquared(rightStick) > 0.001f) {
         aim.rawDirection = Normalized(rightStick);
         aim.direction = AssistAimInWorld(world, aim.rawDirection, stats);
     } else if (firing) {
         aim.direction = AssistAimInWorld(world, aim.rawDirection, stats);
-    } else if (LengthSquared(moveInput) > 0.001f) {
-        aim.rawDirection = Normalized(moveInput);
-        aim.direction = aim.rawDirection;
     }
     return GamepadAimPoint(world.player.motion.position, {}, aim.direction, stats.crosshairDistance);
 }
