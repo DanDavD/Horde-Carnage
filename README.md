@@ -7,8 +7,11 @@ One arena, one very hard boss: the Matriarch, a giant hairball. You run with the
 ![C++20](https://img.shields.io/badge/C%2B%2B-20-blue?logo=cplusplus)
 ![raylib](https://img.shields.io/badge/raylib-5.5-black)
 ![Status](https://img.shields.io/badge/status-v1.0.0-brightgreen)
+[![Roadmap on Trello](https://img.shields.io/badge/roadmap-Trello-0052CC?logo=trello)](https://trello.com/b/4Ii5Aoep/horde-carnage-roadmap)
 
 **Play it:** download the latest zip from [Releases](https://github.com/DanDavD/Horde-Carnage/releases), unzip it and run `HordeCarnage.exe` (Windows 10 or 11, nothing to install), or play it in the browser on itch.io.
+
+**Roadmap:** I plan and track what comes next on a public [Trello board](https://trello.com/b/4Ii5Aoep/horde-carnage-roadmap): one card per working session, each with its goal, acceptance criteria, estimate and branch, and the pull request attached once it is open.
 
 ---
 
