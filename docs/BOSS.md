@@ -282,6 +282,13 @@ In a Debug build, `F1` shows the boss's health next to the shots fired and hit, 
 
 The tests about one attack's timings use a boss without its chance (`tests/core/PredictableBoss.h`): every warning at its stats' exact length and no combos.
 
+One test does the opposite and keeps all her chance: the golden fight (`tests/core/GoldenFightTests.cpp`). It plays a whole 120 s fight with a fixed seed against a scripted hunter, who circles her at 300, 450 and 600 units in turn, keeps off the walls, fires the gun her shield needs and dashes through strands and charges. The hunter cannot die, so the fight always reaches its end. Once a simulated second it samples her phase, attack, stage, shield, health and position, the hunter's health and position, the hairballs, the strands in the air, the shots and the random generator's state, and compares them with a table recorded from the game (`GoldenFightTable.inc`). I wrote it before splitting the boss into reusable attacks, so the refactor has to keep her exactly as she is: any change in her timing, her choices or what she draws from the generator fails it, and the message names the first second and every value that moved. Changing her charge speed from 1000 to 1001 fails it at 17 s.
+
+- `tests/core/GoldenFightTests.cpp`:
+  - the Matriarch fights exactly as she did when the table was recorded;
+  - the scenario covers all five attacks, the second phase, the frenzy, at least four shield breaks, hits on the hunter, summoned hairballs and the win, so a table recorded again later still tests all of it;
+  - a third case, skipped unless asked for, prints the table to record it again: `horde_tests --no-skip --minimal -tc="golden fight: print the table"`. A change that is meant to alter the fight records it again and says why in its commit.
+
 - `tests/core/BossVolleyTests.cpp`:
   - during the Volley's warning the boss holds still and its aim follows the player;
   - a Volley fires three bursts a beat apart, each aimed where a standing player is when it leaves;

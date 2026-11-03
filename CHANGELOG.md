@@ -5,6 +5,9 @@ Versions follow [Semantic Versioning](https://semver.org/) while the game is a p
 
 ## [Unreleased]
 
+### Added
+- **Golden fight test** (`GoldenFightTests.cpp`, `GoldenFightTable.inc`): a whole 120 s fight against the Matriarch with a fixed seed and a scripted hunter, sampled once a second (her phase, attack, stage, shield, health and position, the hunter, the hairballs, the strands, the shots and the random generator's state) and compared with a recorded table. It guards the coming split of the boss into reusable attacks: any change in what she does fails it at the first second that differs. A second case checks that the scenario covers every attack, both phases, the frenzy, the shield, the hairballs and the win. Explained in `docs/BOSS.md`.
+
 ## [1.0.0] - 2026-10-29
 
 The fight finished: drawn and scored in code, with menus, settings, gamepads, a laser sight and a browser build.

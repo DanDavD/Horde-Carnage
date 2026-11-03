@@ -105,7 +105,7 @@ Game objects are plain structs (components) that hold data, and free functions (
 - `tests/core/Vec2Tests.cpp`, `MovementTests.cpp`, `FacingTests.cpp`, `ArenaTests.cpp`, `AnalogInputTests.cpp`, `GamepadAimTests.cpp` and `MouseAimTests.cpp`: see [Movement](MOVEMENT.md#tests) and [Controllers](CONTROLLERS.md#tests).
 - `tests/core/FollowCameraTests.cpp`: see [Camera](CAMERA.md#tests).
 - `tests/core/ChaseTests.cpp` and `WorldTests.cpp`: see [Enemies](ENEMIES.md#tests).
-- `tests/core/AttackChoiceTests.cpp`, `BossTests.cpp`, `BossChargeTests.cpp`, `BossComboTests.cpp`, `BossHairRingTests.cpp`, `BossLeapTests.cpp`, `BossVolleyTests.cpp`, `FrenzyTests.cpp`, `PhaseTwoTests.cpp`, `ShockwaveTests.cpp` and `SummonTests.cpp`: see [The boss](BOSS.md#tests). The boss tests share `PredictableBoss.h`, a boss without its chance.
+- `tests/core/AttackChoiceTests.cpp`, `BossTests.cpp`, `BossChargeTests.cpp`, `BossComboTests.cpp`, `BossHairRingTests.cpp`, `BossLeapTests.cpp`, `BossVolleyTests.cpp`, `FrenzyTests.cpp`, `PhaseTwoTests.cpp`, `ShockwaveTests.cpp`, `SummonTests.cpp` and `GoldenFightTests.cpp`: see [The boss](BOSS.md#tests). The boss tests share `PredictableBoss.h`, a boss without its chance.
 - `tests/core/RandomTests.cpp`: see [Random numbers](RANDOM.md#tests).
 - `tests/core/WorldEventTests.cpp`, `HitStopTests.cpp`, `ScreenShakeTests.cpp`, `ImpactFeelTests.cpp`, `ParticleTests.cpp`, `ParticleEmitterTests.cpp` and `TrailingBarTests.cpp`: see [Game feel](GAME_FEEL.md#tests).
 - `tests/core/SynthTests.cpp` and `SoundCueTests.cpp`: see [Audio](AUDIO.md#tests).

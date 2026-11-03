@@ -22,6 +22,7 @@ add_executable(horde_tests
     core/GamepadAimTests.cpp
     core/GamepadConnectionTests.cpp
     core/GamepadTypeTests.cpp
+    core/GoldenFightTests.cpp
     core/HealthTests.cpp
     core/HitStopTests.cpp
     core/ImpactFeelTests.cpp
