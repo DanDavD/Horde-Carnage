@@ -62,7 +62,7 @@ int StepsUntilSpit(Boss& boss, Vec2 player) {
 }
 
 bool InStage(const Boss& boss, AttackStage stage) {
-    return boss.attack && boss.attack->stage == stage;
+    return boss.attack && boss.attack->clock.stage == stage;
 }
 
 // The angle between two directions of length 1, from 0 to 180 degrees.

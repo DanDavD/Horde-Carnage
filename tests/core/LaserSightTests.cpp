@@ -112,8 +112,8 @@ TEST_CASE("laser sight stops at the nearest living body and passes through dead 
     // While the boss is in the air during a Leap, the beam shines across the floor under her.
     world.enemies.Clear();
     world.boss.attack = horde::BossAttack{.kind = horde::AttackKind::Leap,
-                                          .stage = horde::AttackStage::Warning,
-                                          .stageSeconds = world.boss.leap.crouchSeconds + 0.2f,
+                                          .clock = {.stage = horde::AttackStage::Warning,
+                                                    .seconds = world.boss.leap.crouchSeconds + 0.2f},
                                           .takeoff = world.boss.motion.position,
                                           .target = world.boss.motion.position};
     REQUIRE(horde::IsAirborne(world.boss));

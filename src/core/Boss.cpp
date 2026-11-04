@@ -13,11 +13,6 @@ namespace {
 
 constexpr float kRadiansPerDegree = std::numbers::pi_v<float> / 180.0f;
 
-void EnterStage(BossAttack& attack, AttackStage stage) {
-    attack.stage = stage;
-    attack.stageSeconds = 0.0f;
-}
-
 // Toward the player, or the same way as before when the player stands right on the boss and gives no
 // direction.
 Vec2 AimAt(Vec2 from, Vec2 target, Vec2 previous) {
@@ -103,20 +98,20 @@ BossActions StepCharge(Boss& boss, BossAttack& charge, Vec2 playerPosition, cons
                        float dt) {
     const ChargeStats& stats = boss.charge;
     Motion& motion = boss.motion;
-    charge.stageSeconds += dt;
+    TickClock(charge.clock, dt);
     BossActions actions;
 
-    switch (charge.stage) {
+    switch (charge.clock.stage) {
     case AttackStage::Warning: {
         // It plants itself to crouch. The path follows the player until the aim locks, so standing still
         // or running away is not enough: the player has to move out of the line once it is fixed.
         StepMovement(motion, Vec2{}, boss.stats, dt);
         const float warning = WarningSeconds(boss, charge);
-        if (charge.stageSeconds <= warning - stats.aimLockSeconds) {
+        if (charge.clock.seconds <= warning - stats.aimLockSeconds) {
             charge.direction = AimAt(motion.position, playerPosition, charge.direction);
         }
-        if (charge.stageSeconds >= warning) {
-            EnterStage(charge, AttackStage::Active);
+        if (HasLasted(charge.clock, warning)) {
+            EnterStage(charge.clock, AttackStage::Active);
             charge.distanceLeft = stats.distance;
         }
         break;
@@ -124,8 +119,7 @@ BossActions StepCharge(Boss& boss, BossAttack& charge, Vec2 playerPosition, cons
 
     case AttackStage::Active: {
         // In a frenzy it throws strands as it runs, on a beat counted from the start of the run.
-        const float nextBolt = static_cast<float>(charge.wavesSpat) * stats.boltIntervalSeconds;
-        if (stats.boltIntervalSeconds > 0.0f && charge.stageSeconds >= nextBolt) {
+        if (stats.boltIntervalSeconds > 0.0f && IsBeatDue(charge.clock, charge.wavesSpat, stats.boltIntervalSeconds)) {
             ++charge.wavesSpat;
             actions.throwBolts = true;
         }
@@ -142,7 +136,7 @@ BossActions StepCharge(Boss& boss, BossAttack& charge, Vec2 playerPosition, cons
             motion.velocity = Vec2{};
             charge.stunned = path.endsAtWall;
             actions.hitWall = path.endsAtWall;
-            EnterStage(charge, AttackStage::Recovery);
+            EnterStage(charge.clock, AttackStage::Recovery);
         } else {
             motion.position += charge.direction * step;
             motion.velocity = charge.direction * stats.speed;
@@ -154,7 +148,7 @@ BossActions StepCharge(Boss& boss, BossAttack& charge, Vec2 playerPosition, cons
     case AttackStage::Recovery: {
         StepMovement(motion, Vec2{}, boss.stats, dt);
         const float recovery = charge.stunned ? stats.stunSeconds : stats.recoverySeconds;
-        if (charge.stageSeconds >= RecoverySeconds(boss, charge, recovery)) {
+        if (HasLasted(charge.clock, RecoverySeconds(boss, charge, recovery))) {
             FinishAttack(boss, random);
         }
         break;
@@ -167,36 +161,35 @@ BossActions StepCharge(Boss& boss, BossAttack& charge, Vec2 playerPosition, cons
 BossActions StepHairRing(Boss& boss, BossAttack& ring, Random& random, float dt) {
     const HairRingStats& stats = boss.hairRing;
     StepMovement(boss.motion, Vec2{}, boss.stats, dt);
-    ring.stageSeconds += dt;
+    TickClock(ring.clock, dt);
     BossActions actions;
 
-    switch (ring.stage) {
+    switch (ring.clock.stage) {
     case AttackStage::Warning:
-        if (ring.stageSeconds >= WarningSeconds(boss, ring)) {
-            EnterStage(ring, AttackStage::Active);
+        if (HasLasted(ring.clock, WarningSeconds(boss, ring))) {
+            EnterStage(ring.clock, AttackStage::Active);
         }
         break;
 
     case AttackStage::Active: {
         // Each ring leaves on its own beat, counted from the start of the stage. The gap turns before every
         // ring after the first, so that a few waves can sweep it around the boss.
-        const float nextWave = static_cast<float>(ring.wavesSpat) * stats.waveIntervalSeconds;
-        if (ring.wavesSpat < stats.waves && ring.stageSeconds >= nextWave) {
+        if (ring.wavesSpat < stats.waves && IsBeatDue(ring.clock, ring.wavesSpat, stats.waveIntervalSeconds)) {
             if (ring.wavesSpat > 0) {
                 ring.direction = Rotated(ring.direction, stats.gapTurnDegrees * kRadiansPerDegree);
             }
             ++ring.wavesSpat;
             actions.spitHairRing = true;
         }
-        const float lastWave = static_cast<float>(stats.waves - 1) * stats.waveIntervalSeconds;
-        if (ring.wavesSpat >= stats.waves && ring.stageSeconds >= lastWave + stats.activeSeconds) {
-            EnterStage(ring, AttackStage::Recovery);
+        if (ring.wavesSpat >= stats.waves &&
+            HasLastedPastBeats(ring.clock, stats.waves, stats.waveIntervalSeconds, stats.activeSeconds)) {
+            EnterStage(ring.clock, AttackStage::Recovery);
         }
         break;
     }
 
     case AttackStage::Recovery:
-        if (ring.stageSeconds >= RecoverySeconds(boss, ring, stats.recoverySeconds)) {
+        if (HasLasted(ring.clock, RecoverySeconds(boss, ring, stats.recoverySeconds))) {
             FinishAttack(boss, random);
         }
         break;
@@ -208,13 +201,13 @@ BossActions StepLeap(Boss& boss, BossAttack& leap, Vec2 playerPosition, const Ar
                      float dt) {
     const LeapStats& stats = boss.leap;
     Motion& motion = boss.motion;
-    leap.stageSeconds += dt;
+    TickClock(leap.clock, dt);
     BossActions actions;
 
-    switch (leap.stage) {
+    switch (leap.clock.stage) {
     case AttackStage::Warning: {
         const float airSeconds = LeapAirSeconds(boss, leap);
-        const float airborne = leap.stageSeconds - LeapCrouchSeconds(boss, leap);
+        const float airborne = leap.clock.seconds - LeapCrouchSeconds(boss, leap);
         if (airborne <= 0.0f) {
             // Crouched, it plants itself, and the jump starts from where it comes to rest.
             StepMovement(motion, Vec2{}, boss.stats, dt);
@@ -233,7 +226,7 @@ BossActions StepLeap(Boss& boss, BossAttack& leap, Vec2 playerPosition, const Ar
         motion.velocity = Vec2{};
         if (airborne >= airSeconds) {
             motion.position = leap.target;
-            EnterStage(leap, AttackStage::Active);
+            EnterStage(leap.clock, AttackStage::Active);
             actions.landed = true;
         }
         break;
@@ -241,14 +234,14 @@ BossActions StepLeap(Boss& boss, BossAttack& leap, Vec2 playerPosition, const Ar
 
     case AttackStage::Active:
         StepMovement(motion, Vec2{}, boss.stats, dt);
-        if (leap.stageSeconds >= stats.landingSeconds) {
-            EnterStage(leap, AttackStage::Recovery);
+        if (HasLasted(leap.clock, stats.landingSeconds)) {
+            EnterStage(leap.clock, AttackStage::Recovery);
         }
         break;
 
     case AttackStage::Recovery:
         StepMovement(motion, Vec2{}, boss.stats, dt);
-        if (leap.stageSeconds >= RecoverySeconds(boss, leap, stats.recoverySeconds)) {
+        if (HasLasted(leap.clock, RecoverySeconds(boss, leap, stats.recoverySeconds))) {
             FinishAttack(boss, random);
         }
         break;
@@ -263,35 +256,34 @@ BossActions StepVolley(Boss& boss, BossAttack& volley, const Motion& player, con
     const VolleyStats& stats = boss.volley;
     StepMovement(boss.motion, Vec2{}, boss.stats, dt);
     volley.direction = AimAt(boss.motion.position, player.position, volley.direction);
-    volley.stageSeconds += dt;
+    TickClock(volley.clock, dt);
     BossActions actions;
 
-    switch (volley.stage) {
+    switch (volley.clock.stage) {
     case AttackStage::Warning:
-        if (volley.stageSeconds >= WarningSeconds(boss, volley)) {
-            EnterStage(volley, AttackStage::Active);
+        if (HasLasted(volley.clock, WarningSeconds(boss, volley))) {
+            EnterStage(volley.clock, AttackStage::Active);
         }
         break;
 
     case AttackStage::Active: {
         // Each burst on its own beat, counted from the start of the stage, like the waves of a ring.
-        const float nextBurst = static_cast<float>(volley.wavesSpat) * stats.burstIntervalSeconds;
-        if (volley.wavesSpat < stats.bursts && volley.stageSeconds >= nextBurst) {
+        if (volley.wavesSpat < stats.bursts && IsBeatDue(volley.clock, volley.wavesSpat, stats.burstIntervalSeconds)) {
             if (volley.wavesSpat % 2 == 1) {
                 volley.direction = AimAt(boss.motion.position, LeadPoint(boss, player, arena), volley.direction);
             }
             ++volley.wavesSpat;
             actions.spitVolley = true;
         }
-        const float lastBurst = static_cast<float>(stats.bursts - 1) * stats.burstIntervalSeconds;
-        if (volley.wavesSpat >= stats.bursts && volley.stageSeconds >= lastBurst + stats.activeSeconds) {
-            EnterStage(volley, AttackStage::Recovery);
+        if (volley.wavesSpat >= stats.bursts &&
+            HasLastedPastBeats(volley.clock, stats.bursts, stats.burstIntervalSeconds, stats.activeSeconds)) {
+            EnterStage(volley.clock, AttackStage::Recovery);
         }
         break;
     }
 
     case AttackStage::Recovery:
-        if (volley.stageSeconds >= RecoverySeconds(boss, volley, stats.recoverySeconds)) {
+        if (HasLasted(volley.clock, RecoverySeconds(boss, volley, stats.recoverySeconds))) {
             FinishAttack(boss, random);
         }
         break;
@@ -304,26 +296,26 @@ BossActions StepVolley(Boss& boss, BossAttack& volley, const Motion& player, con
 BossActions StepSummon(Boss& boss, BossAttack& summon, Random& random, float dt) {
     const SummonStats& stats = boss.summon;
     StepMovement(boss.motion, Vec2{}, boss.stats, dt);
-    summon.stageSeconds += dt;
+    TickClock(summon.clock, dt);
     BossActions actions;
 
-    switch (summon.stage) {
+    switch (summon.clock.stage) {
     case AttackStage::Warning:
         if (summon.wavesSpat == 0) {
             summon.wavesSpat = 1;
             actions.summon = true;
         }
-        if (summon.stageSeconds >= WarningSeconds(boss, summon)) {
-            EnterStage(summon, AttackStage::Active);
+        if (HasLasted(summon.clock, WarningSeconds(boss, summon))) {
+            EnterStage(summon.clock, AttackStage::Active);
         }
         break;
     case AttackStage::Active:
-        if (summon.stageSeconds >= stats.activeSeconds) {
-            EnterStage(summon, AttackStage::Recovery);
+        if (HasLasted(summon.clock, stats.activeSeconds)) {
+            EnterStage(summon.clock, AttackStage::Recovery);
         }
         break;
     case AttackStage::Recovery:
-        if (summon.stageSeconds >= RecoverySeconds(boss, summon, stats.recoverySeconds)) {
+        if (HasLasted(summon.clock, RecoverySeconds(boss, summon, stats.recoverySeconds))) {
             FinishAttack(boss, random);
         }
         break;
@@ -396,7 +388,7 @@ BossActions StepBoss(Boss& boss, const Motion& player, float playerRadius, const
     BossActions actions = StepAttack(boss, player, arena, random, dt);
     // A combo skips its opener's recovery: the follow-up starts in the step the opener would begin to rest,
     // so there is no opening between the two. A Charge stunned by a wall shakes it off for the follow-up.
-    if (boss.attack && boss.attack->stage == AttackStage::Recovery && boss.attack->followUp) {
+    if (boss.attack && boss.attack->clock.stage == AttackStage::Recovery && boss.attack->followUp) {
         StartAttack(boss, *boss.attack->followUp, true, playerPosition, arena, random);
         actions.attackStarted = true;
     }
@@ -464,13 +456,13 @@ void StaggerBoss(Boss& boss) {
 }
 
 bool IsCharging(const Boss& boss) {
-    return boss.attack && boss.attack->kind == AttackKind::Charge && boss.attack->stage == AttackStage::Active;
+    return boss.attack && boss.attack->kind == AttackKind::Charge && boss.attack->clock.stage == AttackStage::Active;
 }
 
 bool IsAirborne(const Boss& boss) {
     const std::optional<BossAttack>& attack = boss.attack;
-    return attack && attack->kind == AttackKind::Leap && attack->stage == AttackStage::Warning &&
-           attack->stageSeconds > LeapCrouchSeconds(boss, *attack);
+    return attack && attack->kind == AttackKind::Leap && attack->clock.stage == AttackStage::Warning &&
+           attack->clock.seconds > LeapCrouchSeconds(boss, *attack);
 }
 
 float WarningSeconds(const Boss& boss, const BossAttack& attack) {

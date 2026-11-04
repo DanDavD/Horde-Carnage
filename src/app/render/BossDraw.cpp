@@ -102,7 +102,7 @@ constexpr float kDeathSag = 0.86f;
 constexpr float kDeathEyesShut = 0.75f;
 
 bool InAttack(const Boss& boss, AttackKind kind, AttackStage stage) {
-    return boss.attack && boss.attack->kind == kind && boss.attack->stage == stage;
+    return boss.attack && boss.attack->kind == kind && boss.attack->clock.stage == stage;
 }
 
 // The charge's path on the floor, drawn by the same `PlanChargePath` the run follows. Faint while it still
@@ -120,8 +120,8 @@ void DrawChargeTelegraph(const Boss& boss, const Arena& arena) {
     const Vec2 end = path.end + charge.direction * boss.radius;
     const Vec2 side = Vec2{-charge.direction.y, charge.direction.x} * boss.radius;
     const float warning = WarningSeconds(boss, charge);
-    const bool locked = charge.stageSeconds > warning - stats.aimLockSeconds;
-    const float progress = std::min(charge.stageSeconds / warning, 1.0f);
+    const bool locked = charge.clock.seconds > warning - stats.aimLockSeconds;
+    const float progress = std::min(charge.clock.seconds / warning, 1.0f);
 
     DrawLineEx(ToRaylib(start), ToRaylib(end), boss.radius * 2.0f,
                Fade(kBlood, locked ? 0.3f : 0.06f + 0.12f * progress));
@@ -142,7 +142,7 @@ void DrawLeapTelegraph(const Boss& boss) {
     const BossAttack& leap = *boss.attack;
     const LeapStats& stats = boss.leap;
     const float airSeconds = LeapAirSeconds(boss, leap);
-    const float airborne = std::max(leap.stageSeconds - LeapCrouchSeconds(boss, leap), 0.0f);
+    const float airborne = std::max(leap.clock.seconds - LeapCrouchSeconds(boss, leap), 0.0f);
     const float progress = std::min(airborne / airSeconds, 1.0f);
     const bool locked = airborne > airSeconds - stats.lockSeconds;
     const Vector2 center = ToRaylib(leap.target);
@@ -163,7 +163,7 @@ void DrawHairRingTelegraph(const Boss& boss) {
     }
     const BossAttack& ring = *boss.attack;
     const HairRingStats& stats = boss.hairRing;
-    const float progress = std::min(ring.stageSeconds / WarningSeconds(boss, ring), 1.0f);
+    const float progress = std::min(ring.clock.seconds / WarningSeconds(boss, ring), 1.0f);
     const Vector2 center = ToRaylib(boss.motion.position);
     // In degrees, clockwise on screen, the way raylib draws arcs.
     const float gapMiddle = std::atan2(ring.direction.y, ring.direction.x) * kDegreesPerRadian;
@@ -199,7 +199,7 @@ void DrawVolleyTelegraph(const Boss& boss) {
         return;
     }
     const BossAttack& volley = *boss.attack;
-    const float progress = std::min(volley.stageSeconds / WarningSeconds(boss, volley), 1.0f);
+    const float progress = std::min(volley.clock.seconds / WarningSeconds(boss, volley), 1.0f);
     const Vec2 start = boss.motion.position + volley.direction * boss.radius;
     const Vec2 end = start + volley.direction * kVolleyLineLength;
     DrawLineEx(ToRaylib(start), ToRaylib(end), 2.0f + 2.0f * progress, Fade(kBlood, 0.2f + 0.6f * progress));
@@ -295,15 +295,15 @@ void DrawChargingBoss(const Boss& boss, Vec2 position, HairPose pose, const Art&
     float radius = boss.radius;
     pose.lookAt = position + attack.direction * boss.radius;
     pose.stretchAlong = attack.direction;
-    switch (attack.stage) {
+    switch (attack.clock.stage) {
     case AttackStage::Warning: {
         const float warning = WarningSeconds(boss, attack);
-        const float crouch = std::min(attack.stageSeconds / warning, 1.0f);
+        const float crouch = std::min(attack.clock.seconds / warning, 1.0f);
         radius *= 1.0f - kChargeCrouch * crouch;
         pose.stretch = 1.0f + (kCrouchSquash - 1.0f) * crouch;
-        if (attack.stageSeconds > warning - stats.aimLockSeconds) {
+        if (attack.clock.seconds > warning - stats.aimLockSeconds) {
             const Vec2 side{-attack.direction.y, attack.direction.x};
-            position += side * (kChargeTremble * std::sin(attack.stageSeconds * 90.0f));
+            position += side * (kChargeTremble * std::sin(attack.clock.seconds * 90.0f));
         }
         break;
     }
@@ -321,8 +321,8 @@ void DrawChargingBoss(const Boss& boss, Vec2 position, HairPose pose, const Art&
     }
     pose.lookAt = position + attack.direction * boss.radius;
     DrawBossBody(boss, position, radius, pose, art);
-    if (attack.stage == AttackStage::Recovery && attack.stunned) {
-        DrawStunStars(position, radius, attack.stageSeconds);
+    if (attack.clock.stage == AttackStage::Recovery && attack.stunned) {
+        DrawStunStars(position, radius, attack.clock.seconds);
     }
 }
 
@@ -331,9 +331,9 @@ void DrawChargingBoss(const Boss& boss, Vec2 position, HairPose pose, const Art&
 void DrawSpittingBoss(const Boss& boss, Vec2 position, HairPose pose, const Art& art) {
     const BossAttack& ring = *boss.attack;
     float radius = boss.radius;
-    if (ring.stage == AttackStage::Warning) {
-        radius *= 1.0f + kRingSwell * std::min(ring.stageSeconds / WarningSeconds(boss, ring), 1.0f);
-    } else if (ring.stage == AttackStage::Active) {
+    if (ring.clock.stage == AttackStage::Warning) {
+        radius *= 1.0f + kRingSwell * std::min(ring.clock.seconds / WarningSeconds(boss, ring), 1.0f);
+    } else if (ring.clock.stage == AttackStage::Active) {
         radius *= 1.0f - kRingSpitShrink;
         OpenMouth(boss, pose, kSpitMouth);
     }
@@ -346,12 +346,12 @@ void DrawLeapingBoss(const Boss& boss, Vec2 position, HairPose pose, const Art& 
     const BossAttack& leap = *boss.attack;
     float radius = boss.radius;
     pose.stretchAlong = Vec2{0.0f, 1.0f};
-    switch (leap.stage) {
+    switch (leap.clock.stage) {
     case AttackStage::Warning: {
         const float crouch = LeapCrouchSeconds(boss, leap);
-        const float airborne = leap.stageSeconds - crouch;
+        const float airborne = leap.clock.seconds - crouch;
         if (airborne <= 0.0f) {
-            const float down = leap.stageSeconds / crouch;
+            const float down = leap.clock.seconds / crouch;
             radius *= 1.0f - kLeapCrouch * down;
             pose.stretch = 1.0f + (kCrouchSquash - 1.0f) * down;
             break;
@@ -377,10 +377,10 @@ void DrawLeapingBoss(const Boss& boss, Vec2 position, HairPose pose, const Art& 
 void DrawVolleyingBoss(const Boss& boss, Vec2 position, HairPose pose, const Art& art) {
     const BossAttack& volley = *boss.attack;
     float radius = boss.radius;
-    if (volley.stage == AttackStage::Warning) {
-        radius *= 1.0f - kVolleyLean * std::min(volley.stageSeconds / WarningSeconds(boss, volley), 1.0f);
-    } else if (volley.stage == AttackStage::Active) {
-        const float sinceBurst = std::fmod(volley.stageSeconds, boss.volley.burstIntervalSeconds);
+    if (volley.clock.stage == AttackStage::Warning) {
+        radius *= 1.0f - kVolleyLean * std::min(volley.clock.seconds / WarningSeconds(boss, volley), 1.0f);
+    } else if (volley.clock.stage == AttackStage::Active) {
+        const float sinceBurst = std::fmod(volley.clock.seconds, boss.volley.burstIntervalSeconds);
         if (sinceBurst < kVolleyBurstFlash) {
             radius *= 1.0f + kVolleyBurstSwell;
             pose.stretchAlong = volley.direction;
@@ -395,10 +395,10 @@ void DrawVolleyingBoss(const Boss& boss, Vec2 position, HairPose pose, const Art
 void DrawSummoningBoss(const Boss& boss, Vec2 position, HairPose pose, const Art& art) {
     const BossAttack& summon = *boss.attack;
     float radius = boss.radius;
-    if (summon.stage == AttackStage::Warning) {
-        const float howl = std::min(summon.stageSeconds / WarningSeconds(boss, summon), 1.0f);
+    if (summon.clock.stage == AttackStage::Warning) {
+        const float howl = std::min(summon.clock.seconds / WarningSeconds(boss, summon), 1.0f);
         radius *= 1.0f + kSummonSwell * howl;
-        position.x += kSummonShudder * std::sin(summon.stageSeconds * 60.0f);
+        position.x += kSummonShudder * std::sin(summon.clock.seconds * 60.0f);
         OpenMouth(boss, pose, howl);
     }
     DrawBossBody(boss, position, radius, pose, art);

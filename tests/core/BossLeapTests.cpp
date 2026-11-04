@@ -42,7 +42,7 @@ int Step(Boss& boss, Vec2 player, int steps) {
 }
 
 bool InStage(const Boss& boss, AttackStage stage) {
-    return boss.attack && boss.attack->stage == stage;
+    return boss.attack && boss.attack->clock.stage == stage;
 }
 
 } // namespace
@@ -91,7 +91,7 @@ TEST_CASE("the boss flies to its shadow and lands on it, once") {
     Boss boss = AboutToLeapFrom(kCenter);
     Step(boss, kSouth, 1);
     int landings = 0;
-    while (boss.attack && boss.attack->stage == AttackStage::Warning) {
+    while (boss.attack && boss.attack->clock.stage == AttackStage::Warning) {
         landings += Step(boss, kSouth, 1);
     }
     CHECK(landings == 1);
@@ -115,7 +115,7 @@ TEST_CASE("the shadow stays where the whole body fits inside the arena") {
 TEST_CASE("after landing the boss recovers for a second, then stalks again") {
     Boss boss = AboutToLeapFrom(kCenter);
     Step(boss, kSouth, 1);
-    while (boss.attack && boss.attack->stage == AttackStage::Warning) {
+    while (boss.attack && boss.attack->clock.stage == AttackStage::Warning) {
         Step(boss, kSouth, 1);
     }
     // 0.15 s of impact and 1 s of recovery.

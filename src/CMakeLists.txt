@@ -2,6 +2,7 @@
 add_library(horde_core STATIC
     core/Arena.cpp
     core/AttackChoice.cpp
+    core/AttackClock.cpp
     core/Boss.cpp
     core/BossTheme.cpp
     core/Chase.cpp

@@ -51,7 +51,7 @@ TEST_CASE("during the volley's warning the boss holds still and its aim follows 
     Boss boss = AboutToVolley();
     Step(boss, kCenter + Vec2{300.0f, 0.0f}, 10);
     REQUIRE(boss.attack);
-    CHECK(boss.attack->stage == AttackStage::Warning);
+    CHECK(boss.attack->clock.stage == AttackStage::Warning);
     CHECK(boss.attack->direction.x == doctest::Approx(1.0f));
     Step(boss, kCenter + Vec2{0.0f, -300.0f}, 10);
     CHECK(boss.attack->direction.y == doctest::Approx(-1.0f));

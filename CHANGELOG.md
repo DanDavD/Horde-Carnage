@@ -8,6 +8,9 @@ Versions follow [Semantic Versioning](https://semver.org/) while the game is a p
 ### Added
 - **Golden fight test** (`GoldenFightTests.cpp`, `GoldenFightTable.inc`): a whole 120 s fight against the Matriarch with a fixed seed and a scripted hunter, sampled once a second (her phase, attack, stage, shield, health and position, the hunter, the hairballs, the strands, the shots and the random generator's state) and compared with a recorded table. It guards the coming split of the boss into reusable attacks: any change in what she does fails it at the first second that differs. A second case checks that the scenario covers every attack, both phases, the frenzy, the shield, the hairballs and the win. Explained in `docs/BOSS.md`.
 
+### Changed
+- **Attack clock** (`AttackClock.cpp`, `Boss.cpp`, `BossDraw.cpp`, `DebugOverlay.cpp`): the stage of an attack and the time spent in it are now one small type, `AttackClock`, with `TickClock`, `EnterStage`, `HasLasted`, `IsBeatDue` and `HasLastedPastBeats`. The five attacks used to repeat that timing code each; now it is written once, and the next boss can use it as it is. `AttackStage` moved with it, and `BossAttack::stage` and `stageSeconds` became `BossAttack::clock`. Nothing in the fight changes: the golden fight test passes on the same table. Covered by `AttackClockTests`, explained in `docs/BOSS.md`.
+
 ## [1.0.0] - 2026-10-29
 
 The fight finished: drawn and scored in code, with menus, settings, gamepads, a laser sight and a browser build.

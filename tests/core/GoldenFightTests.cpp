@@ -137,7 +137,7 @@ GoldenSample Sample(const World& world, int second) {
         .phase = static_cast<int>(boss.phase),
         .frenzied = boss.frenzied ? 1 : 0,
         .attack = boss.attack ? static_cast<int>(boss.attack->kind) : -1,
-        .stage = boss.attack ? static_cast<int>(boss.attack->stage) : -1,
+        .stage = boss.attack ? static_cast<int>(boss.attack->clock.stage) : -1,
         .shieldKind = static_cast<int>(boss.shield.kind),
         .shieldUp = horde::IsShieldUp(boss.shield) ? 1 : 0,
         .shieldStrength = boss.shield.strength,

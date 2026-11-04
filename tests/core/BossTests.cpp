@@ -91,7 +91,7 @@ void LeapRunningEast(World& world, float delay) {
     world.boss.leap.shadowSpeed = horde::LeapStats{}.shadowSpeed;
     Step(world, PlayerCommands{}, 1);
     float airborne = 0.0f;
-    while (world.boss.attack && world.boss.attack->stage == AttackStage::Warning) {
+    while (world.boss.attack && world.boss.attack->clock.stage == AttackStage::Warning) {
         const bool run = horde::IsAirborne(world.boss) && airborne >= delay;
         Step(world, PlayerCommands{.move = run ? Vec2{1.0f, 0.0f} : Vec2{}}, 1);
         airborne += horde::IsAirborne(world.boss) ? kDt : 0.0f;
@@ -118,11 +118,11 @@ float NearestStrandGap(const World& world) {
 
 // Steps until the boss's attack reaches `stage`, for at most two seconds.
 void StepUntilStage(World& world, const PlayerCommands& commands, AttackStage stage) {
-    for (int i = 0; i < 120 && !(world.boss.attack && world.boss.attack->stage == stage); ++i) {
+    for (int i = 0; i < 120 && !(world.boss.attack && world.boss.attack->clock.stage == stage); ++i) {
         horde::StepWorld(world, commands, kDt);
     }
     REQUIRE(world.boss.attack);
-    REQUIRE(world.boss.attack->stage == stage);
+    REQUIRE(world.boss.attack->clock.stage == stage);
 }
 
 // Whether `point` is on the screen, `inset` units or more from every edge of the view.

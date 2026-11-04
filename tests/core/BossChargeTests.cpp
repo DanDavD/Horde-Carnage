@@ -42,7 +42,7 @@ bool StalkInRange(const Boss& boss) {
 }
 
 bool InStage(const Boss& boss, AttackStage stage) {
-    return boss.attack && boss.attack->stage == stage;
+    return boss.attack && boss.attack->clock.stage == stage;
 }
 
 // Steps until the attack reaches `stage`, for at most five seconds.
@@ -67,7 +67,7 @@ TEST_CASE("the boss stalks the player for two seconds, then opens the fight with
     Step(boss, player, 4);
     REQUIRE(boss.attack);
     CHECK(boss.attack->kind == horde::AttackKind::Charge);
-    CHECK(boss.attack->stage == AttackStage::Warning);
+    CHECK(boss.attack->clock.stage == AttackStage::Warning);
 }
 
 TEST_CASE("during the warning the boss stands still, and its aim follows the player until it locks") {

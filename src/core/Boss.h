@@ -4,6 +4,7 @@
 
 #include "core/Arena.h"
 #include "core/AttackChoice.h"
+#include "core/AttackClock.h"
 #include "core/Health.h"
 #include "core/Movement.h"
 #include "core/Projectile.h"
@@ -15,19 +16,10 @@
 
 namespace horde {
 
-/// Every attack runs through the same three stages, so the player learns one rhythm: a warning that shows
-/// what is coming and where, the attack itself, and a recovery that is the opening to punish it.
-enum class AttackStage {
-    Warning,
-    Active,
-    Recovery,
-};
-
 /// The attack in progress.
 struct BossAttack {
     AttackKind kind = AttackKind::Charge;
-    AttackStage stage = AttackStage::Warning;
-    float stageSeconds = 0.0f; ///< Time spent in the current stage.
+    AttackClock clock; ///< Its stage, and the time spent in it.
     /// Where the attack points, length 1. Charge: where it runs; it follows the player through the warning
     /// until the aim locks. Hair Ring: the middle of the gap, fixed from the start of the warning.
     Vec2 direction{0.0f, 1.0f};
