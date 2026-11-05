@@ -6,6 +6,7 @@
 
 #include "core/Arena.h"
 #include "core/Boss.h"
+#include "core/BossId.h"
 #include "core/DamageSource.h"
 #include "core/Enemy.h"
 #include "core/FollowCamera.h"
@@ -76,10 +77,11 @@ struct World {
     ObjectPool<WorldEvent, kMaxWorldEvents> events;
 };
 
-/// The starting world: the boss in the middle of `arena`, the player `kStartingDistance` south of it and
-/// facing it, no hairballs, the camera settled on both, and the random generator seeded with `seed`.
-/// Tests that do not depend on chance leave the seed at its default.
-[[nodiscard]] World CreateWorld(const Arena& arena, Vec2 viewSize, std::uint64_t seed = 0);
+/// The starting world: a fresh boss of kind `boss` in the middle of `arena`, the player `kStartingDistance`
+/// south of it and facing it, no hairballs, the camera settled on both, and the random generator seeded with
+/// `seed`. Tests that do not depend on chance leave the seed at its default.
+[[nodiscard]] World CreateWorld(const Arena& arena, Vec2 viewSize, std::uint64_t seed = 0,
+                                BossId boss = BossId::Matriarch);
 
 /// Advances the whole simulation by one fixed step of `dt` seconds, in this order: the player moves,
 /// aims and fires; hairballs chase and the boss stalks or attacks, spitting its strands into their pool

@@ -1,11 +1,13 @@
 #pragma once
 
 #include <optional>
+#include <string_view>
 
 #include "core/Arena.h"
 #include "core/AttackChoice.h"
 #include "core/AttackClock.h"
 #include "core/BossAttack.h"
+#include "core/BossId.h"
 #include "core/Health.h"
 #include "core/Movement.h"
 #include "core/Projectile.h"
@@ -19,69 +21,9 @@
 #include "core/attacks/Leap.h"
 #include "core/attacks/Summon.h"
 #include "core/attacks/Volley.h"
+#include "core/bosses/MatriarchStats.h"
 
 namespace horde {
-
-/// The second phase's weights: the Volley and the Summon join the three attacks of the first. Both are at
-/// their best far away, where the others leave gaps, so keeping away is no longer the safe answer. Stalks
-/// are shorter and warnings a little shorter on average.
-inline constexpr AttackChoiceStats PhaseTwoChoice() {
-    AttackChoiceStats choice;
-    choice.volley = AttackWeights{.nearWeight = 1.0f, .midWeight = 3.0f, .farWeight = 3.0f};
-    choice.summon = AttackWeights{.nearWeight = 0.5f, .midWeight = 1.0f, .farWeight = 2.5f};
-    choice.minStalkSeconds = 0.6f;
-    choice.maxStalkSeconds = 1.2f;
-    choice.minWarningScale = 0.75f;
-    choice.maxWarningScale = 1.0f;
-    return choice;
-}
-
-/// What changes when the boss enters its second phase. It keeps its attacks and its body, and these numbers
-/// replace the first phase's.
-struct PhaseTwoStats {
-    /// Invulnerable and roaring, with its bar refilling, between the two phases.
-    float transformSeconds = 2.0f;
-    AttackChoiceStats choice = PhaseTwoChoice();
-    /// Half of the attacks that can open a combo do, with a shorter rest after the chain.
-    ComboStats combo{.chance = 0.5f, .warningScale = 0.7f, .finalRecoverySeconds = 1.0f};
-    float exposedSeconds = 4.0f; ///< Of each broken shield: a shorter opening.
-    /// The roar that ends the transformation sends a shockwave like a landing's, but shorter, so it punishes
-    /// a player who waits next to the boss for phase 2, not one who keeps their distance (the fight starts
-    /// 400 units apart).
-    ShockwaveStats roar{.speed = 380.0f, .reach = 300.0f, .thickness = 20.0f, .damage = 20};
-};
-
-/// The second phase's stalks and combos once the boss is in a frenzy.
-inline constexpr AttackChoiceStats FrenzyChoice() {
-    AttackChoiceStats choice = PhaseTwoChoice();
-    choice.minStalkSeconds = 0.4f;
-    choice.maxStalkSeconds = 0.9f;
-    return choice;
-}
-
-/// What changes when the boss, in its second phase, drops to half its health: it roars again and every
-/// attack gains something. Like the second phase, these are numbers that replace the ones before.
-struct FrenzyStats {
-    float healthFraction = 0.5f; ///< Of the second phase's bar.
-    AttackChoiceStats choice = FrenzyChoice();
-    ComboStats combo{.chance = 0.65f, .warningScale = 0.7f, .finalRecoverySeconds = 0.9f};
-    float chargeBoltIntervalSeconds = 0.15f; ///< Strands thrown while it runs.
-    int ringWaves = 2;                       ///< Rings per Hair Ring.
-    float ringGapTurnDegrees = 30.0f;        ///< How far the gap turns from one ring to the next.
-    float leapShadowSpeed = 240.0f;          ///< Still slower than the player's 300.
-    int leapLandingStrands = 12;
-    int volleyBursts = 5; ///< Aimed, led, aimed, led, aimed.
-    float volleyBurstIntervalSeconds = 0.25f;
-    int summonCount = 6; ///< Hairballs per Summon.
-    ShockwaveStats roar{.speed = 380.0f, .reach = 300.0f, .thickness = 20.0f, .damage = 20};
-};
-
-/// The boss's two phases and the transformation between them.
-enum class BossPhase {
-    One,          ///< The three attacks. Emptying the bar starts the transformation, not the victory.
-    Transforming, ///< Invulnerable for `PhaseTwoStats::transformSeconds`, then the second phase.
-    Two,          ///< Faster, with the Volley. Emptying the bar wins the fight.
-};
 
 /// What a boss step asks of the world. The boss decides when to spit and when it lands, but its
 /// projectiles and shockwaves live in the world's pools, and the impact hurts the player, so the world
@@ -115,6 +57,7 @@ struct BossActions {
 ///
 /// A dead boss takes no part in the simulation: it does not chase, attack, block, take bullets or hurt.
 struct Boss {
+    BossId id = BossId::Matriarch; ///< Which boss this is: picks its row in the table of `BossRules`.
     Motion motion;
     /// Slower than a hairball (160) when it walks, and slow to get going. It is not the walk that makes it
     /// dangerous, it is the attacks.
@@ -158,14 +101,35 @@ struct Boss {
     FrenzyStats frenzy;
 };
 
-/// Advances the boss by one fixed step: the walk while it stalks, and every stage of its attack. Pushing
-/// bodies apart, bullets and damage to the player are handled by `StepWorld`. Every random pick (the next
-/// attack, the stalk, the warning's length and the combos) draws from `random`.
+/// Advances the boss by one fixed step. The hit flash fades and a dead boss only brakes to a stop, whoever
+/// the boss is; everything else (the walk while it stalks, its attacks, its phases) is the step function in
+/// its `BossRules`. Pushing bodies apart, bullets and damage to the player are handled by `StepWorld`. Every
+/// random pick draws from `random`.
 ///
 /// @param player Where the player is and how fast they move: the Volley leads a moving player.
 /// @return What the world has to do for the boss in this step, such as spawning a ring of hair.
 BossActions StepBoss(Boss& boss, const Motion& player, float playerRadius, const Arena& arena, Random& random,
                      float dt);
+
+/// The step of one living boss, past what `StepBoss` does for every boss.
+using BossStepFunction = BossActions (*)(Boss& boss, const Motion& player, float playerRadius, const Arena& arena,
+                                         Random& random, float dt);
+
+/// One row of the table of bosses: its name and the plain functions that make and run it. A table of function
+/// pointers instead of a class with virtual functions, so `Boss` and `World` stay plain data that can be
+/// copied, compared and stepped the same way every time.
+struct BossRules {
+    BossId id;
+    std::string_view name;       ///< As the game shows it, in title case.
+    Boss (*make)(Vec2 position); ///< A fresh boss of this kind, standing still at `position`.
+    BossStepFunction step;
+};
+
+/// The row of the table for `id`. Adding a boss is a new `BossId`, its file in `core/bosses/` and one row.
+[[nodiscard]] const BossRules& RulesOf(BossId id);
+
+/// A fresh boss of kind `id`, standing still at `position`.
+[[nodiscard]] Boss MakeBoss(BossId id, Vec2 position);
 
 /// How long the warning of `attack` lasts: its stats' warning, scaled by the attack's `warningScale`. For a
 /// Leap, the crouch and the air time together. Never shorter than the aim or shadow lock at its end.
@@ -185,37 +149,12 @@ BossActions StepBoss(Boss& boss, const Motion& player, float playerRadius, const
 /// bullets or hurt on touch.
 [[nodiscard]] bool IsAirborne(const Boss& boss);
 
-/// Whether the boss is between its two phases: invulnerable, still and roaring.
-[[nodiscard]] bool IsTransforming(const Boss& boss);
-
-/// Starts the transformation into the second phase: the attack is dropped, the health is refilled at once
-/// (the bar draws it filling up), and nothing hurts the boss until it ends. Only from the first phase.
-void StartTransformation(Boss& boss);
-
-/// Whether the boss has just dropped low enough in its second phase to fall into a frenzy.
-[[nodiscard]] bool ShouldFrenzy(const Boss& boss);
-
-/// Puts the boss in a frenzy: `FrenzyStats` replace the numbers of the second phase.
-void EnterFrenzy(Boss& boss);
-
-/// How far into the Summon's far range the player stands, from 0 inside `midDistance` (400) to 1 at or
-/// past `farDistance` (550), eased with smoothstep. Zero in the first phase, while transforming, or once
-/// the boss is dead.
-[[nodiscard]] float SummonThreat(const Boss& boss, float distance);
-
 /// Where a strand leaving the boss now meets a player who keeps their velocity, at most
 /// `VolleyStats::maxLeadSeconds` ahead and inside the arena.
 [[nodiscard]] Vec2 LeadPoint(const Boss& boss, const Motion& player, const Arena& arena);
 
 /// One strand of a Volley's burst, leaving the edge of the body in `direction` (length 1).
 [[nodiscard]] Projectile MakeVolleyStrand(const Boss& boss, Vec2 direction);
-
-/// Whether the boss is reeling from its broken shield.
-[[nodiscard]] bool IsStaggered(const Boss& boss);
-
-/// Cuts the boss's attack off and holds it still for `breakStaggerSeconds`, with the shortest stalk after
-/// it. Called when its shield breaks, so the break is felt, not only seen on a bar.
-void StaggerBoss(Boss& boss);
 
 /// One strand of the boss's ring, leaving the edge of its body in `direction` (length 1), with the ring's
 /// speed, range, size and damage.

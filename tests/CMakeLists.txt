@@ -9,6 +9,7 @@ add_executable(horde_tests
     core/BossComboTests.cpp
     core/BossHairRingTests.cpp
     core/BossLeapTests.cpp
+    core/BossRulesTests.cpp
     core/BossTests.cpp
     core/BossThemeTests.cpp
     core/BossVolleyTests.cpp

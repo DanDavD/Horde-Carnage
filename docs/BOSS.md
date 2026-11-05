@@ -8,7 +8,10 @@ This document describes what exists today. The boss stalks the player, shoves th
 
 The rules live in `horde_core`:
 
-- `src/core/Boss.h`, `src/core/Boss.cpp`: the `Boss` struct, with the same body components as the player and the hairballs (`Motion`, `MovementStats`, a radius and a weight) and the boss's numbers, with one set of stats for each of its attacks; and the systems that run it: `StepBoss`, which returns the `BossActions` the world has to carry out, `IsCharging`, `IsAirborne`, `WarningSeconds`, `LeapCrouchSeconds`, `LeapAirSeconds`, `SummonThreat`, and `MakeHairStrand`, `MakeVolleyStrand` and `LeadPoint` for the strands the world spawns from her body. Every one of these reads the boss's own numbers and passes them on to the attack parts below.
+- `src/core/Boss.h`, `src/core/Boss.cpp`: the `Boss` struct, with the same body components as the player and the hairballs (`Motion`, `MovementStats`, a radius and a weight), its `BossId`, and the boss's numbers, with one set of stats for each of its attacks; the table of bosses (`BossRules`, `RulesOf`, `MakeBoss`); and what every boss shares: `StepBoss`, which fades the hit flash, stops a dead boss and hands a living one to the step in its row of the table, returning the `BossActions` the world has to carry out, `IsCharging`, `IsAirborne`, `WarningSeconds`, `LeapCrouchSeconds`, `LeapAirSeconds`, and `MakeHairStrand`, `MakeVolleyStrand` and `LeadPoint` for the strands the world spawns from her body. Every one of these reads the boss's own numbers and passes them on to the attack parts below.
+- `src/core/BossId.h`: `BossId`, one value per boss, and `kBossCount`.
+- `src/core/bosses/Matriarch.h`, `Matriarch.cpp`: the Matriarch's rules, her row's `MakeMatriarch` and `StepMatriarch`: how she stalks and starts her attacks, her shield and the stagger when it breaks (`IsStaggered`, `StaggerBoss`), the transformation (`IsTransforming`, `StartTransformation`), the frenzy (`ShouldFrenzy`, `EnterFrenzy`) and `SummonThreat`.
+- `src/core/bosses/MatriarchStats.h`: the numbers only she has, `BossPhase`, `PhaseTwoStats`, `PhaseTwoChoice`, `FrenzyStats` and `FrenzyChoice`, which the `Boss` struct carries.
 - `src/core/BossAttack.h`, `src/core/BossAttack.cpp`: the attack in progress (`BossAttack`), and `Attacker`, the body that carries an attack out: its `Motion`, how it brakes, its radius and the shortest recovery after a combo. With `RecoverySeconds` and `AimAt`, which every attack shares.
 - `src/core/attacks/`: the five attacks as parts any boss can run with its own numbers, one pair of files each: `Charge`, `HairRing`, `Leap`, `Volley` and `Summon`. Each has its stats (`ChargeStats`, `HairRingStats`, `LeapStats`, `VolleyStats`, `SummonStats`), its warning (`ChargeWarningSeconds`, `HairRingWarningSeconds`, `LeapCrouchSeconds` with `LeapAirSeconds`, `VolleyWarningSeconds`, `SummonWarningSeconds`), how it starts where it needs to (`AimHairRing`, `AimLeap`) and its step (`StepCharge`, `StepHairRing`, `StepLeap`, `StepVolley`, `StepSummon`), which takes an `Attacker` instead of a `Boss` and returns what happened (`ChargeStep`, `HairRingStep`, `LeapStep`, `VolleyStep`, `SummonStep`). The geometry lives with its attack: `PlanChargePath` with the Charge, `HairRingStrands`, `HairStrandDirection` and `MakeHairStrand` with the ring, `LeadPoint` and `MakeVolleyStrand` with the Volley; the ones that make a strand take the center and radius of the body that spits it.
 - `src/core/AttackClock.h`, `src/core/AttackClock.cpp`: the clock every attack keeps time with. `AttackStage` (warning, active, recovery), `AttackClock` (the stage and the seconds spent in it), and the few questions every attack asks of it: `TickClock`, `EnterStage`, `HasLasted`, and, for attacks that fire on a beat, `IsBeatDue` and `HasLastedPastBeats`.
@@ -181,6 +184,9 @@ The frenzy's strands carry `DamageSource::Frenzy`, so the death screen reads "Sl
 - **Attacks are parts a boss runs, not part of the boss.** All five live in `core/attacks/`, take an `Attacker` (the body they move and the combo rule) and their stats as parameters, and return what happened in the step (`ChargeStep`, `HairRingStep` and so on). They never see a `Boss`, and none of them draws from the random generator: the random picks (the warning's length, the combo, the next attack) stay in `StepBoss`, in the order the golden fight records. `StepBoss` turns the result into `BossActions` and goes back to stalking when the attack says it is finished. So a second boss can charge with its own body, speed and timing without a line of the Charge changing.
   - Rejected: passing the whole `Boss`. Every attack could then read any of the Matriarch's numbers, and a second boss would have to look like her to reuse one.
   - Rejected: an `Attack` base class with a virtual step. The attacks are free functions over plain data like the rest of the core, and a hierarchy would move them to the heap for no gain: the boss already knows which attack it is running.
+- **A table of bosses, not a hierarchy.** Each boss is a `BossId` and one row of a table (`BossRules`): its name, a function that makes it and a function that steps it. `StepBoss` does what every boss shares (the hit flash, a dead boss braking) and calls the step in the boss's row; the Matriarch's step and all her own rules live in `core/bosses/Matriarch.cpp`. Adding a boss is a new `BossId`, a file in `core/bosses/` and one row, and a test checks that every id has its row in order.
+  - Rejected: a `Boss` base class with a virtual `Step`. The world is plain data that a fight copies, compares and steps the same way every time (the golden fight depends on it); a pointer to a polymorphic boss would put the boss in the heap and make a `World` impossible to copy as a value.
+  - Rejected, for now: splitting the `Boss` struct into what every boss has and what only the Matriarch has. Her shield, phase and frenzy fields stay in it until the second boss shows which of them it shares; splitting them now would be guessing.
   - Rejected: a state per attack and stage (`ChargeWarning`, `Charging`, `ChargeRecovery`, `RingWarning`...). Five attacks would make fifteen states that repeat the same timing code, and nothing would force them to keep the same rhythm.
   - Rejected: a class per attack with virtual `Update`. The attacks share all their data except a direction, a distance and a count, so a hierarchy would be more code than behaviour, and it would put the attacks in the heap instead of in the plain `Boss` struct.
 - **A random choice, weighted by distance.** A fixed order is learned in one attempt, and after that the fight is about rhythm, not reading. A random pick makes the player read every warning, and the weights keep the boss from looking random: each attack shows up where it makes sense, the Charge from afar, the Ring up close and the Leap in between.
@@ -245,16 +251,16 @@ The frenzy's strands carry `DamageSource::Frenzy`, so the death screen reads "Sl
 | Combo chance | `ComboStats::chance` | 35% |
 | Follow-up warning, and the recovery after it | `ComboStats::warningScale`, `finalRecoverySeconds` | 0.7, at least 1.2 s |
 | The combos | `kCombos` (`src/core/AttackChoice.h`) | Rebound, Pursuit, Crash |
-| Volley warning, bursts, time between them, active and recovery | `VolleyStats::warningSeconds`, `bursts`, `burstIntervalSeconds`, `activeSeconds`, `recoverySeconds` (`src/core/Boss.h`) | 0.55 s, 3, 0.3 s, 0.15 s, 0.8 s |
+| Volley warning, bursts, time between them, active and recovery | `VolleyStats::warningSeconds`, `bursts`, `burstIntervalSeconds`, `activeSeconds`, `recoverySeconds` (`src/core/attacks/Volley.h`) | 0.55 s, 3, 0.3 s, 0.15 s, 0.8 s |
 | Volley strands: per burst, spread, speed, range, radius, damage | `VolleyStats::strandsPerBurst`, `spreadDegrees`, `speed`, `range`, `strandRadius`, `damage` | 5, 8 degrees, 520 units/s, 900 units, 7 units, 12 |
 | How far ahead the led burst looks, at most | `VolleyStats::maxLeadSeconds` | 1.5 s |
 | Transformation | `PhaseTwoStats::transformSeconds` | 2 s |
-| Second phase: weights, stalks and warnings | `PhaseTwoChoice` (`src/core/Boss.h`) | Volley 1, 3, 3; stalks 0.6 to 1.2 s; warnings 0.75 to 1.0 |
+| Second phase: weights, stalks and warnings | `PhaseTwoChoice` (`src/core/bosses/MatriarchStats.h`) | Volley 1, 3, 3; stalks 0.6 to 1.2 s; warnings 0.75 to 1.0 |
 | Second phase: combos and exposed time | `PhaseTwoStats::combo`, `exposedSeconds` | 50%, 1 s of rest after; 4 s |
 | The roar's shockwave | `PhaseTwoStats::roar` | 380 units/s, 300 units, 20 units, 20 |
 | When the frenzy starts | `FrenzyStats::healthFraction` | Half of the second bar |
 | The frenzy's extras | `FrenzyStats` (`chargeBoltIntervalSeconds`, `ringWaves`, `ringGapTurnDegrees`, `leapShadowSpeed`, `leapLandingStrands`, `volleyBursts`, `volleyBurstIntervalSeconds`) | 0.15 s, 2, 30 degrees, 240 units/s, 12, 5, 0.25 s |
-| Summon warning, active and recovery | `SummonStats::warningSeconds`, `activeSeconds`, `recoverySeconds` (`src/core/Boss.h`) | 0.75 s, 0.2 s, 1 s |
+| Summon warning, active and recovery | `SummonStats::warningSeconds`, `activeSeconds`, `recoverySeconds` (`src/core/attacks/Summon.h`) | 0.75 s, 0.2 s, 1 s |
 | From the marks to the hairballs, and the most alive at once | `SummonStats::markerSeconds`, `maxAlive` | 0.75 s, 8 |
 | Marks: how many, how far, inside the walls, and how far from the player and the boss | `SummonPlacement::count`, `distance`, `wallMargin`, `minPlayerDistance`, `minBossDistance` (`src/core/SpawnMarker.h`) | 4 (6 in a frenzy), 250, 40, 150, 100 units |
 | Summon weights in the second phase | `PhaseTwoChoice` | 0.5, 1, 2.5 |
@@ -287,6 +293,11 @@ In a Debug build, `F1` shows the boss's health next to the shots fired and hit, 
 
 ## Tests
 
+- `tests/core/BossRulesTests.cpp`:
+  - every boss id has its row in the table of bosses, in the order of the enum;
+  - a boss made from the table is the kind asked for, standing still where it was asked to;
+  - a new world starts with the boss it is asked for, in the middle of the arena;
+  - stepping a living boss runs the step in its row of the table.
 - `tests/core/ChargeAttackTests.cpp`, `HairRingAttackTests.cpp`, `LeapAttackTests.cpp`, `VolleyAttackTests.cpp` and `SummonAttackTests.cpp` run the parts on a plain body (`tests/core/TestAttacker.h`, with a step of 1/64 s so every stage lasts a whole number of steps) and numbers that are not the Matriarch's, as a second boss would:
   - a charge with its own numbers aims, runs its own distance at its own speed and recovers;
   - a charge that meets a wall stops against it, says so, and recovers for its stun time;

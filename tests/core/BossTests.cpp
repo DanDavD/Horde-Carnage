@@ -7,6 +7,7 @@
 #include "PredictableBoss.h"
 #include "core/Collision.h"
 #include "core/World.h"
+#include "core/bosses/Matriarch.h"
 
 using horde::AttackStage;
 using horde::Boss;

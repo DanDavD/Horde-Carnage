@@ -8,6 +8,7 @@
 #include "core/Health.h"
 #include "core/ImpactFeel.h"
 #include "core/Shield.h"
+#include "core/bosses/Matriarch.h"
 
 namespace horde {
 

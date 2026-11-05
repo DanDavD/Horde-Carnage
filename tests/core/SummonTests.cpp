@@ -8,6 +8,7 @@
 #include "core/Boss.h"
 #include "core/SpawnMarker.h"
 #include "core/World.h"
+#include "core/bosses/Matriarch.h"
 
 using horde::Arena;
 using horde::AttackKind;

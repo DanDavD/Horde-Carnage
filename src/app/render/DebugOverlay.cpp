@@ -8,6 +8,7 @@
 #include "app/RaylibConvert.h"
 #include "core/BossTheme.h"
 #include "core/Loadout.h"
+#include "core/bosses/Matriarch.h"
 
 #ifndef NDEBUG
 

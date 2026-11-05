@@ -7,6 +7,7 @@
 #include "app/RaylibConvert.h"
 #include "app/render/HairBody.h"
 #include "app/render/Palette.h"
+#include "core/bosses/Matriarch.h"
 
 namespace horde {
 

@@ -12,6 +12,7 @@
 #include "core/Health.h"
 #include "core/Loadout.h"
 #include "core/Movement.h"
+#include "core/bosses/Matriarch.h"
 
 namespace horde {
 
@@ -551,11 +552,11 @@ void AimPlayer(World& world, const PlayerCommands& commands, float dt) {
 
 } // namespace
 
-World CreateWorld(const Arena& arena, Vec2 viewSize, std::uint64_t seed) {
+World CreateWorld(const Arena& arena, Vec2 viewSize, std::uint64_t seed, BossId boss) {
     const Vec2 bossStart = Center(arena);
     World world{.arena = arena,
                 .player = {.motion = MotionAt(bossStart + Vec2{0.0f, kStartingDistance})},
-                .boss = {.motion = MotionAt(bossStart)},
+                .boss = MakeBoss(boss, bossStart),
                 .seed = seed,
                 .random = SeedRandom(seed)};
     // The player starts looking at the boss, so the first shot goes where the threat is.

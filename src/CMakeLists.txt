@@ -50,7 +50,8 @@ add_library(horde_core STATIC
     core/attacks/HairRing.cpp
     core/attacks/Leap.cpp
     core/attacks/Summon.cpp
-    core/attacks/Volley.cpp)
+    core/attacks/Volley.cpp
+    core/bosses/Matriarch.cpp)
 target_include_directories(horde_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 horde_set_warnings(horde_core)
 
