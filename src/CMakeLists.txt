@@ -47,7 +47,10 @@ add_library(horde_core STATIC
     core/Weapon.cpp
     core/World.cpp
     core/attacks/Charge.cpp
-    core/attacks/Leap.cpp)
+    core/attacks/HairRing.cpp
+    core/attacks/Leap.cpp
+    core/attacks/Summon.cpp
+    core/attacks/Volley.cpp)
 target_include_directories(horde_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 horde_set_warnings(horde_core)
 

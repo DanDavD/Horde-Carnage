@@ -15,85 +15,12 @@
 #include "core/SpawnMarker.h"
 #include "core/Vec2.h"
 #include "core/attacks/Charge.h"
+#include "core/attacks/HairRing.h"
 #include "core/attacks/Leap.h"
+#include "core/attacks/Summon.h"
+#include "core/attacks/Volley.h"
 
 namespace horde {
-
-/// The numbers of the Hair Ring. One ring by default; more waves and a gap that turns between them are
-/// there for the combos and the second phase.
-struct HairRingStats {
-    float warningSeconds = 0.6f; ///< Swelling, with the ring and its gap drawn on the floor.
-    /// The spit. The first ring leaves at its start; with more waves, the stage lasts until the last one has
-    /// left, plus this.
-    float activeSeconds = 0.15f;
-    float recoverySeconds = 0.8f; ///< Deflated and still: the opening to punish it.
-    /// Directions evenly spaced around the body, 7.5 degrees apart. Close to the boss the strands are too
-    /// tight to slip between; far away they spread out.
-    int slots = 48;
-    int gapSlots = 6; ///< Directions left empty, centred on the gap: 45 degrees.
-    /// How far around from the player the gap opens, on alternate sides from one ring to the next. Never
-    /// toward the player, or standing still would be the answer.
-    float gapAngleDegrees = 90.0f;
-    float speed = 220.0f; ///< Units per second. Slower than the player, so the gap can be reached on foot.
-    float range = 900.0f; ///< Units a strand flies at most, unless a wall stops it first.
-    float strandRadius = 8.0f;
-    int damage = 15; ///< Per strand. The invulnerability window after a hit lets only one land.
-    int waves = 1;   ///< Rings per attack.
-    float waveIntervalSeconds = 0.4f; ///< Between two rings of the same attack.
-    float gapTurnDegrees = 0.0f;      ///< How far the gap turns from one ring to the next.
-};
-
-/// The numbers of the Aimed Volley, the second phase's ranged attack.
-struct VolleyStats {
-    float warningSeconds = 0.55f; ///< Leaning back, with a line on the floor toward the player.
-    int bursts = 3;
-    /// Between two bursts. The bursts take turns: the first goes where the player is, the second where
-    /// the player will be if they keep running, the third where they are again. Running in a straight line
-    /// is caught by the second, stopping by the first and third: only a change of rhythm gets through.
-    float burstIntervalSeconds = 0.3f;
-    /// How far ahead a led burst looks, at most. Across the whole arena the flight is longer than this, and
-    /// leading a player by all of it would aim at empty floor.
-    float maxLeadSeconds = 1.5f;
-    float activeSeconds = 0.15f;  ///< After the last burst, before the recovery.
-    float recoverySeconds = 0.8f; ///< Spent: the opening to punish it.
-    /// A fan 32 degrees wide: a step to the side is not enough to leave it, close up. Far away the gaps
-    /// between the strands open up enough to slip through.
-    int strandsPerBurst = 5;
-    float spreadDegrees = 8.0f; ///< Between two strands of a burst.
-    /// Units per second. More than twice the Hair Ring's: across the arena, 600 units, it still takes over a
-    /// second to arrive, so it can be read, but standing far away is no longer enough on its own.
-    float speed = 520.0f;
-    float range = 900.0f;
-    float strandRadius = 7.0f;
-    int damage = 12; ///< Per strand. A burst lands at most one hit, through the invulnerability window.
-};
-
-/// The numbers of the Summon, the second phase's answer to a player who keeps far away.
-struct SummonStats {
-    float warningSeconds = 0.75f; ///< Howling, swollen, while the marks appear on the floor.
-    float activeSeconds = 0.2f;
-    float recoverySeconds = 1.0f; ///< Spent: the opening to punish it, if the hairballs allow.
-    /// From the marks appearing to the hairballs coming out: as long as the warning, so the hairballs come
-    /// out as the howl ends.
-    float markerSeconds = 0.75f;
-    /// Hairballs alive at once, at most. A summon brings fewer when the arena is already this full, so
-    /// ignoring the hairballs does not bury the player.
-    int maxAlive = 8;
-    SummonPlacement placement; ///< Four marks 250 units around the player, inside the walls.
-    /// Each summoned hairball spits a strand at the player this often, so the hairballs are something to
-    /// watch, not only to outrun. Its first one comes at a random moment in the first two values, so a
-    /// crowd does not spit in step.
-    float spitIntervalSeconds = 3.0f;
-    float firstSpitMinSeconds = 1.0f;
-    float firstSpitMaxSeconds = 3.0f;
-    float spitWarningSeconds = 0.4f; ///< It swells and its eyes redden for this long before it spits.
-    /// A little faster than the Hair Ring's strands and far slower than the Volley's, and weaker than both,
-    /// since there can be eight hairballs spitting.
-    float spitSpeed = 300.0f;
-    float spitRange = 700.0f;
-    float spitRadius = 6.0f;
-    int spitDamage = 8;
-};
 
 /// The second phase's weights: the Volley and the Summon join the three attacks of the first. Both are at
 /// their best far away, where the others leave gaps, so keeping away is no longer the safe answer. Stalks
@@ -289,13 +216,6 @@ void EnterFrenzy(Boss& boss);
 /// Cuts the boss's attack off and holds it still for `breakStaggerSeconds`, with the shortest stalk after
 /// it. Called when its shield breaks, so the break is felt, not only seen on a bar.
 void StaggerBoss(Boss& boss);
-
-/// How many strands one ring has: every slot around the body except the gap.
-[[nodiscard]] int HairRingStrands(const HairRingStats& stats);
-
-/// The direction of strand `index` (0 to `HairRingStrands` - 1) of a ring whose gap is centred on `gap`
-/// (length 1). The strands go round from one edge of the gap to the other, `slots` apart.
-[[nodiscard]] Vec2 HairStrandDirection(Vec2 gap, int index, const HairRingStats& stats);
 
 /// One strand of the boss's ring, leaving the edge of its body in `direction` (length 1), with the ring's
 /// speed, range, size and damage.

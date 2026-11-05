@@ -25,6 +25,7 @@ add_executable(horde_tests
     core/GamepadConnectionTests.cpp
     core/GamepadTypeTests.cpp
     core/GoldenFightTests.cpp
+    core/HairRingAttackTests.cpp
     core/HealthTests.cpp
     core/HitStopTests.cpp
     core/ImpactFeelTests.cpp
@@ -48,6 +49,7 @@ add_executable(horde_tests
     core/SequencerTests.cpp
     core/SessionTests.cpp
     core/SettingsTests.cpp
+    core/SummonAttackTests.cpp
     core/SummonTests.cpp
     core/ShieldTests.cpp
     core/ShockwaveTests.cpp
@@ -56,6 +58,7 @@ add_executable(horde_tests
     core/SynthTests.cpp
     core/TrailingBarTests.cpp
     core/Vec2Tests.cpp
+    core/VolleyAttackTests.cpp
     core/WeaponTests.cpp
     core/WorldEventTests.cpp
     core/WorldTests.cpp)

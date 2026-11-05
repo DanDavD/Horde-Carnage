@@ -1,5 +1,6 @@
 #include <doctest/doctest.h>
 
+#include "TestAttacker.h"
 #include "core/attacks/Leap.h"
 
 using horde::AttackStage;
@@ -9,8 +10,7 @@ using horde::Vec2;
 
 namespace {
 
-// A sixty-fourth of a second is exact in binary, so every stage below lasts a whole number of steps.
-constexpr float kDt = 1.0f / 64.0f;
+constexpr float kDt = horde::test::kAttackDt;
 constexpr horde::Arena kArena{{0.0f, 0.0f}, {2000.0f, 1000.0f}};
 constexpr float kRadius = 30.0f;
 
@@ -24,19 +24,13 @@ constexpr LeapStats kQuickLeap{.crouchSeconds = 0.25f,
                                .landingSeconds = 0.125f,
                                .recoverySeconds = 0.25f};
 
-struct Body {
-    horde::Motion motion;
-    horde::MovementStats walk;
-};
-
-horde::Attacker AttackerOf(Body& body) {
-    return horde::Attacker{.motion = body.motion, .walk = body.walk, .radius = kRadius};
-}
+using Body = horde::test::TestBody;
+using horde::test::BodyAt;
 
 horde::LeapStep Step(BossAttack& leap, Body& body, Vec2 player, int steps) {
     horde::LeapStep step;
     for (int i = 0; i < steps; ++i) {
-        step = horde::StepLeap(leap, AttackerOf(body), kQuickLeap, player, kArena, kDt);
+        step = horde::StepLeap(leap, body.AsAttacker(), kQuickLeap, player, kArena, kDt);
     }
     return step;
 }
@@ -44,7 +38,7 @@ horde::LeapStep Step(BossAttack& leap, Body& body, Vec2 player, int steps) {
 } // namespace
 
 TEST_CASE("a leap with its own numbers crouches, flies to its shadow and lands after its own air time") {
-    Body body{.motion = horde::MotionAt(Vec2{500.0f, 500.0f})};
+    Body body = BodyAt(Vec2{500.0f, 500.0f});
     BossAttack leap;
     const Vec2 player{700.0f, 500.0f};
     horde::AimLeap(leap, body.motion.position, player, kRadius, kArena);
@@ -72,7 +66,7 @@ TEST_CASE("a leap with its own numbers crouches, flies to its shadow and lands a
 }
 
 TEST_CASE("a leap's shadow chases the player at its own speed until it locks") {
-    Body body{.motion = horde::MotionAt(Vec2{500.0f, 500.0f})};
+    Body body = BodyAt(Vec2{500.0f, 500.0f});
     BossAttack leap;
     horde::AimLeap(leap, body.motion.position, Vec2{700.0f, 500.0f}, kRadius, kArena);
 

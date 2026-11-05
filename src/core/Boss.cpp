@@ -1,7 +1,6 @@
 #include "core/Boss.h"
 
 #include <algorithm>
-#include <numbers>
 
 #include "core/Chase.h"
 #include "core/Collision.h"
@@ -9,8 +8,6 @@
 namespace horde {
 
 namespace {
-
-constexpr float kRadiansPerDegree = std::numbers::pi_v<float> / 180.0f;
 
 // The boss's body, as the attacks in core/attacks/ see it.
 Attacker AttackerOf(Boss& boss) {
@@ -36,14 +33,12 @@ void StartAttack(Boss& boss, AttackKind kind, bool endsCombo, Vec2 playerPositio
     switch (kind) {
     case AttackKind::Charge:
         break;
-    case AttackKind::HairRing: {
+    case AttackKind::HairRing:
         // To one side of the player, and to the other side the next time, so reaching the gap always means
         // moving, and the player cannot settle into one habit.
-        const float side = boss.ringsStarted % 2 == 0 ? 1.0f : -1.0f;
-        attack.direction = Rotated(toPlayer, side * boss.hairRing.gapAngleDegrees * kRadiansPerDegree);
+        AimHairRing(attack, toPlayer, boss.ringsStarted % 2 != 0, boss.hairRing);
         ++boss.ringsStarted;
         break;
-    }
     case AttackKind::Leap:
         // The shadow appears under the player, and the jump starts from where the boss stands.
         AimLeap(attack, boss.motion.position, playerPosition, boss.radius, arena);
@@ -82,120 +77,6 @@ bool Stalk(Boss& boss, Vec2 playerPosition, float playerRadius, const Arena& are
     return false;
 }
 
-// The boss holds its ground through the whole attack: it swells, spits and gets its breath back.
-BossActions StepHairRing(Boss& boss, BossAttack& ring, Random& random, float dt) {
-    const HairRingStats& stats = boss.hairRing;
-    StepMovement(boss.motion, Vec2{}, boss.stats, dt);
-    TickClock(ring.clock, dt);
-    BossActions actions;
-
-    switch (ring.clock.stage) {
-    case AttackStage::Warning:
-        if (HasLasted(ring.clock, WarningSeconds(boss, ring))) {
-            EnterStage(ring.clock, AttackStage::Active);
-        }
-        break;
-
-    case AttackStage::Active: {
-        // Each ring leaves on its own beat, counted from the start of the stage. The gap turns before every
-        // ring after the first, so that a few waves can sweep it around the boss.
-        if (ring.wavesSpat < stats.waves && IsBeatDue(ring.clock, ring.wavesSpat, stats.waveIntervalSeconds)) {
-            if (ring.wavesSpat > 0) {
-                ring.direction = Rotated(ring.direction, stats.gapTurnDegrees * kRadiansPerDegree);
-            }
-            ++ring.wavesSpat;
-            actions.spitHairRing = true;
-        }
-        if (ring.wavesSpat >= stats.waves &&
-            HasLastedPastBeats(ring.clock, stats.waves, stats.waveIntervalSeconds, stats.activeSeconds)) {
-            EnterStage(ring.clock, AttackStage::Recovery);
-        }
-        break;
-    }
-
-    case AttackStage::Recovery:
-        if (HasLasted(ring.clock, RecoverySeconds(AttackerOf(boss), ring, stats.recoverySeconds))) {
-            FinishAttack(boss, random);
-        }
-        break;
-    }
-    return actions;
-}
-
-// The boss holds its ground and keeps turning to the player. Even bursts (the first and the third) leave
-// toward where the player is; odd ones toward where they will be.
-BossActions StepVolley(Boss& boss, BossAttack& volley, const Motion& player, const Arena& arena, Random& random,
-                       float dt) {
-    const VolleyStats& stats = boss.volley;
-    StepMovement(boss.motion, Vec2{}, boss.stats, dt);
-    volley.direction = AimAt(boss.motion.position, player.position, volley.direction);
-    TickClock(volley.clock, dt);
-    BossActions actions;
-
-    switch (volley.clock.stage) {
-    case AttackStage::Warning:
-        if (HasLasted(volley.clock, WarningSeconds(boss, volley))) {
-            EnterStage(volley.clock, AttackStage::Active);
-        }
-        break;
-
-    case AttackStage::Active: {
-        // Each burst on its own beat, counted from the start of the stage, like the waves of a ring.
-        if (volley.wavesSpat < stats.bursts && IsBeatDue(volley.clock, volley.wavesSpat, stats.burstIntervalSeconds)) {
-            if (volley.wavesSpat % 2 == 1) {
-                volley.direction = AimAt(boss.motion.position, LeadPoint(boss, player, arena), volley.direction);
-            }
-            ++volley.wavesSpat;
-            actions.spitVolley = true;
-        }
-        if (volley.wavesSpat >= stats.bursts &&
-            HasLastedPastBeats(volley.clock, stats.bursts, stats.burstIntervalSeconds, stats.activeSeconds)) {
-            EnterStage(volley.clock, AttackStage::Recovery);
-        }
-        break;
-    }
-
-    case AttackStage::Recovery:
-        if (HasLasted(volley.clock, RecoverySeconds(AttackerOf(boss), volley, stats.recoverySeconds))) {
-            FinishAttack(boss, random);
-        }
-        break;
-    }
-    return actions;
-}
-
-// The boss holds its ground and howls. The marks go down as the howl starts; the world counts them down and
-// lets the hairballs out, so the boss is free to recover while they come.
-BossActions StepSummon(Boss& boss, BossAttack& summon, Random& random, float dt) {
-    const SummonStats& stats = boss.summon;
-    StepMovement(boss.motion, Vec2{}, boss.stats, dt);
-    TickClock(summon.clock, dt);
-    BossActions actions;
-
-    switch (summon.clock.stage) {
-    case AttackStage::Warning:
-        if (summon.wavesSpat == 0) {
-            summon.wavesSpat = 1;
-            actions.summon = true;
-        }
-        if (HasLasted(summon.clock, WarningSeconds(boss, summon))) {
-            EnterStage(summon.clock, AttackStage::Active);
-        }
-        break;
-    case AttackStage::Active:
-        if (HasLasted(summon.clock, stats.activeSeconds)) {
-            EnterStage(summon.clock, AttackStage::Recovery);
-        }
-        break;
-    case AttackStage::Recovery:
-        if (HasLasted(summon.clock, RecoverySeconds(AttackerOf(boss), summon, stats.recoverySeconds))) {
-            FinishAttack(boss, random);
-        }
-        break;
-    }
-    return actions;
-}
-
 // The roar ends the transformation: the second phase's numbers replace the first's, a fresh Shell comes up
 // with the shorter opening, and the first attack of the new phase is the new one, so the player sees what
 // changed at once.
@@ -223,8 +104,13 @@ BossActions StepAttack(Boss& boss, const Motion& player, const Arena& arena, Ran
         }
         return BossActions{.throwBolts = step.throwBolts, .hitWall = step.hitWall};
     }
-    case AttackKind::HairRing:
-        return StepHairRing(boss, attack, random, dt);
+    case AttackKind::HairRing: {
+        const HairRingStep step = StepHairRing(attack, AttackerOf(boss), boss.hairRing, dt);
+        if (step.finished) {
+            FinishAttack(boss, random);
+        }
+        return BossActions{.spitHairRing = step.spit};
+    }
     case AttackKind::Leap: {
         const LeapStep step = StepLeap(attack, AttackerOf(boss), boss.leap, playerPosition, arena, dt);
         if (step.finished) {
@@ -232,10 +118,20 @@ BossActions StepAttack(Boss& boss, const Motion& player, const Arena& arena, Ran
         }
         return BossActions{.landed = step.landed};
     }
-    case AttackKind::Volley:
-        return StepVolley(boss, attack, player, arena, random, dt);
-    case AttackKind::Summon:
-        return StepSummon(boss, attack, random, dt);
+    case AttackKind::Volley: {
+        const VolleyStep step = StepVolley(attack, AttackerOf(boss), boss.volley, player, arena, dt);
+        if (step.finished) {
+            FinishAttack(boss, random);
+        }
+        return BossActions{.spitVolley = step.spit};
+    }
+    case AttackKind::Summon: {
+        const SummonStep step = StepSummon(attack, AttackerOf(boss), boss.summon, dt);
+        if (step.finished) {
+            FinishAttack(boss, random);
+        }
+        return BossActions{.summon = step.placeMarks};
+    }
     }
     return {};
 }
@@ -352,13 +248,13 @@ float WarningSeconds(const Boss& boss, const BossAttack& attack) {
     case AttackKind::Charge:
         return ChargeWarningSeconds(boss.charge, attack);
     case AttackKind::HairRing:
-        return boss.hairRing.warningSeconds * attack.warningScale;
+        return HairRingWarningSeconds(boss.hairRing, attack);
     case AttackKind::Leap:
         return LeapCrouchSeconds(boss, attack) + LeapAirSeconds(boss, attack);
     case AttackKind::Volley:
-        return boss.volley.warningSeconds * attack.warningScale;
+        return VolleyWarningSeconds(boss.volley, attack);
     case AttackKind::Summon:
-        return boss.summon.warningSeconds * attack.warningScale;
+        return SummonWarningSeconds(boss.summon, attack);
     }
     return 0.0f;
 }
@@ -371,53 +267,16 @@ float LeapAirSeconds(const Boss& boss, const BossAttack& leap) {
     return LeapAirSeconds(boss.leap, leap);
 }
 
-int HairRingStrands(const HairRingStats& stats) {
-    return std::max(stats.slots - stats.gapSlots, 0);
-}
-
-Vec2 HairStrandDirection(Vec2 gap, int index, const HairRingStats& stats) {
-    // The empty slots sit evenly around the middle of the gap, so the strands on its two edges are
-    // (gapSlots + 1) / 2 slots away from the middle, one on each side. The rest go round from one to the
-    // other.
-    const float slot = 2.0f * std::numbers::pi_v<float> / static_cast<float>(stats.slots);
-    const float firstStrand = 0.5f * static_cast<float>(stats.gapSlots + 1) * slot;
-    return Rotated(gap, firstStrand + static_cast<float>(index) * slot);
-}
-
 Projectile MakeHairStrand(const Boss& boss, Vec2 direction) {
-    const HairRingStats& stats = boss.hairRing;
-    // From the edge of the body, so a player pressed against the boss is caught at once.
-    const Vec2 origin = boss.motion.position + direction * boss.radius;
-    Projectile strand = LaunchProjectile(origin, direction, stats.speed, stats.range);
-    strand.radius = stats.strandRadius;
-    strand.damage = stats.damage;
-    return strand;
+    return MakeHairStrand(boss.hairRing, boss.motion.position, boss.radius, direction);
 }
 
-// Where a strand leaving now meets a player who keeps their velocity. The time of flight is guessed from the
-// distance today, then again from the distance to the last guess. The strands are faster than the player, so
-// each guess is closer than the one before, and a few are enough for a burst three strands wide. Strands
-// leave the edge of the body, so that part of the distance is not flown. The lead is capped, and kept inside
-// the walls the player cannot leave.
 Vec2 LeadPoint(const Boss& boss, const Motion& player, const Arena& arena) {
-    constexpr int kGuesses = 4;
-    const VolleyStats& stats = boss.volley;
-    Vec2 ahead = player.position;
-    for (int i = 0; i < kGuesses; ++i) {
-        const float distance = std::max(Length(ahead - boss.motion.position) - boss.radius, 0.0f);
-        ahead = player.position + player.velocity * std::min(distance / stats.speed, stats.maxLeadSeconds);
-    }
-    return InsideArena(ahead, 0.0f, arena);
+    return LeadPoint(boss.volley, boss.motion.position, boss.radius, player, arena);
 }
 
 Projectile MakeVolleyStrand(const Boss& boss, Vec2 direction) {
-    const VolleyStats& stats = boss.volley;
-    const Vec2 origin = boss.motion.position + direction * boss.radius;
-    Projectile strand = LaunchProjectile(origin, direction, stats.speed, stats.range);
-    strand.radius = stats.strandRadius;
-    strand.damage = stats.damage;
-    strand.source = DamageSource::Volley;
-    return strand;
+    return MakeVolleyStrand(boss.volley, boss.motion.position, boss.radius, direction);
 }
 
 } // namespace horde

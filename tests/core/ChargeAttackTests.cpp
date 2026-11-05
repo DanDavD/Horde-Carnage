@@ -1,5 +1,6 @@
 #include <doctest/doctest.h>
 
+#include "TestAttacker.h"
 #include "core/attacks/Charge.h"
 
 using horde::AttackStage;
@@ -9,8 +10,7 @@ using horde::Vec2;
 
 namespace {
 
-// A sixty-fourth of a second is exact in binary, so every stage below lasts a whole number of steps.
-constexpr float kDt = 1.0f / 64.0f;
+constexpr float kDt = horde::test::kAttackDt;
 constexpr horde::Arena kArena{{0.0f, 0.0f}, {2000.0f, 1000.0f}};
 
 // A body and numbers that are not the Matriarch's: what a second boss would bring to the same attack.
@@ -24,20 +24,14 @@ constexpr ChargeStats kSmallCharge{.warningSeconds = 0.5f,
                                    .stunSeconds = 1.0f};
 constexpr float kRadius = 30.0f;
 
-struct Body {
-    horde::Motion motion;
-    horde::MovementStats walk;
-};
-
-horde::Attacker AttackerOf(Body& body) {
-    return horde::Attacker{.motion = body.motion, .walk = body.walk, .radius = kRadius};
-}
+using Body = horde::test::TestBody;
+using horde::test::BodyAt;
 
 // Steps the charge `steps` times and returns the last step's result.
 horde::ChargeStep Step(BossAttack& charge, Body& body, Vec2 player, int steps) {
     horde::ChargeStep step;
     for (int i = 0; i < steps; ++i) {
-        step = horde::StepCharge(charge, AttackerOf(body), kSmallCharge, player, kArena, kDt);
+        step = horde::StepCharge(charge, body.AsAttacker(), kSmallCharge, player, kArena, kDt);
     }
     return step;
 }
@@ -45,7 +39,7 @@ horde::ChargeStep Step(BossAttack& charge, Body& body, Vec2 player, int steps) {
 } // namespace
 
 TEST_CASE("a charge with its own numbers aims, runs its own distance at its own speed and recovers") {
-    Body body{.motion = horde::MotionAt(Vec2{500.0f, 500.0f})};
+    Body body = BodyAt(Vec2{500.0f, 500.0f});
     BossAttack charge;
     const Vec2 player{900.0f, 500.0f};
 
@@ -71,7 +65,7 @@ TEST_CASE("a charge with its own numbers aims, runs its own distance at its own 
 
 TEST_CASE("a charge that meets a wall stops against it, says so, and recovers for its stun time") {
     // 1800 units east, with 200 of room before the body of radius 30 touches the east wall at 1970.
-    Body body{.motion = horde::MotionAt(Vec2{1800.0f, 500.0f})};
+    Body body = BodyAt(Vec2{1800.0f, 500.0f});
     BossAttack charge;
     const Vec2 player{1950.0f, 500.0f};
 
@@ -92,7 +86,7 @@ TEST_CASE("a charge that meets a wall stops against it, says so, and recovers fo
 }
 
 TEST_CASE("the aim locks for the last part of the warning, so a player who moves then escapes the line") {
-    Body body{.motion = horde::MotionAt(Vec2{500.0f, 500.0f})};
+    Body body = BodyAt(Vec2{500.0f, 500.0f});
     BossAttack charge;
 
     // East until the lock at 0.25 s, then the player steps south: the run still goes east.
