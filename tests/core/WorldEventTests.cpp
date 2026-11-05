@@ -257,7 +257,7 @@ TEST_CASE("the boss starting an attack records which one, once, at the start of 
     REQUIRE(started);
     CHECK(started->amount == static_cast<int>(horde::AttackKind::Leap));
     REQUIRE(world.boss.attack);
-    CHECK(world.boss.attack->stage == horde::AttackStage::Warning);
+    CHECK(world.boss.attack->clock.stage == horde::AttackStage::Warning);
     world.events.Clear();
     Step(world, PlayerCommands{}, 20); // Still inside the same warning.
     CHECK(Count(world, WorldEventKind::AttackStarted) == 0);

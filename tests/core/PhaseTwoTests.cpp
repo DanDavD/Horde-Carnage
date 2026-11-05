@@ -6,6 +6,7 @@
 #include "PredictableBoss.h"
 #include "core/AttackChoice.h"
 #include "core/World.h"
+#include "core/bosses/Matriarch.h"
 
 using horde::AttackKind;
 using horde::Boss;

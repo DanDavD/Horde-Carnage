@@ -1,5 +1,7 @@
 #pragma once
 
+#include <algorithm>
+
 #include "core/Movement.h"
 #include "core/Vec2.h"
 
@@ -23,5 +25,11 @@ struct Arena {
 /// that points into a wall it touches. The rest of the velocity is kept, so a mover slides along
 /// a wall instead of sticking to it.
 void ConfineToArena(Motion& motion, float radius, const Arena& arena);
+
+/// `point`, moved just far enough inside the walls for a circle of `radius` centred on it to fit.
+[[nodiscard]] constexpr Vec2 InsideArena(Vec2 point, float radius, const Arena& arena) {
+    return Vec2{std::clamp(point.x, arena.min.x + radius, arena.max.x - radius),
+                std::clamp(point.y, arena.min.y + radius, arena.max.y - radius)};
+}
 
 } // namespace horde

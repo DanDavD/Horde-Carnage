@@ -3,6 +3,7 @@
 #include "PredictableBoss.h"
 #include "core/Boss.h"
 #include "core/World.h"
+#include "core/bosses/Matriarch.h"
 
 using horde::AttackKind;
 using horde::AttackStage;
@@ -106,7 +107,7 @@ TEST_CASE("a frenzied charge throws a pair of strands on a beat while it runs, o
     world.boss.attack->direction = Vec2{1.0f, 0.0f};
     world.boss.charge.aimLockSeconds = world.boss.charge.warningSeconds;
     int pairs = 0;
-    for (int i = 0; i < 120 && world.boss.attack && world.boss.attack->stage != AttackStage::Recovery; ++i) {
+    for (int i = 0; i < 120 && world.boss.attack && world.boss.attack->clock.stage != AttackStage::Recovery; ++i) {
         const int before = CountFrenzyStrands(world);
         horde::StepWorld(world, PlayerCommands{.move = {-1.0f, 0.0f}}, kDt);
         if (CountFrenzyStrands(world) == before + 2) {

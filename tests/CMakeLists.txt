@@ -4,13 +4,16 @@ add_executable(horde_tests
     core/AnalogInputTests.cpp
     core/ArenaTests.cpp
     core/AttackChoiceTests.cpp
+    core/AttackClockTests.cpp
     core/BossChargeTests.cpp
     core/BossComboTests.cpp
     core/BossHairRingTests.cpp
     core/BossLeapTests.cpp
+    core/BossRulesTests.cpp
     core/BossTests.cpp
     core/BossThemeTests.cpp
     core/BossVolleyTests.cpp
+    core/ChargeAttackTests.cpp
     core/ChaseTests.cpp
     core/CollisionTests.cpp
     core/DashTests.cpp
@@ -22,10 +25,13 @@ add_executable(horde_tests
     core/GamepadAimTests.cpp
     core/GamepadConnectionTests.cpp
     core/GamepadTypeTests.cpp
+    core/GoldenFightTests.cpp
+    core/HairRingAttackTests.cpp
     core/HealthTests.cpp
     core/HitStopTests.cpp
     core/ImpactFeelTests.cpp
     core/LaserSightTests.cpp
+    core/LeapAttackTests.cpp
     core/LoadoutTests.cpp
     core/MenuRepeatTests.cpp
     core/MenuTests.cpp
@@ -44,6 +50,7 @@ add_executable(horde_tests
     core/SequencerTests.cpp
     core/SessionTests.cpp
     core/SettingsTests.cpp
+    core/SummonAttackTests.cpp
     core/SummonTests.cpp
     core/ShieldTests.cpp
     core/ShockwaveTests.cpp
@@ -52,6 +59,7 @@ add_executable(horde_tests
     core/SynthTests.cpp
     core/TrailingBarTests.cpp
     core/Vec2Tests.cpp
+    core/VolleyAttackTests.cpp
     core/WeaponTests.cpp
     core/WorldEventTests.cpp
     core/WorldTests.cpp)

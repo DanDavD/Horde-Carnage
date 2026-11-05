@@ -8,6 +8,7 @@
 #include "core/Boss.h"
 #include "core/SpawnMarker.h"
 #include "core/World.h"
+#include "core/bosses/Matriarch.h"
 
 using horde::Arena;
 using horde::AttackKind;
@@ -122,7 +123,7 @@ TEST_CASE("a summon puts its marks down as the howl starts, then holds still, re
     Step(world, 1);
     CHECK(world.spawnMarkers.Size() == 4);
     REQUIRE(world.boss.attack);
-    CHECK(world.boss.attack->stage == AttackStage::Warning);
+    CHECK(world.boss.attack->clock.stage == AttackStage::Warning);
     // Only once.
     Step(world, 20);
     CHECK(world.spawnMarkers.Size() == 4);

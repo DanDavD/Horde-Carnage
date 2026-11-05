@@ -2,6 +2,8 @@
 add_library(horde_core STATIC
     core/Arena.cpp
     core/AttackChoice.cpp
+    core/AttackClock.cpp
+    core/BossAttack.cpp
     core/Boss.cpp
     core/BossTheme.cpp
     core/Chase.cpp
@@ -43,7 +45,13 @@ add_library(horde_core STATIC
     core/Synth.cpp
     core/TrailingBar.cpp
     core/Weapon.cpp
-    core/World.cpp)
+    core/World.cpp
+    core/attacks/Charge.cpp
+    core/attacks/HairRing.cpp
+    core/attacks/Leap.cpp
+    core/attacks/Summon.cpp
+    core/attacks/Volley.cpp
+    core/bosses/Matriarch.cpp)
 target_include_directories(horde_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 horde_set_warnings(horde_core)
 

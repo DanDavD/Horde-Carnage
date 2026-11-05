@@ -14,6 +14,7 @@
 #include "app/render/View.h"
 #include "core/Loadout.h"
 #include "core/TrailingBar.h"
+#include "core/bosses/Matriarch.h"
 
 namespace horde {
 

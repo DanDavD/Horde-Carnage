@@ -70,7 +70,7 @@ std::vector<Started> PlayFight(Boss boss, std::uint64_t seed, float seconds) {
         }
         attacking = true;
         // An attack has not been stepped yet in the step it starts.
-        if (boss.attack->stage == AttackStage::Warning && boss.attack->stageSeconds == 0.0f) {
+        if (boss.attack->clock.stage == AttackStage::Warning && boss.attack->clock.seconds == 0.0f) {
             started.push_back({*boss.attack, boss.attack->endsCombo ? 0.0f : stalk});
         }
     }
@@ -164,21 +164,21 @@ TEST_CASE("in a combo the second attack starts in place of the first one's recov
     for (int i = 0; i < 120 && boss.attack && !boss.attack->endsCombo; ++i) {
         Step(boss, kEast, random, 1);
         REQUIRE(boss.attack);
-        CHECK(boss.attack->stage != AttackStage::Recovery);
+        CHECK(boss.attack->clock.stage != AttackStage::Recovery);
     }
     REQUIRE(boss.attack);
     const BossAttack& rebound = *boss.attack;
     CHECK(rebound.endsCombo);
     CHECK_FALSE(rebound.followUp);
     CHECK(rebound.kind == AttackKind::Charge);
-    CHECK(rebound.stage == AttackStage::Warning);
+    CHECK(rebound.clock.stage == AttackStage::Warning);
     // Against the east wall, with no stun.
     CHECK(boss.motion.position.x == doctest::Approx(kArena.max.x - boss.radius));
     CHECK_FALSE(rebound.stunned);
     // 0.8 s at 0.7.
     CHECK(horde::WarningSeconds(boss, rebound) == doctest::Approx(0.56f));
     int warning = 0;
-    while (boss.attack && boss.attack->stage == AttackStage::Warning && warning < 120) {
+    while (boss.attack && boss.attack->clock.stage == AttackStage::Warning && warning < 120) {
         Step(boss, kCenter, random, 1);
         ++warning;
     }
@@ -195,7 +195,7 @@ TEST_CASE("the last attack of a combo rests for the combo's longer recovery") {
     int landings = 0;
     int spits = 0;
     int stepsToSpit = 0;
-    for (int i = 0; i < 300 && boss.attack && boss.attack->stage != AttackStage::Recovery; ++i) {
+    for (int i = 0; i < 300 && boss.attack && boss.attack->clock.stage != AttackStage::Recovery; ++i) {
         const horde::BossActions actions = Step(boss, kSouth, random, 1);
         landings += actions.landed ? 1 : 0;
         spits += actions.spitHairRing ? 1 : 0;
@@ -228,7 +228,7 @@ TEST_CASE("a longer or shorter warning keeps the charge's aim lock at its exact 
     CHECK(boss.attack->direction.y == doctest::Approx(-1.0f));
     Step(boss, north, random, 3);
     Step(boss, kEast, random, 10); // From 0.72 s on, locked.
-    REQUIRE(boss.attack->stage == AttackStage::Warning);
+    REQUIRE(boss.attack->clock.stage == AttackStage::Warning);
     CHECK(boss.attack->direction.y == doctest::Approx(-1.0f));
     CHECK(horde::WarningSeconds(boss, *boss.attack) == doctest::Approx(1.0f));
 }
@@ -244,7 +244,7 @@ TEST_CASE("a shorter leap keeps the shadow's lock, and the boss is in the air af
     const BossAttack tinyCharge{.kind = AttackKind::Charge, .warningScale = 0.1f};
     CHECK(horde::WarningSeconds(boss, tinyCharge) == doctest::Approx(boss.charge.aimLockSeconds));
 
-    boss.attack = BossAttack{.kind = AttackKind::Leap, .stageSeconds = 0.2f, .warningScale = 0.5f};
+    boss.attack = BossAttack{.kind = AttackKind::Leap, .clock = {.seconds = 0.2f}, .warningScale = 0.5f};
     CHECK(horde::IsAirborne(boss));
     boss.attack->warningScale = 1.0f;
     CHECK_FALSE(horde::IsAirborne(boss));

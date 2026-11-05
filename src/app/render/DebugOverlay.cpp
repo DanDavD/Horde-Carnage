@@ -8,6 +8,7 @@
 #include "app/RaylibConvert.h"
 #include "core/BossTheme.h"
 #include "core/Loadout.h"
+#include "core/bosses/Matriarch.h"
 
 #ifndef NDEBUG
 
@@ -57,8 +58,8 @@ const char* BossStateLabel(const Boss& boss) {
     }
     const BossAttack& attack = *boss.attack;
     const char* combo = attack.followUp ? " combo 1/2" : (attack.endsCombo ? " combo 2/2" : "");
-    return TextFormat("%s %s %s %.2f/%.2f%s%s%s", phase, AttackKindLabel(attack.kind), AttackStageLabel(attack.stage),
-                      attack.stageSeconds, WarningSeconds(boss, attack), attack.stunned ? " stunned" : "",
+    return TextFormat("%s %s %s %.2f/%.2f%s%s%s", phase, AttackKindLabel(attack.kind), AttackStageLabel(attack.clock.stage),
+                      attack.clock.seconds, WarningSeconds(boss, attack), attack.stunned ? " stunned" : "",
                       IsAirborne(boss) ? " airborne" : "", combo);
 }
 
