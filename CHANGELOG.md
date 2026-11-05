@@ -10,6 +10,7 @@ Versions follow [Semantic Versioning](https://semver.org/) while the game is a p
 
 ### Changed
 - **Attack clock** (`AttackClock.cpp`, `Boss.cpp`, `BossDraw.cpp`, `DebugOverlay.cpp`): the stage of an attack and the time spent in it are now one small type, `AttackClock`, with `TickClock`, `EnterStage`, `HasLasted`, `IsBeatDue` and `HasLastedPastBeats`. The five attacks used to repeat that timing code each; now it is written once, and the next boss can use it as it is. `AttackStage` moved with it, and `BossAttack::stage` and `stageSeconds` became `BossAttack::clock`. Nothing in the fight changes: the golden fight test passes on the same table. Covered by `AttackClockTests`, explained in `docs/BOSS.md`.
+- **The Charge and the Leap as reusable attacks** (`attacks/Charge.cpp`, `attacks/Leap.cpp`, `BossAttack.cpp`, `Boss.cpp`, `Arena.h`): the two movement attacks moved out of `Boss.cpp` into `core/attacks/`. Their steps take an `Attacker` (the body they move, how it brakes, its radius and the combo rule) and their stats as parameters instead of the whole `Boss`, and return what happened (`ChargeStep`, `LeapStep`), so a second boss can run them with its own body and numbers. `BossAttack` moved to its own header, `InsideArena` to `Arena.h`, and `PlanChargePath` to the Charge. Nothing in the fight changes: the golden fight test passes on the same table. Covered by `ChargeAttackTests` and `LeapAttackTests`, which run both on a body that is not the Matriarch's, explained in `docs/BOSS.md`.
 
 ## [1.0.0] - 2026-10-29
 

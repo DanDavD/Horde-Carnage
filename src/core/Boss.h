@@ -5,6 +5,7 @@
 #include "core/Arena.h"
 #include "core/AttackChoice.h"
 #include "core/AttackClock.h"
+#include "core/BossAttack.h"
 #include "core/Health.h"
 #include "core/Movement.h"
 #include "core/Projectile.h"
@@ -13,49 +14,10 @@
 #include "core/Shockwave.h"
 #include "core/SpawnMarker.h"
 #include "core/Vec2.h"
+#include "core/attacks/Charge.h"
+#include "core/attacks/Leap.h"
 
 namespace horde {
-
-/// The attack in progress.
-struct BossAttack {
-    AttackKind kind = AttackKind::Charge;
-    AttackClock clock; ///< Its stage, and the time spent in it.
-    /// Where the attack points, length 1. Charge: where it runs; it follows the player through the warning
-    /// until the aim locks. Hair Ring: the middle of the gap, fixed from the start of the warning.
-    Vec2 direction{0.0f, 1.0f};
-    float distanceLeft = 0.0f; ///< Charge: how much of the run is left while it is active.
-    bool stunned = false;      ///< Charge: it ran into a wall, so the recovery is the long one.
-    int wavesSpat = 0;         ///< Hair Ring: how many of its rings it has spat so far.
-    Vec2 takeoff; ///< Leap: where it left the ground.
-    /// Leap: where it will land, drawn as its shadow. It follows the player through the air until it locks.
-    Vec2 target;
-    /// How much longer or shorter than its stats the warning lasts, picked when the attack starts. Read it
-    /// through `WarningSeconds`.
-    float warningScale = 1.0f;
-    /// The attack that starts the moment this one would begin its recovery: set when this attack opens a
-    /// combo.
-    std::optional<AttackKind> followUp;
-    bool endsCombo = false; ///< The second attack of a combo: a shorter warning and a longer recovery.
-};
-
-/// The numbers of the Charge.
-struct ChargeStats {
-    float warningSeconds = 0.8f; ///< Crouched, with its path drawn on the floor.
-    /// The last part of the warning, in which the path stops following the player. That is the moment to
-    /// get out of the way: dodging earlier only drags the path along.
-    float aimLockSeconds = 0.3f;
-    float speed = 1000.0f; ///< Units per second. Faster than the player, slower than a dash.
-    /// The run overshoots the player by a lot, so it usually ends at a wall. From the open middle of the
-    /// arena it can stop short of one.
-    float distance = 800.0f;
-    int damage = 30;          ///< Instead of the touch damage, while it runs.
-    float knockback = 700.0f; ///< Units per second added to the player, sideways out of the path.
-    float recoverySeconds = 0.5f; ///< After a run that ends in the open.
-    float stunSeconds = 1.5f;     ///< After running into a wall: the opening to punish it.
-    /// In a frenzy only: while it runs it throws a pair of strands this often, one at the player and one
-    /// where the player is going. 0 throws none.
-    float boltIntervalSeconds = 0.0f;
-};
 
 /// The numbers of the Hair Ring. One ring by default; more waves and a gap that turns between them are
 /// there for the combos and the second phase.
@@ -79,31 +41,6 @@ struct HairRingStats {
     int waves = 1;   ///< Rings per attack.
     float waveIntervalSeconds = 0.4f; ///< Between two rings of the same attack.
     float gapTurnDegrees = 0.0f;      ///< How far the gap turns from one ring to the next.
-};
-
-/// The numbers of the Leap.
-struct LeapStats {
-    float crouchSeconds = 0.35f; ///< On the ground, gathering itself, before it leaves it.
-    /// In the air, out of reach, while its shadow on the floor shows where it will land.
-    float airSeconds = 1.0f;
-    /// The last part of the air time, in which the shadow stops following the player. Running out from
-    /// under it before then only drags it along.
-    float lockSeconds = 0.35f;
-    /// How fast the shadow follows the player, in units per second. A third slower than the player runs, so
-    /// a player who keeps moving from the takeoff gets out from under it. One who only starts running when
-    /// it locks covers about 100 units, not enough to leave the landing zone: then only the dash helps.
-    float shadowSpeed = 200.0f;
-    /// The landing zone around the shadow's centre, a little wider than the body. A player inside it when
-    /// the boss lands takes the impact.
-    float impactRadius = 100.0f;
-    int impactDamage = 35;
-    float impactKnockback = 600.0f; ///< Units per second added to the player, away from the landing.
-    float landingSeconds = 0.15f;   ///< The impact itself, the active stage.
-    float recoverySeconds = 1.0f;   ///< Sunk into the floor after landing: the opening to punish it.
-    ShockwaveStats shockwave;       ///< The ring that leaves the landing point.
-    /// In a frenzy only: a ring of strands with no gap leaves the landing too, one of them at the player.
-    /// 0 spits none.
-    int landingStrands = 0;
 };
 
 /// The numbers of the Aimed Volley, the second phase's ranged attack.
@@ -233,12 +170,6 @@ struct BossActions {
     bool attackStarted = false; ///< An attack began its warning in this step, `BossAttack::kind` says which.
 };
 
-/// Where a charge would end: after its full distance, or earlier, where the body meets a wall.
-struct ChargePath {
-    Vec2 end;
-    bool endsAtWall = false;
-};
-
 /// The Matriarch, the one boss the game is about: a giant hairball, mother of the small ones.
 ///
 /// It has the same body components as the player and the hairballs (`Motion`, `MovementStats`, a radius
@@ -358,11 +289,6 @@ void EnterFrenzy(Boss& boss);
 /// Cuts the boss's attack off and holds it still for `breakStaggerSeconds`, with the shortest stalk after
 /// it. Called when its shield breaks, so the break is felt, not only seen on a bar.
 void StaggerBoss(Boss& boss);
-
-/// The path of a charge from `start` along `direction` (length 1), for a body of `radius`: the full
-/// `distance`, or less if a wall comes first. The simulation runs along it and the warning draws it, so
-/// what the player sees is what will happen.
-[[nodiscard]] ChargePath PlanChargePath(Vec2 start, Vec2 direction, float distance, float radius, const Arena& arena);
 
 /// How many strands one ring has: every slot around the body except the gap.
 [[nodiscard]] int HairRingStrands(const HairRingStats& stats);

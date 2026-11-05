@@ -1,7 +1,6 @@
 #include "core/Boss.h"
 
 #include <algorithm>
-#include <limits>
 #include <numbers>
 
 #include "core/Chase.h"
@@ -13,22 +12,12 @@ namespace {
 
 constexpr float kRadiansPerDegree = std::numbers::pi_v<float> / 180.0f;
 
-// Toward the player, or the same way as before when the player stands right on the boss and gives no
-// direction.
-Vec2 AimAt(Vec2 from, Vec2 target, Vec2 previous) {
-    const Vec2 offset = target - from;
-    return LengthSquared(offset) > 1.0f ? Normalized(offset) : previous;
-}
-
-// Where the whole body fits inside the walls, so the boss never lands half inside one.
-Vec2 InsideArena(Vec2 point, float radius, const Arena& arena) {
-    return Vec2{std::clamp(point.x, arena.min.x + radius, arena.max.x - radius),
-                std::clamp(point.y, arena.min.y + radius, arena.max.y - radius)};
-}
-
-// The second attack of a combo rests longer: the reward for getting through the whole chain.
-float RecoverySeconds(const Boss& boss, const BossAttack& attack, float recovery) {
-    return attack.endsCombo ? std::max(recovery, boss.combo.finalRecoverySeconds) : recovery;
+// The boss's body, as the attacks in core/attacks/ see it.
+Attacker AttackerOf(Boss& boss) {
+    return Attacker{.motion = boss.motion,
+                    .walk = boss.stats,
+                    .radius = boss.radius,
+                    .comboRecoverySeconds = boss.combo.finalRecoverySeconds};
 }
 
 // Every attack starts with its random picks in the same order (the warning's length, then the combo), so
@@ -57,8 +46,7 @@ void StartAttack(Boss& boss, AttackKind kind, bool endsCombo, Vec2 playerPositio
     }
     case AttackKind::Leap:
         // The shadow appears under the player, and the jump starts from where the boss stands.
-        attack.takeoff = boss.motion.position;
-        attack.target = InsideArena(playerPosition, boss.radius, arena);
+        AimLeap(attack, boss.motion.position, playerPosition, boss.radius, arena);
         break;
     case AttackKind::Volley:
     case AttackKind::Summon:
@@ -94,69 +82,6 @@ bool Stalk(Boss& boss, Vec2 playerPosition, float playerRadius, const Arena& are
     return false;
 }
 
-BossActions StepCharge(Boss& boss, BossAttack& charge, Vec2 playerPosition, const Arena& arena, Random& random,
-                       float dt) {
-    const ChargeStats& stats = boss.charge;
-    Motion& motion = boss.motion;
-    TickClock(charge.clock, dt);
-    BossActions actions;
-
-    switch (charge.clock.stage) {
-    case AttackStage::Warning: {
-        // It plants itself to crouch. The path follows the player until the aim locks, so standing still
-        // or running away is not enough: the player has to move out of the line once it is fixed.
-        StepMovement(motion, Vec2{}, boss.stats, dt);
-        const float warning = WarningSeconds(boss, charge);
-        if (charge.clock.seconds <= warning - stats.aimLockSeconds) {
-            charge.direction = AimAt(motion.position, playerPosition, charge.direction);
-        }
-        if (HasLasted(charge.clock, warning)) {
-            EnterStage(charge.clock, AttackStage::Active);
-            charge.distanceLeft = stats.distance;
-        }
-        break;
-    }
-
-    case AttackStage::Active: {
-        // In a frenzy it throws strands as it runs, on a beat counted from the start of the run.
-        if (stats.boltIntervalSeconds > 0.0f && IsBeatDue(charge.clock, charge.wavesSpat, stats.boltIntervalSeconds)) {
-            ++charge.wavesSpat;
-            actions.throwBolts = true;
-        }
-        // The run replaces normal movement, like the player's dash: a fixed speed in a fixed direction,
-        // with no acceleration to read.
-        motion.previousPosition = motion.position;
-        const ChargePath path =
-            PlanChargePath(motion.position, charge.direction, charge.distanceLeft, boss.radius, arena);
-
-        const float step = stats.speed * dt;
-        const float toEnd = Length(path.end - motion.position);
-        if (step >= toEnd) {
-            motion.position = path.end;
-            motion.velocity = Vec2{};
-            charge.stunned = path.endsAtWall;
-            actions.hitWall = path.endsAtWall;
-            EnterStage(charge.clock, AttackStage::Recovery);
-        } else {
-            motion.position += charge.direction * step;
-            motion.velocity = charge.direction * stats.speed;
-            charge.distanceLeft -= step;
-        }
-        break;
-    }
-
-    case AttackStage::Recovery: {
-        StepMovement(motion, Vec2{}, boss.stats, dt);
-        const float recovery = charge.stunned ? stats.stunSeconds : stats.recoverySeconds;
-        if (HasLasted(charge.clock, RecoverySeconds(boss, charge, recovery))) {
-            FinishAttack(boss, random);
-        }
-        break;
-    }
-    }
-    return actions;
-}
-
 // The boss holds its ground through the whole attack: it swells, spits and gets its breath back.
 BossActions StepHairRing(Boss& boss, BossAttack& ring, Random& random, float dt) {
     const HairRingStats& stats = boss.hairRing;
@@ -189,59 +114,7 @@ BossActions StepHairRing(Boss& boss, BossAttack& ring, Random& random, float dt)
     }
 
     case AttackStage::Recovery:
-        if (HasLasted(ring.clock, RecoverySeconds(boss, ring, stats.recoverySeconds))) {
-            FinishAttack(boss, random);
-        }
-        break;
-    }
-    return actions;
-}
-
-BossActions StepLeap(Boss& boss, BossAttack& leap, Vec2 playerPosition, const Arena& arena, Random& random,
-                     float dt) {
-    const LeapStats& stats = boss.leap;
-    Motion& motion = boss.motion;
-    TickClock(leap.clock, dt);
-    BossActions actions;
-
-    switch (leap.clock.stage) {
-    case AttackStage::Warning: {
-        const float airSeconds = LeapAirSeconds(boss, leap);
-        const float airborne = leap.clock.seconds - LeapCrouchSeconds(boss, leap);
-        if (airborne <= 0.0f) {
-            // Crouched, it plants itself, and the jump starts from where it comes to rest.
-            StepMovement(motion, Vec2{}, boss.stats, dt);
-            leap.takeoff = motion.position;
-            break;
-        }
-        // The shadow chases the player until it locks, at a speed the player can outrun.
-        if (airborne <= airSeconds - stats.lockSeconds) {
-            const Vec2 chased = MoveTowards(leap.target, playerPosition, stats.shadowSpeed * dt);
-            leap.target = InsideArena(chased, boss.radius, arena);
-        }
-        // The body travels through the air from the takeoff to the shadow, so the camera keeps both in view
-        // and the drawing can arc it over the floor.
-        motion.previousPosition = motion.position;
-        motion.position = Lerp(leap.takeoff, leap.target, std::min(airborne / airSeconds, 1.0f));
-        motion.velocity = Vec2{};
-        if (airborne >= airSeconds) {
-            motion.position = leap.target;
-            EnterStage(leap.clock, AttackStage::Active);
-            actions.landed = true;
-        }
-        break;
-    }
-
-    case AttackStage::Active:
-        StepMovement(motion, Vec2{}, boss.stats, dt);
-        if (HasLasted(leap.clock, stats.landingSeconds)) {
-            EnterStage(leap.clock, AttackStage::Recovery);
-        }
-        break;
-
-    case AttackStage::Recovery:
-        StepMovement(motion, Vec2{}, boss.stats, dt);
-        if (HasLasted(leap.clock, RecoverySeconds(boss, leap, stats.recoverySeconds))) {
+        if (HasLasted(ring.clock, RecoverySeconds(AttackerOf(boss), ring, stats.recoverySeconds))) {
             FinishAttack(boss, random);
         }
         break;
@@ -283,7 +156,7 @@ BossActions StepVolley(Boss& boss, BossAttack& volley, const Motion& player, con
     }
 
     case AttackStage::Recovery:
-        if (HasLasted(volley.clock, RecoverySeconds(boss, volley, stats.recoverySeconds))) {
+        if (HasLasted(volley.clock, RecoverySeconds(AttackerOf(boss), volley, stats.recoverySeconds))) {
             FinishAttack(boss, random);
         }
         break;
@@ -315,7 +188,7 @@ BossActions StepSummon(Boss& boss, BossAttack& summon, Random& random, float dt)
         }
         break;
     case AttackStage::Recovery:
-        if (HasLasted(summon.clock, RecoverySeconds(boss, summon, stats.recoverySeconds))) {
+        if (HasLasted(summon.clock, RecoverySeconds(AttackerOf(boss), summon, stats.recoverySeconds))) {
             FinishAttack(boss, random);
         }
         break;
@@ -343,12 +216,22 @@ BossActions StepAttack(Boss& boss, const Motion& player, const Arena& arena, Ran
     const Vec2 playerPosition = player.position;
     BossAttack& attack = *boss.attack;
     switch (attack.kind) {
-    case AttackKind::Charge:
-        return StepCharge(boss, attack, playerPosition, arena, random, dt);
+    case AttackKind::Charge: {
+        const ChargeStep step = StepCharge(attack, AttackerOf(boss), boss.charge, playerPosition, arena, dt);
+        if (step.finished) {
+            FinishAttack(boss, random);
+        }
+        return BossActions{.throwBolts = step.throwBolts, .hitWall = step.hitWall};
+    }
     case AttackKind::HairRing:
         return StepHairRing(boss, attack, random, dt);
-    case AttackKind::Leap:
-        return StepLeap(boss, attack, playerPosition, arena, random, dt);
+    case AttackKind::Leap: {
+        const LeapStep step = StepLeap(attack, AttackerOf(boss), boss.leap, playerPosition, arena, dt);
+        if (step.finished) {
+            FinishAttack(boss, random);
+        }
+        return BossActions{.landed = step.landed};
+    }
     case AttackKind::Volley:
         return StepVolley(boss, attack, player, arena, random, dt);
     case AttackKind::Summon:
@@ -461,14 +344,13 @@ bool IsCharging(const Boss& boss) {
 
 bool IsAirborne(const Boss& boss) {
     const std::optional<BossAttack>& attack = boss.attack;
-    return attack && attack->kind == AttackKind::Leap && attack->clock.stage == AttackStage::Warning &&
-           attack->clock.seconds > LeapCrouchSeconds(boss, *attack);
+    return attack && attack->kind == AttackKind::Leap && IsLeapAirborne(boss.leap, *attack);
 }
 
 float WarningSeconds(const Boss& boss, const BossAttack& attack) {
     switch (attack.kind) {
     case AttackKind::Charge:
-        return std::max(boss.charge.warningSeconds * attack.warningScale, boss.charge.aimLockSeconds);
+        return ChargeWarningSeconds(boss.charge, attack);
     case AttackKind::HairRing:
         return boss.hairRing.warningSeconds * attack.warningScale;
     case AttackKind::Leap:
@@ -482,32 +364,11 @@ float WarningSeconds(const Boss& boss, const BossAttack& attack) {
 }
 
 float LeapCrouchSeconds(const Boss& boss, const BossAttack& leap) {
-    return boss.leap.crouchSeconds * leap.warningScale;
+    return LeapCrouchSeconds(boss.leap, leap);
 }
 
 float LeapAirSeconds(const Boss& boss, const BossAttack& leap) {
-    return std::max(boss.leap.airSeconds * leap.warningScale, boss.leap.lockSeconds);
-}
-
-ChargePath PlanChargePath(Vec2 start, Vec2 direction, float distance, float radius, const Arena& arena) {
-    // How far the centre can travel before the body touches a wall, on each axis the path moves along.
-    // The nearest of the two is where it hits.
-    float toWall = std::numeric_limits<float>::infinity();
-    const auto limit = [&toWall](float position, float speed, float low, float high) {
-        if (speed > 0.0f) {
-            toWall = std::min(toWall, (high - position) / speed);
-        } else if (speed < 0.0f) {
-            toWall = std::min(toWall, (low - position) / speed);
-        }
-    };
-    limit(start.x, direction.x, arena.min.x + radius, arena.max.x - radius);
-    limit(start.y, direction.y, arena.min.y + radius, arena.max.y - radius);
-    toWall = std::max(toWall, 0.0f);
-
-    if (toWall <= distance) {
-        return ChargePath{.end = start + direction * toWall, .endsAtWall = true};
-    }
-    return ChargePath{.end = start + direction * distance, .endsAtWall = false};
+    return LeapAirSeconds(boss.leap, leap);
 }
 
 int HairRingStrands(const HairRingStats& stats) {
