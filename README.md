@@ -5,6 +5,7 @@ A top-down boss fight game built in C++20 on top of raylib 5.5, combining arcade
 - **Play in Browser (WebAssembly):** [dandavd.itch.io/horde-carnage-demo](https://dandavd.itch.io/horde-carnage-demo)
 - **Windows Release (v1.0.0):** [github.com/DanDavD/Horde-Carnage/releases/latest](https://github.com/DanDavD/Horde-Carnage/releases/latest)
 - **Gameplay Demonstration:** [youtu.be/Oz9MaF9-lhU](https://youtu.be/Oz9MaF9-lhU)
+- **Agile Roadmap (Trello):** [trello.com/b/4Ii5Aoep/horde-carnage-roadmap](https://trello.com/b/4Ii5Aoep/horde-carnage-roadmap)
 - **Author:** Daniel David ([@DanDavD](https://github.com/DanDavD))
 - **Stack:** C++20, raylib 5.5, CMake, Emscripten, GitHub Actions, doctest
 
